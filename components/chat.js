@@ -4,11 +4,18 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 import aocIcon from "@/aoc-icon.png";
+import aocLogo from "@/aoc-logo.png";
 
 const MAX_INPUT_LENGTH = 12000;
 const MAX_HISTORY_MESSAGES = 30;
+const MAX_ASSET_DATA_URL_LENGTH = 12_000_000;
+const CLIENT_TIMEOUT_MS = 55000;
+const LOCAL_ASSET_SOURCES = {
+  "aoc-icon": aocIcon.src,
+  "aoc-logo": aocLogo.src,
+};
 
-function createMessage(role, content = "") {
+function createMessage(role, content = "", modelId = "") {
   const randomId = globalThis.crypto?.randomUUID?.()
     || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -17,7 +24,87 @@ function createMessage(role, content = "") {
     role,
     content,
     status: role === "assistant" ? "streaming" : "completed",
+    ...(role === "assistant"
+      ? {
+          phase: "queued",
+          progressMessage: "Starting the request...",
+          assets: [],
+          ...(modelId ? { modelId } : {}),
+        }
+      : {}),
   };
+}
+
+function normalizeStreamAsset(value) {
+  const localAsset = typeof value?.localAsset === "string"
+    && Object.hasOwn(LOCAL_ASSET_SOURCES, value.localAsset)
+    ? value.localAsset
+    : "";
+  const hasValidDataUrl = typeof value?.dataUrl === "string"
+    && /^data:image\/(?:png|webp|jpeg);base64,/i.test(value.dataUrl)
+    && value.dataUrl.length <= MAX_ASSET_DATA_URL_LENGTH;
+
+  if (
+    value?.kind !== "image"
+    || typeof value?.id !== "string"
+    || typeof value?.filename !== "string"
+    || typeof value?.mimeType !== "string"
+    || !value.mimeType.startsWith("image/")
+    || (!localAsset && !hasValidDataUrl)
+  ) {
+    return null;
+  }
+
+  return {
+    id: value.id.slice(0, 160),
+    kind: "image",
+    filename: value.filename.slice(0, 180),
+    mimeType: value.mimeType.slice(0, 80),
+    alt: typeof value.alt === "string"
+      ? value.alt.slice(0, 180)
+      : "AI-generated image",
+    ...(localAsset ? { localAsset } : { dataUrl: value.dataUrl }),
+  };
+}
+
+function assetSource(asset) {
+  if (Object.hasOwn(LOCAL_ASSET_SOURCES, asset?.localAsset)) {
+    return LOCAL_ASSET_SOURCES[asset.localAsset];
+  }
+
+  return typeof asset?.dataUrl === "string" ? asset.dataUrl : "";
+}
+
+function normalizeDiagnostic(value) {
+  if (!value || typeof value !== "object") return null;
+
+  const clean = (field, maxLength = 180) =>
+    typeof value[field] === "string"
+      ? value[field].trim().slice(0, maxLength)
+      : "";
+  const httpStatus = Number.isInteger(value.httpStatus)
+    && value.httpStatus >= 100
+    && value.httpStatus <= 599
+    ? value.httpStatus
+    : null;
+  const diagnostic = {
+    provider: clean("provider", 80),
+    category: clean("category", 80),
+    stage: clean("stage", 120),
+    code: clean("code", 120),
+    requestId: clean("requestId"),
+    model: clean("model", 120),
+    imageModel: clean("imageModel", 120),
+    ...(httpStatus ? { httpStatus } : {}),
+  };
+
+  return Object.values(diagnostic).some(Boolean) ? diagnostic : null;
+}
+
+function responseError(message, diagnostic) {
+  const error = new Error(message);
+  error.diagnostic = normalizeDiagnostic(diagnostic);
+  return error;
 }
 
 async function readJsonLines(response, onEvent) {
@@ -74,6 +161,46 @@ function canBranchAt(messages, index) {
     );
 }
 
+function completedRequestHistory(messages) {
+  const history = [];
+
+  for (let index = 0; index + 1 < messages.length; index += 2) {
+    const userMessage = messages[index];
+    const assistantMessage = messages[index + 1];
+
+    if (
+      userMessage?.role !== "user"
+      || assistantMessage?.role !== "assistant"
+    ) {
+      break;
+    }
+
+    const userContent = typeof userMessage.content === "string"
+      ? userMessage.content.trim()
+      : "";
+    const assistantContent = typeof assistantMessage.content === "string"
+      ? assistantMessage.content.trim()
+      : "";
+
+    // Failed, stopped, and legacy empty placeholders belong in the UI, but
+    // they are not valid model conversation history.
+    if (
+      !userContent
+      || !assistantContent
+      || assistantMessage.status !== "completed"
+    ) {
+      continue;
+    }
+
+    history.push(
+      { role: "user", content: userContent },
+      { role: "assistant", content: assistantContent },
+    );
+  }
+
+  return history;
+}
+
 export default function Chat({
   starters,
   messages,
@@ -83,6 +210,11 @@ export default function Chat({
   conversationTitle,
   folderName,
   autoFocusComposer,
+  models,
+  modelsStatus,
+  modelsNotice,
+  selectedModel,
+  onModelChange,
 }) {
   const [input, setInput] = useState("");
   const [status, setStatus] = useState("idle");
@@ -90,7 +222,7 @@ export default function Chat({
   const [assistantAnnouncement, setAssistantAnnouncement] = useState("");
   const abortRef = useRef(null);
   const sendingRef = useRef(false);
-  const endRef = useRef(null);
+  const messagesRef = useRef(null);
   const textAreaRef = useRef(null);
   const headingRef = useRef(null);
 
@@ -98,16 +230,17 @@ export default function Chat({
 
   useEffect(() => {
     if (autoFocusComposer) textAreaRef.current?.focus();
-    else headingRef.current?.focus();
+    else headingRef.current?.focus({ preventScroll: true });
   }, [autoFocusComposer]);
 
   useEffect(() => {
     const reduceMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
-    endRef.current?.scrollIntoView({
+    const messageLog = messagesRef.current;
+    messageLog?.scrollTo({
+      top: messageLog.scrollHeight,
       behavior: reduceMotion ? "auto" : "smooth",
-      block: "end",
     });
   }, [messages]);
 
@@ -132,19 +265,21 @@ export default function Chat({
     const content = text.trim();
     if (!content || sendingRef.current) return;
 
+    const requestHistory = completedRequestHistory(messages);
+
     if (
       messages.some(
         (message) =>
-          message.role === "assistant" && message.status !== "completed",
+          message.role === "assistant" && message.status === "streaming",
       )
     ) {
       setError(
-        "This chat contains an incomplete response. Start a new chat or branch from an earlier completed response.",
+        "Wait for the current response to finish or stop it before sending another message.",
       );
       return;
     }
 
-    if (messages.length >= MAX_HISTORY_MESSAGES) {
+    if (requestHistory.length >= MAX_HISTORY_MESSAGES) {
       setError(
         "This chat reached the prototype history limit. Branch from an earlier response or start a new chat.",
       );
@@ -154,13 +289,11 @@ export default function Chat({
     sendingRef.current = true;
 
     const userMessage = createMessage("user", content);
-    const assistantMessage = createMessage("assistant");
-    const requestMessages = [...messages, userMessage].map(
-      ({ role, content: messageContent }) => ({
-        role,
-        content: messageContent,
-      }),
-    );
+    const assistantMessage = createMessage("assistant", "", selectedModel);
+    const requestMessages = [
+      ...requestHistory,
+      { role: "user", content: userMessage.content },
+    ];
 
     setInput("");
     setError("");
@@ -175,67 +308,126 @@ export default function Chat({
     const controller = new AbortController();
     abortRef.current = controller;
     let receivedContent = "";
+    let receivedAssets = 0;
+    let requestTimedOut = false;
+    const clientTimeout = window.setTimeout(() => {
+      requestTimedOut = true;
+      controller.abort();
+    }, CLIENT_TIMEOUT_MS);
 
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: requestMessages }),
+        body: JSON.stringify({
+          messages: requestMessages,
+          ...(selectedModel ? { model: selectedModel } : {}),
+        }),
         signal: controller.signal,
       });
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error || "The assistant could not respond.");
+        throw responseError(
+          payload?.error || "The assistant could not respond.",
+          payload?.diagnostic,
+        );
       }
 
       await readJsonLines(response, (event) => {
-        if (event.type === "delta") {
+        if (event.type === "status") {
+          const progressMessage = typeof event.message === "string"
+            ? event.message.slice(0, 180)
+            : "Processing...";
+          const phase = typeof event.phase === "string"
+            ? event.phase.slice(0, 50)
+            : "processing";
+
+          updateAssistant(assistantMessage.id, {
+            phase,
+            progressMessage,
+          });
+          setAssistantAnnouncement(progressMessage);
+        }
+
+        if (event.type === "delta" && typeof event.delta === "string") {
           receivedContent += event.delta;
           updateAssistant(assistantMessage.id, (message) => ({
             content: message.content + event.delta,
           }));
         }
 
+        if (event.type === "asset") {
+          const asset = normalizeStreamAsset(event.asset);
+          if (!asset) {
+            throw new Error("The server returned an invalid generated file.");
+          }
+
+          receivedAssets += 1;
+          updateAssistant(assistantMessage.id, (message) => ({
+            assets: [...(message.assets || []), asset],
+          }));
+        }
+
+        if (event.type === "done" && typeof event.model === "string") {
+          updateAssistant(assistantMessage.id, {
+            modelId: event.model.slice(0, 100),
+          });
+        }
+
         if (event.type === "error") {
-          throw new Error(event.message || "The response stream failed.");
+          throw responseError(
+            event.message || "The response stream failed.",
+            event.diagnostic,
+          );
         }
       });
 
-      if (!receivedContent.trim()) {
-        throw new Error("The assistant returned an empty response.");
+      if (!receivedContent.trim() && receivedAssets === 0) {
+        throw new Error("The assistant returned no text or file.");
       }
 
-      updateAssistant(assistantMessage.id, { status: "completed" });
+      updateAssistant(assistantMessage.id, {
+        status: "completed",
+        phase: "completed",
+        progressMessage: "",
+      });
       setAssistantAnnouncement("Response complete.");
     } catch (requestError) {
-      const stopped = requestError.name === "AbortError";
-      setError(stopped ? "Response stopped." : requestError.message || "Something went wrong.");
+      const stopped = requestError.name === "AbortError" && !requestTimedOut;
+      const failureMessage = requestTimedOut
+        ? "The response took too long and was stopped. Please try again."
+        : stopped
+          ? "Response stopped."
+          : requestError.message || "Something went wrong.";
+      setError("");
       setAssistantAnnouncement(
         stopped ? "Response stopped." : "Response incomplete.",
       );
-
-      if (!receivedContent.trim()) setInput(content);
 
       onMessagesChange((current) => {
         const assistant = current.find(
           (message) => message.id === assistantMessage.id,
         );
 
-        if (assistant?.content.trim()) {
-          return current.map((message) =>
-            message.id === assistantMessage.id
-              ? { ...message, status: stopped ? "stopped" : "failed" }
-              : message,
-          );
-        }
-
-        return current.filter(
-          (message) =>
-            message.id !== assistantMessage.id && message.id !== userMessage.id,
+        return current.map((message) =>
+          message.id === assistantMessage.id
+            ? {
+                ...message,
+                content: assistant?.content.trim() ? assistant.content : "",
+                errorMessage: failureMessage,
+                ...(normalizeDiagnostic(requestError.diagnostic)
+                  ? { diagnostic: normalizeDiagnostic(requestError.diagnostic) }
+                  : {}),
+                status: stopped ? "stopped" : "failed",
+                phase: stopped ? "stopped" : "failed",
+                progressMessage: "",
+              }
+            : message,
         );
       });
     } finally {
+      window.clearTimeout(clientTimeout);
       if (abortRef.current === controller) {
         abortRef.current = null;
         sendingRef.current = false;
@@ -257,6 +449,18 @@ export default function Chat({
     }
   }
 
+  function rejectFileInput(event) {
+    const items = event.clipboardData?.items || event.dataTransfer?.items || [];
+    const hasFile = [...items].some((item) => item.kind === "file");
+
+    if (!hasFile) return;
+
+    event.preventDefault();
+    setError(
+      "File attachments are not enabled in this prototype yet. Send text, or connect an authenticated file-storage service first.",
+    );
+  }
+
   function newConversation() {
     abortRef.current?.abort();
     onNewConversation();
@@ -269,17 +473,38 @@ export default function Chat({
           <p title={conversationTitle}>{conversationTitle}</p>
           <span>{folderName}</span>
         </div>
-        <button
-          className="new-chat-button"
-          type="button"
-          onClick={newConversation}
-        >
-          New chat
-        </button>
+        <div className="conversation-actions">
+          <label className="model-picker" title={modelsNotice || undefined}>
+            <span>Model</span>
+            <select
+              value={selectedModel}
+              onChange={(event) => onModelChange(event.target.value)}
+              disabled={isStreaming || modelsStatus === "loading" || !models.length}
+              aria-label="OpenAI model"
+            >
+              {!models.length ? (
+                <option value="">
+                  {modelsStatus === "loading" ? "Loading models..." : "Server default"}
+                </option>
+              ) : null}
+              {models.map((model) => (
+                <option value={model.id} key={model.id}>{model.label}</option>
+              ))}
+            </select>
+          </label>
+          <button
+            className="new-chat-button"
+            type="button"
+            onClick={newConversation}
+          >
+            New chat
+          </button>
+        </div>
       </div>
 
       <div
         className="messages"
+        ref={messagesRef}
         role="log"
         aria-live="off"
       >
@@ -320,23 +545,119 @@ export default function Chat({
                 <strong>
                   {message.role === "assistant" ? "AOC Assistant" : "You"}
                 </strong>
-                {message.content ? (
-                  <p>{message.content}</p>
-                ) : message.status === "streaming" ? (
-                  <span className="typing-indicator" aria-label="Thinking">
-                    <i />
-                    <i />
-                    <i />
-                  </span>
-                ) : (
+                {message.content
+                  && !(message.status === "failed" && !message.errorMessage) ? (
+                    <p>{message.content}</p>
+                  ) : null}
+                {!message.content && message.status === "completed" ? (
                   <p className="empty-response">No response was received.</p>
-                )}
+                ) : null}
+                {message.role === "assistant" && message.assets?.length ? (
+                  <div className="message-assets">
+                    {message.assets.map((asset) => (
+                      <figure className="generated-asset" key={asset.id}>
+                        {assetSource(asset) ? (
+                          <Image
+                            className="generated-image"
+                            src={assetSource(asset)}
+                            alt={asset.alt || "AI-generated image"}
+                            width={1024}
+                            height={1024}
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="asset-unavailable" role="note">
+                            This generated image was not saved after the page
+                            closed. Generate it again to restore the preview.
+                          </div>
+                        )}
+                        <figcaption>
+                          <span>{asset.filename}</span>
+                          {assetSource(asset) ? (
+                            <a
+                              href={assetSource(asset)}
+                              download={asset.filename}
+                            >
+                              Download image
+                            </a>
+                          ) : null}
+                        </figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                ) : null}
+                {message.role === "assistant" && message.status === "streaming" ? (
+                  <span className="processing-status" role="status">
+                    <i aria-hidden="true" />
+                    {message.progressMessage || "Processing your request..."}
+                  </span>
+                ) : null}
                 {message.role === "assistant" && message.status === "stopped" ? (
                   <span className="message-status">Response stopped</span>
                 ) : null}
                 {message.role === "assistant" && message.status === "failed" ? (
-                  <span className="message-status error">Response incomplete</span>
+                  <span className="message-status error">
+                    Response incomplete: {message.errorMessage
+                      || message.content
+                      || "Please try again."}
+                  </span>
                 ) : null}
+                {message.role === "assistant"
+                  && message.status === "failed"
+                  && message.diagnostic ? (
+                    <details className="request-diagnostic">
+                      <summary>Technical details</summary>
+                      <dl>
+                        {message.diagnostic.stage ? (
+                          <>
+                            <dt>Stage</dt>
+                            <dd>{message.diagnostic.stage}</dd>
+                          </>
+                        ) : null}
+                        {message.diagnostic.httpStatus ? (
+                          <>
+                            <dt>HTTP status</dt>
+                            <dd>{message.diagnostic.httpStatus}</dd>
+                          </>
+                        ) : null}
+                        {message.diagnostic.category ? (
+                          <>
+                            <dt>Category</dt>
+                            <dd>{message.diagnostic.category}</dd>
+                          </>
+                        ) : null}
+                        {message.diagnostic.code ? (
+                          <>
+                            <dt>OpenAI code</dt>
+                            <dd>{message.diagnostic.code}</dd>
+                          </>
+                        ) : null}
+                        {message.diagnostic.model ? (
+                          <>
+                            <dt>Chat model</dt>
+                            <dd>{message.diagnostic.model}</dd>
+                          </>
+                        ) : null}
+                        {message.diagnostic.imageModel ? (
+                          <>
+                            <dt>Image model</dt>
+                            <dd>{message.diagnostic.imageModel}</dd>
+                          </>
+                        ) : null}
+                        {message.diagnostic.requestId ? (
+                          <>
+                            <dt>Request ID</dt>
+                            <dd>{message.diagnostic.requestId}</dd>
+                          </>
+                        ) : null}
+                      </dl>
+                    </details>
+                  ) : null}
+                {message.role === "assistant"
+                  && message.modelId
+                  && message.status === "completed" ? (
+                    <span className="message-model">Model: {message.modelId}</span>
+                  ) : null}
                 {message.role === "assistant"
                   && message.content
                   && message.status === "completed"
@@ -355,7 +676,6 @@ export default function Chat({
             </article>
           ))
         )}
-        <div ref={endRef} />
       </div>
 
       <p className="sr-only" aria-live="polite">{assistantAnnouncement}</p>
@@ -368,6 +688,13 @@ export default function Chat({
             value={input}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={rejectFileInput}
+            onDrop={rejectFileInput}
+            onDragOver={(event) => {
+              if ([...event.dataTransfer.types].includes("Files")) {
+                event.preventDefault();
+              }
+            }}
             placeholder="Ask AOC Assistant..."
             aria-label="Message AOC Assistant"
             maxLength={MAX_INPUT_LENGTH}
@@ -395,8 +722,8 @@ export default function Chat({
           )}
         </form>
         <p className="composer-help">
-          Enter to send &middot; Shift + Enter for a new line &middot; Prototype
-          responses may be inaccurate
+          Enter to send &middot; Models reflect this API key &middot; API usage may
+          be billed separately
         </p>
       </div>
     </div>

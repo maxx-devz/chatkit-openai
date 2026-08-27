@@ -1,6 +1,5 @@
-import Workspace from "@/components/workspace";
-import { SITE_CONFIG } from "@/config/site";
+import ClientPortal from "@/components/portal/client-portal";
 
 export default function HomePage() {
-  return <Workspace config={SITE_CONFIG} />;
+  return <ClientPortal />;
 }

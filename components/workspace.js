@@ -15,6 +15,9 @@ const MAX_STORED_MESSAGES = 100;
 const MAX_FOLDER_NAME = 60;
 const MAX_TITLE_LENGTH = 72;
 const MAX_MESSAGE_LENGTH = 12000;
+const MAX_MESSAGE_ASSETS = 4;
+const MAX_ASSET_TEXT_LENGTH = 180;
+const MAX_ERROR_MESSAGE_LENGTH = 500;
 const MAX_REASONABLE_FUTURE_MS = 365 * 24 * 60 * 60 * 1000;
 
 const INITIAL_WORKSPACE = {
@@ -83,8 +86,115 @@ function limitThreads(threads, protectedThreadIds = []) {
   return threads.filter((thread) => !removedIds.has(thread.id));
 }
 
+function workspaceForStorage(workspace) {
+  return {
+    version: STORAGE_VERSION,
+    folders: workspace.folders.map(({ id, name, createdAt }) => ({
+      id,
+      name,
+      createdAt,
+    })),
+    threads: workspace.threads.map((thread) => ({
+      id: thread.id,
+      folderId: thread.folderId,
+      title: thread.title,
+      messages: thread.messages.map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        status: message.status,
+        ...(message.errorMessage
+          ? { errorMessage: message.errorMessage }
+          : {}),
+        ...(message.diagnostic ? { diagnostic: message.diagnostic } : {}),
+        ...(message.originMessageId
+          ? { originMessageId: message.originMessageId }
+          : {}),
+        ...(message.modelId ? { modelId: message.modelId } : {}),
+        ...(Array.isArray(message.assets) && message.assets.length
+          ? {
+              assets: message.assets.slice(0, MAX_MESSAGE_ASSETS).map((asset) => ({
+                id: asset.id,
+                kind: asset.kind,
+                filename: asset.filename,
+                mimeType: asset.mimeType,
+                alt: asset.alt,
+                ...(asset.localAsset
+                  ? { localAsset: asset.localAsset }
+                  : {}),
+              })),
+            }
+          : {}),
+      })),
+      createdAt: thread.createdAt,
+      updatedAt: thread.updatedAt,
+      parentThreadId: thread.parentThreadId,
+      branchedFromMessageId: thread.branchedFromMessageId,
+    })),
+    activeFolderId: workspace.activeFolderId,
+    activeThreadId: workspace.activeThreadId,
+  };
+}
+
 function writeWorkspace(workspace) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace));
+  window.localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify(workspaceForStorage(workspace)),
+  );
+}
+
+function normalizeAssets(value) {
+  if (!Array.isArray(value)) return [];
+
+  return value.slice(0, MAX_MESSAGE_ASSETS).flatMap((candidate) => {
+    const id = cleanString(candidate?.id, 160);
+    const kind = cleanString(candidate?.kind, 30);
+    const filename = cleanString(candidate?.filename, MAX_ASSET_TEXT_LENGTH);
+    const mimeType = cleanString(candidate?.mimeType, 80);
+    const alt = cleanString(candidate?.alt, MAX_ASSET_TEXT_LENGTH);
+    const localAsset = cleanString(candidate?.localAsset, 40);
+
+    if (
+      !id
+      || kind !== "image"
+      || !filename
+      || !mimeType.startsWith("image/")
+      || (localAsset && !["aoc-icon", "aoc-logo"].includes(localAsset))
+    ) {
+      return [];
+    }
+
+    return [{
+      id,
+      kind,
+      filename,
+      mimeType,
+      alt: alt || "Generated image",
+      ...(localAsset ? { localAsset } : {}),
+    }];
+  });
+}
+
+function normalizeDiagnostic(value) {
+  if (!value || typeof value !== "object") return null;
+
+  const httpStatus = Number.isInteger(value.httpStatus)
+    && value.httpStatus >= 100
+    && value.httpStatus <= 599
+    ? value.httpStatus
+    : null;
+  const diagnostic = {
+    provider: cleanString(value.provider, 80),
+    category: cleanString(value.category, 80),
+    stage: cleanString(value.stage, 120),
+    code: cleanString(value.code, 120),
+    requestId: cleanString(value.requestId, 180),
+    model: cleanString(value.model, 120),
+    imageModel: cleanString(value.imageModel, 120),
+    ...(httpStatus ? { httpStatus } : {}),
+  };
+
+  return Object.values(diagnostic).some(Boolean) ? diagnostic : null;
 }
 
 function normalizeMessages(value) {
@@ -109,7 +219,24 @@ function normalizeMessages(value) {
         role === "assistant"
         && ["streaming", "stopped", "failed"].includes(candidate?.status)
       ) {
-        messages.push({ id, role, content: "", status: "stopped" });
+        const status = candidate.status === "streaming"
+          ? "stopped"
+          : candidate.status;
+        const errorMessage = cleanString(
+          candidate?.errorMessage,
+          MAX_ERROR_MESSAGE_LENGTH,
+        );
+        const diagnostic = normalizeDiagnostic(candidate?.diagnostic);
+
+        messages.push({
+          id,
+          role,
+          content: "",
+          status,
+          ...(errorMessage ? { errorMessage } : {}),
+          ...(diagnostic ? { diagnostic } : {}),
+        });
+        continue;
       }
       break;
     }
@@ -124,13 +251,30 @@ function normalizeMessages(value) {
           : "completed";
     }
 
+    const assets = normalizeAssets(candidate?.assets);
+
     messages.push({
       id,
       role,
       content,
       status,
+      ...(assets.length ? { assets } : {}),
+      ...(cleanString(candidate?.modelId, 100)
+        ? { modelId: cleanString(candidate.modelId, 100) }
+        : {}),
       ...(cleanString(candidate?.originMessageId, 160)
         ? { originMessageId: cleanString(candidate.originMessageId, 160) }
+        : {}),
+      ...(cleanString(candidate?.errorMessage, MAX_ERROR_MESSAGE_LENGTH)
+        ? {
+            errorMessage: cleanString(
+              candidate.errorMessage,
+              MAX_ERROR_MESSAGE_LENGTH,
+            ),
+          }
+        : {}),
+      ...(normalizeDiagnostic(candidate?.diagnostic)
+        ? { diagnostic: normalizeDiagnostic(candidate.diagnostic) }
         : {}),
     });
   }
@@ -342,7 +486,7 @@ function HistoryList({ threads, activeThreadId, onSelect, emptyMessage }) {
   );
 }
 
-export default function Workspace({ config }) {
+export default function Workspace({ config, embedded = false }) {
   const [workspace, setWorkspace] = useState(INITIAL_WORKSPACE);
   const [hydrated, setHydrated] = useState(false);
   const [storageStatus, setStorageStatus] = useState("loading");
@@ -351,6 +495,10 @@ export default function Workspace({ config }) {
   const [folderError, setFolderError] = useState("");
   const [announcement, setAnnouncement] = useState("");
   const [focusComposer, setFocusComposer] = useState(false);
+  const [models, setModels] = useState([]);
+  const [modelsStatus, setModelsStatus] = useState("loading");
+  const [modelsNotice, setModelsNotice] = useState("");
+  const [selectedModel, setSelectedModel] = useState("");
   const addFolderDialogRef = useRef(null);
   const folderInputRef = useRef(null);
   const mobileHistoryDialogRef = useRef(null);
@@ -381,6 +529,42 @@ export default function Workspace({ config }) {
     }, 0);
 
     return () => window.clearTimeout(hydrationTimer);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadModels() {
+      try {
+        const response = await fetch("/api/models", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok || !Array.isArray(payload?.models)) {
+          throw new Error(payload?.error || "Model access could not be loaded.");
+        }
+
+        setModels(payload.models);
+        setSelectedModel((current) =>
+          payload.models.some((model) => model.id === current)
+            ? current
+            : payload.defaultModel || payload.models[0]?.id || "",
+        );
+        setModelsNotice(
+          [payload.notice, payload.billingNotice].filter(Boolean).join(" "),
+        );
+        setModelsStatus(payload.verified ? "ready" : "unverified");
+      } catch (error) {
+        if (error.name === "AbortError") return;
+        setModelsStatus("error");
+        setModelsNotice(error.message || "Model access could not be loaded.");
+      }
+    }
+
+    loadModels();
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -636,7 +820,10 @@ export default function Workspace({ config }) {
       : "Saved on this device";
 
   return (
-    <main className="app-shell">
+    <section
+      className={`app-shell assistant-workspace ${embedded ? "assistant-workspace--embedded" : ""}`}
+      aria-label="AI chat workspace"
+    >
       <aside className="sidebar">
         <div className="brand">
           <Image className="brand-logo" src={aocLogo} alt={config.company} />
@@ -760,6 +947,11 @@ export default function Workspace({ config }) {
             conversationTitle={displayTitle(activeThread)}
             folderName={activeFolder?.name || "General"}
             autoFocusComposer={focusComposer}
+            models={models}
+            modelsStatus={modelsStatus}
+            modelsNotice={modelsNotice}
+            selectedModel={selectedModel}
+            onModelChange={setSelectedModel}
           />
         ) : (
           <div className="workspace-loading" role="status">
@@ -884,6 +1076,6 @@ export default function Workspace({ config }) {
       </dialog>
 
       <p className="sr-only" aria-live="polite">{announcement}</p>
-    </main>
+    </section>
   );
 }

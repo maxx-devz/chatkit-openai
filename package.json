@@ -6,7 +6,7 @@
     "dev": "next dev -H 127.0.0.1 -p 3000",
     "build": "next build",
     "start": "next start -H 127.0.0.1 -p 3000",
-    "lint": "eslint app components config next.config.mjs"
+    "lint": "eslint app components config lib next.config.mjs"
   },
   "dependencies": {
     "next": "^16.3.3",

@@ -8,6 +8,10 @@ deploy.
 
 - A responsive AOC-branded chat interface.
 - Streaming responses from the OpenAI API.
+- A model picker populated from models reported by the server's API key.
+- Conversational image generation when the API project has GPT Image access.
+- Visible thinking, file-checking, and image-generation progress states with a
+  client timeout so requests cannot display a permanent loading indicator.
 - Editable server-side assistant instructions.
 - Folders for organizing chats.
 - Saved browser-local chat history.
@@ -93,6 +97,8 @@ npm start
 
 ## Customize the portal
 
+- Edit `config/portal.js` to change the prototype client name, dashboard values,
+  projects, quick questions, and AI Assistant panel size.
 - Edit `config/assistant.js` to change the assistant's role, tone, response
   style, rules, and boundaries. These instructions are used only on the server.
 - Edit `config/site.js` to change the portal name, company information, and
@@ -103,6 +109,94 @@ npm start
 
 Restart `npm run dev` after changing environment variables. Most source and CSS
 changes update automatically while the development server is running.
+
+## Models, API access, and image generation
+
+The model dropdown calls `app/api/models/route.js`, which uses the OpenAI Models
+API with the server-side key. There is no manually maintained list of exact text
+model IDs: the route discovers them at runtime, removes specialized audio, image,
+embedding, and similar models with a generic filter, and orders the remaining
+models using the API's `created` value. `OPENAI_MODEL` remains the preferred
+default and is not rewritten when somebody changes the dropdown. The selected
+ID is also validated on the server before every chat request.
+
+This list describes model availability for the **API key**. It does not read a
+ChatGPT Free, Plus, or workspace subscription, and it cannot guarantee that the
+API project has billing credit remaining. OpenAI API usage is a separate billed
+service. The current OpenAI model documentation marks the API Free tier as not
+supported for GPT-5.4 Mini and GPT Image.
+
+When GPT Image access is reported for the API project, an image request shows
+named progress states and renders the completed image with a download link. To
+keep this Vercel prototype simple and prevent browser-storage failures, the
+binary image preview is kept only in the current page session. Chat text and
+safe image metadata are saved locally, but after reloading the page the image
+must be generated again. Production should upload generated files to private
+tenant-scoped object storage and persist only an asset ID.
+
+Requests to show the official AOC logo are handled differently: the assistant
+returns the approved local `aoc-logo.png` asset without calling an image model or
+using API quota. Requests for a new or redesigned image still use GPT Image.
+When an OpenAI request fails, expand **Technical details** in the failed message
+to see its exact OpenAI error code, HTTP status, request stage, selected models,
+and request ID. The API key and raw provider message are never exposed there.
+
+File uploads are intentionally not enabled yet. Pasting or dropping a file
+shows an explicit message instead of silently ignoring it. Add authenticated
+object storage, file-type and size validation, malware scanning, retention
+rules, and tenant authorization before enabling client attachments.
+
+Official references:
+
+- [List models API](https://developers.openai.com/api/reference/typescript/resources/models/methods/list)
+- [GPT-5.4 Mini](https://developers.openai.com/api/docs/models/gpt-5.4-mini)
+- [Image generation guide](https://developers.openai.com/api/docs/guides/image-generation)
+
+## Reusable AI Assistant component
+
+The complete assistant workspace is wrapped by:
+
+```text
+components/ai-assistant/ai-assistant-panel.js
+```
+
+It keeps the existing chat, API streaming, folders, saved history, and branching
+behavior together. The client portal places that component inside its AI
+Assistant dashboard card.
+
+The default component size is controlled in `config/portal.js`:
+
+```js
+assistantPanel: {
+  height: "680px",
+  minHeight: "540px",
+},
+```
+
+Use a fixed height such as `"680px"`, or make it follow the browser height:
+
+```js
+assistantPanel: {
+  height: "calc(100dvh - 220px)",
+  minHeight: "540px",
+},
+```
+
+To place the assistant in another portal page or card:
+
+```jsx
+import AiAssistantPanel from "@/components/ai-assistant/ai-assistant-panel";
+import { SITE_CONFIG } from "@/config/site";
+
+<AiAssistantPanel
+  config={SITE_CONFIG}
+  height="680px"
+  minHeight="540px"
+/>
+```
+
+Portal presentation files are organized under `components/portal`. The OpenAI
+server route remains in `app/api/chat/route.js`.
 
 ## Create a private Git backup
 
