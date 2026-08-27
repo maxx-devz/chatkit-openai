@@ -1,0 +1,22 @@
+{
+  "name": "aoc-gpt-portal-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -H 127.0.0.1 -p 3000",
+    "build": "next build",
+    "start": "next start -H 127.0.0.1 -p 3000",
+    "lint": "eslint app components config next.config.mjs"
+  },
+  "dependencies": {
+    "next": "^16.3.3",
+    "openai": "^7.7.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.3"
+  }
+}
