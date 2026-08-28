@@ -1,214 +1,357 @@
-# AOC-GPT Client Portal Prototype
+# AOC-GPT Client Portal
 
-A Vercel-ready Next.js client portal with a private AOC AI assistant, Neon
-Postgres chat history, and username/password login. It uses JavaScript only;
-there is no Python server to deploy.
+A Vercel-ready client portal for Always Open Commerce. It provides private
+client login, a tenant-isolated AOC AI Assistant, saved conversations in Neon
+Postgres, and an administrator dashboard for managing clients and monthly AI
+allowances.
 
-## What works now
+The application is one JavaScript/Next.js project. It does not require Python
+or a separate application server.
 
-- AOC-branded client login with no public registration page.
-- Passwords hashed by Better Auth and database-backed session cookies.
-- Dynamic clients such as ChurchBanners, CWR Enviro, and GolfBrands.
-- Membership checks on the portal, model list, chat, and history APIs.
-- Per-client AI instructions and optional per-client OpenAI vector stores.
-- Saved folders, branches, user prompts, AI replies, errors, assets, model
-  metadata, and token usage in Neon.
-- A model picker based on the models available to the server's OpenAI API key.
-- Streaming answers and image-generation progress/error details.
-- A production build that can be deployed as one Next.js Vercel project.
+## Current status
 
-The dashboard metrics and project cards are still prototype content in
-`config/portal.js`. The signed-in client name, username, AI memory, and chat
-history are dynamic.
+This working prototype includes:
 
-## Important security behavior
+- private username/password authentication using Better Auth;
+- no public account-registration page;
+- dynamic client accounts stored in Neon Postgres;
+- server-side client membership and administrator authorization checks;
+- per-client folders, chat history, conversation branches, replies, generated
+  image references, errors, models, and usage metadata;
+- streaming OpenAI Responses API output;
+- a model selector populated from models available to the configured OpenAI
+  API project;
+- global AOC instructions, per-client instructions, and optional per-client
+  OpenAI vector stores;
+- monthly AI request and token-usage tracking;
+- an AOC administrator dashboard at `/admin`;
+- per-client portal and AI Assistant enable/disable controls;
+- a professional locked Assistant state when AI access is paused;
+- near-real-time AI access updates on the client portal; and
+- a production build compatible with Vercel serverless hosting.
 
-The username does not decide database access by itself. After login, every
-server request checks the authenticated Better Auth user ID against
-`portal_memberships`. A user can read and save data only for an assigned
-client. If Neon cannot be reached, the app does not display old browser-local
-history, which avoids leaking one client's chats on a shared device.
+The hours, goals, project cards, and similar business metrics in
+`config/portal.js` are still prototype content. Client identity, access,
+assistant settings, monthly usage, and saved chat history are database-backed.
 
-Passwords are stored only in Better Auth's authentication tables as hashes.
-Do not type or replace a password directly in Neon. A value such as
-`churchbanners123` is acceptable only for local testing and must be replaced
-before a real client receives access.
+## Important implementation note
+
+The chat interface is a custom React interface using the OpenAI Responses API.
+It does not currently use `@openai/chatkit-react` or the hosted ChatKit server
+protocol. This keeps the prototype as a single Next.js application, but moving
+to the ChatKit component later would require a separate integration pass.
+
+## Architecture
+
+```text
+Browser
+  -> Next.js pages and authenticated API routes on Vercel
+     -> Better Auth session tables in Neon
+     -> AOC portal, membership, history, and usage tables in Neon
+     -> OpenAI Responses API
+        -> optional client-specific OpenAI vector store
+```
+
+The main request flow is:
+
+```text
+Client signs in
+  -> Better Auth verifies the password and session
+  -> the server finds the authenticated user's client membership
+  -> the server selects only that assigned client
+  -> the chat route loads global and client-specific instructions
+  -> OpenAI processes the request
+  -> the client workspace saves prompts and replies in Neon
+```
+
+## Security model
+
+The typed username never decides data access by itself. Every protected server
+request verifies the signed session and checks `portal_memberships` or
+`portal_admins` in Neon.
+
+- Client A cannot select Client B by changing browser data.
+- Client history is stored by client ID and portal user ID.
+- Client vector-store IDs are selected on the server after authorization.
+- OpenAI and database credentials remain server-only.
+- If the database is unavailable, the application does not fall back to
+  another client's browser-local history.
+- Passwords are hashed and owned by Better Auth. They are not stored in the AOC
+  portal tables.
+
+Never commit `.env.local`, API keys, database URLs, passwords, or auth secrets.
+The repository already ignores `.env*` except `.env.example`.
+
+If a credential has appeared in a chat, screenshot, issue, commit, or shared
+document, revoke or rotate it before using the portal with real clients.
 
 ## Requirements
 
-- Node.js 20.9 or newer (Node.js 22 LTS recommended).
+- Node.js 20.9 or newer; Node.js 22 LTS is recommended.
 - npm.
 - A Neon Postgres database.
 - An OpenAI API key from <https://platform.openai.com/api-keys>.
+- A Vercel account for production deployment.
 
-OpenAI API billing is separate from a ChatGPT Free, Plus, Business, or
-workspace subscription.
+OpenAI API quota and billing are separate from ChatGPT Free, Plus, Business,
+Enterprise, or workspace subscriptions.
 
-## Local setup, step by step
+## Fresh local setup
+
+Follow these steps in order for a new computer or a new database.
 
 ### 1. Open the project
 
-```powershell
+```cmd
 cd "C:\Users\AOC-DEV 2\chatkit\chatkit-nextjs"
 ```
 
-### 2. Install packages
+### 2. Install dependencies
 
-```powershell
+```cmd
 npm install
 ```
 
-### 3. Copy the Neon connection string
+### 3. Create `.env.local`
 
-In Vercel, open **Storage**, select the `neon-postgres` database, then choose
-**Open in Neon** or **Connect to Project**. Copy the pooled connection string
-named `DATABASE_URL`. It begins with `postgresql://`.
-
-The database URL contains a password. Never paste it into chat, screenshots,
-source code, or Git.
-
-### 4. Configure `.env.local`
-
-The project already ignores `.env.local` in Git. Open it and make sure these
-five values exist:
+Copy `.env.example` to `.env.local`, then provide real server-side values:
 
 ```dotenv
 OPENAI_API_KEY=sk-your-new-api-key
 OPENAI_MODEL=gpt-5.4-mini
-DATABASE_URL=postgresql://your-neon-connection-string
+DATABASE_URL=postgresql://your-pooled-neon-connection-string
 BETTER_AUTH_SECRET=replace-with-a-long-random-secret
 BETTER_AUTH_URL=http://127.0.0.1:3000
 ```
 
-Generate a secure local auth secret in PowerShell:
+Use the exact name `DATABASE_URL`. Do not rename it to `env_DATABASE_URL` or
+another variation.
 
-```powershell
+Generate a local Better Auth secret with:
+
+```cmd
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
-Copy the printed value into `BETTER_AUTH_SECRET`. Do not reuse the production
-secret locally. `BETTER_AUTH_URL` must exactly match the browser origin, so use
-`127.0.0.1`, not `localhost`, for this project.
+Use a different secret in production. `BETTER_AUTH_URL` must exactly match the
+browser origin and must not have a trailing slash. This project uses
+`http://127.0.0.1:3000` locally, not `http://localhost:3000`.
 
-If the OpenAI key previously appeared in chat or a screenshot, revoke it and
-create a new one before deployment.
+Use the pooled Neon connection string for `DATABASE_URL`. It normally contains
+`-pooler` in the hostname.
 
-### 5. Create the authentication tables
+### 4. Run all database migrations
 
-Run this once for the Neon database:
+Run these commands in this order:
 
-```powershell
+```cmd
 npm run auth:migrate
-```
-
-This uses Better Auth's official migration API to create its user, account,
-session, verification, and username fields. It is safe to run again; it reports
-when the schema is already up to date.
-
-### 6. Create the AOC portal tables
-
-Run:
-
-```powershell
 npm run portal:migrate
-```
-
-This applies `database/schema.sql` to the configured Neon database. It is safe
-to run again. You can alternatively install it manually:
-
-1. Open the Neon **SQL Editor**.
-2. Open `database/schema.sql` from this project.
-3. Copy the entire file into the SQL Editor.
-4. Select **Run**.
-
-These tables store clients, portal memberships, saved workspaces, and reviewed
-client knowledge. This script is also safe to run again.
-
-### 7. Create test client logins
-
-Run the command with a username and display name. The password prompt is hidden
-and asks twice:
-
-```powershell
-npm run client:create -- churchbanners ChurchBanners
-```
-
-For your current test, enter `churchbanners123` when prompted. The command will
-warn that it is weak but will hash and save it.
-
-Create another dynamic client the same way:
-
-```powershell
-npm run client:create -- cwrenviro "CWR Enviro"
-npm run client:create -- golfbrands GolfBrands
-```
-
-For testing, you can enter `cwrenviro123` for CWR Enviro. Each command creates:
-
-1. one Better Auth login;
-2. one `portal_clients` row;
-3. one `portal_users` row linked to the authentication ID; and
-4. one `portal_memberships` assignment.
-
-There is no web-based sign-up route, so a visitor cannot create their own
-account or assign themselves to a client.
-
-### 8. Set up the AOC administrator portal
-
-Passwords must not be inserted manually into `database/schema.sql` or Neon.
-Better Auth stores a salted scrypt hash in its own authentication tables, while
-the portal tables store authorization and client membership only.
-
-Apply the administrator, client-control, and monthly AI-usage schema:
-
-```powershell
 npm run admin:migrate
 ```
 
-You can alternatively run the entire `database/admin-schema.sql` file in the
-Neon SQL Editor. Create the first administrator locally with a hidden password
-prompt:
+They create or update:
 
-```powershell
+1. Better Auth users, accounts, sessions, verification, and username fields;
+2. AOC clients, portal users, memberships, workspaces, and knowledge records;
+3. administrator access, client availability controls, monthly request limits,
+   and monthly usage records.
+
+The scripts are designed to be safe to run again when their schema is already
+up to date. Vercel does not automatically run these migrations during a normal
+deployment.
+
+### 5. Create the first administrator
+
+```cmd
 npm run admin:create -- aocadmin "AOC Administrator"
 ```
 
-Use a unique password of at least 12 characters. The command creates the Better
-Auth login, a `portal_users` link, and an active `portal_admins` authorization
-row. The account is redirected to `/admin`, where it can:
+The terminal securely asks for the password twice without displaying it. Use a
+unique password containing at least 12 characters.
 
-- create private client logins;
-- enable or pause a client portal and AI assistant;
-- set monthly AI request allowances;
-- reset the current monthly request counter;
-- edit client-specific instructions and vector store IDs; and
-- review account, conversation, token, and knowledge totals.
+Do not create `aocadmin` again if it already exists. Sign in with the existing
+account instead.
 
-Every admin API request validates the Better Auth session, an active
-`portal_admins` record, and the configured portal origin. Administrator access
-does not automatically create a client membership or expose client chats.
-The signed-in client refreshes its AI access policy every four seconds while
-the page is visible and immediately when the browser window regains focus. A
-paused assistant blocks new requests without deleting saved conversations.
+### 6. Create client accounts
 
-### 9. Start the portal
+The easiest method is the administrator portal:
 
-```powershell
+1. Start the app.
+2. Sign in as `aocadmin`.
+3. Open `/admin`.
+4. Select **Add client**.
+5. Enter the client name, username, temporary password, and monthly AI request
+   allowance.
+
+You can also create clients from the terminal:
+
+```cmd
+npm run client:create -- churchbanners "ChurchBanners"
+npm run client:create -- cwrenviro "CWR Enviro"
+npm run client:create -- golfbrands "GolfBrands"
+```
+
+The terminal asks for each password twice. Use unique passwords of at least 12
+characters even though the lower-level client script permits eight.
+
+Each client creation produces:
+
+- one Better Auth login;
+- one `portal_clients` row;
+- one linked `portal_users` row; and
+- one `portal_memberships` assignment.
+
+New clients are dynamic database records. Adding a client does not require a
+source-code change or another deployment.
+
+### 7. Start development
+
+```cmd
 npm run dev
 ```
 
-Open <http://127.0.0.1:3000>. Sign in with the client username and password.
+Open <http://127.0.0.1:3000>.
 
-### 10. Verify isolation and saved history
+- A client login opens the client portal.
+- An active AOC administrator login is redirected to `/admin`.
 
-1. Sign in as `churchbanners`.
-2. Create a folder, send a message, and wait for the complete AI answer.
-3. Sign out.
-4. Sign in as `cwrenviro`. ChurchBanners chats must not appear.
-5. Sign out and return to `churchbanners`. Its folder and both sides of the
-   conversation should return.
+## Administrator dashboard
 
-To inspect the saved workspaces in Neon without showing message content:
+The administrator portal is available at `/admin`. An administrator can:
+
+- create client workspaces and private client logins;
+- enable or pause the complete client portal;
+- enable or pause new AI Assistant requests;
+- set the client's monthly AI request limit;
+- reset the current monthly request count;
+- review monthly request and token usage;
+- edit the client display name;
+- provide private client-specific assistant instructions;
+- connect a client-specific OpenAI vector store; and
+- review user, conversation, and knowledge totals.
+
+Changes are saved only after selecting **Save changes**.
+
+### Live AI access behavior
+
+When an administrator disables a client's AI Assistant and saves:
+
+- the server immediately rejects new OpenAI requests for that client;
+- the visible client portal refreshes its access policy every four seconds;
+- returning focus to the client window triggers an immediate refresh;
+- an in-progress browser request is stopped when the disabled state arrives;
+- the model selector, starter prompts, composer, send button, and new-chat
+  control are disabled; and
+- saved conversations remain visible and are not deleted.
+
+This is Vercel-compatible near-real-time polling, not WebSocket push. A future
+high-traffic implementation should consider managed realtime notifications to
+reduce repeated status checks.
+
+The administrator configures only the monthly request allowance. There is no
+client-configurable prompts-per-conversation allowance. Long conversations use
+a rolling technical context window while their full saved UI history remains
+in the workspace.
+
+## Managing clients
+
+### Create a client
+
+Prefer **Admin portal -> Add client**. The command-line alternative is:
+
+```cmd
+npm run client:create -- CLIENT_USERNAME "Client Display Name"
+```
+
+### Delete a client
+
+Deletion permanently removes the client record, memberships, saved workspace,
+knowledge, usage records, and exclusive login. Review the username carefully:
+
+```cmd
+npm run client:delete -- CLIENT_USERNAME --confirm-delete
+```
+
+The command asks you to type `DELETE CLIENT_USERNAME` before proceeding.
+`aocadmin`, active administrators, and users assigned to other clients are
+protected.
+
+### Change a password
+
+Do not edit password hashes directly in Neon. This prototype does not yet have
+a client password-change/reset screen. Until that workflow is built, provision
+a replacement login through an approved administrative process.
+
+## Assistant instructions and client knowledge
+
+There are three different kinds of context:
+
+1. `config/assistant.js` contains global AOC behavior, tone, boundaries, and
+   known company facts. Changing it affects every client after deployment.
+2. `assistant_instructions` in `portal_clients` contains private instructions
+   for one client. It can be edited in the administrator portal without a code
+   deployment.
+3. `openai_vector_store_id` connects one approved OpenAI File Search vector
+   store to one client.
+
+The administrator portal is the preferred place to edit client instructions
+and vector-store IDs. A direct SQL example for authorized maintenance is:
+
+```sql
+UPDATE portal_clients
+SET assistant_instructions =
+  'Use the client terminology and approved project information. If evidence is missing, say so.'
+WHERE slug = 'churchbanners';
+```
+
+To connect an approved client vector store:
+
+```sql
+UPDATE portal_clients
+SET openai_vector_store_id = 'vs_your_client_vector_store_id'
+WHERE slug = 'churchbanners';
+```
+
+Use a separate vector store for each client and upload only approved client
+documents. The ChatGPT/AOC-GPT workspace and its project folders are not an API
+database and are not automatically accessible to this portal.
+
+Saved conversations provide continuity but do not train or permanently teach
+the OpenAI model. Durable facts should be reviewed and published to the
+client's approved knowledge source.
+
+## Models, images, and files
+
+- The model selector calls `/api/models` and shows models available to the
+  configured OpenAI API project.
+- `OPENAI_MODEL` is the preferred fallback/default model. It does not grant
+  access to a model that the API project cannot use.
+- Image generation works only when the API project has access and sufficient
+  API billing credit.
+- A ChatGPT subscription does not supply OpenAI API credits.
+- The official AOC logo and icon are approved local application assets and can
+  be returned by the application without generating a new brand asset.
+- General user file uploads and attachments are not enabled in this prototype.
+
+The administrator's monthly request limit is an application allowance. It is
+separate from OpenAI project quota, rate limits, and billing credit. OpenAI API
+errors are displayed with available HTTP status, provider code, request ID, and
+model diagnostics.
+
+## Chat history and tenant-isolation test
+
+Use at least two clients to verify isolation:
+
+1. Sign in as Client A.
+2. Create a folder and send a message.
+3. Wait for the complete AI reply, then sign out.
+4. Sign in as Client B and confirm Client A's folders and messages do not
+   appear.
+5. Sign out and return to Client A.
+6. Confirm Client A's folder, prompt, and AI reply are restored.
+
+To inspect saved workspace ownership without displaying message content:
 
 ```sql
 SELECT
@@ -222,169 +365,253 @@ JOIN portal_users AS users ON users.id = snapshots.user_id
 ORDER BY snapshots.updated_at DESC;
 ```
 
-## How the dynamic client flow works
+## Verify before pushing
 
-```text
-Client signs in
-  -> Better Auth verifies the password hash and session
-  -> server finds that user's portal membership
-  -> server selects only an assigned client
-  -> chat loads that client's instructions and approved vector store
-  -> prompts and AI replies save under that client + user
+```cmd
+npm run lint
+npm run build
 ```
 
-The provisioning command initially uses the username as the client slug. That
-does not make the system static. Each account and membership is a database row,
-and new clients do not require a source-code change. An AOC administrator can
-later assign one staff user to multiple clients; the header automatically shows
-a validated client selector when more than one membership exists.
+Confirm that secrets are not tracked:
 
-## Client instructions and knowledge
-
-Global AOC behavior is in `config/assistant.js`. Client-specific instructions
-are stored in Neon:
-
-```sql
-UPDATE portal_clients
-SET assistant_instructions =
-  'Help ChurchBanners with its ecommerce website and approved project records. Use a concise, friendly tone. If evidence is missing, say so.'
-WHERE slug = 'churchbanners';
+```cmd
+git status --short
+git ls-files .env .env.local .env.production
 ```
 
-For searchable documents, create a separate OpenAI vector store for each
-client, upload only approved documents, and save that client's vector store ID:
+The second command should print nothing.
 
-```sql
-UPDATE portal_clients
-SET openai_vector_store_id = 'vs_your_client_vector_store_id'
-WHERE slug = 'churchbanners';
+## Push to GitHub
+
+The current deployment branch is `master`:
+
+```cmd
+git add .
+git commit -m "Update AOC client portal"
+git push origin master
 ```
 
-The chat route can then use OpenAI File Search only with that selected client's
-vector store. The ChatGPT/AOC-GPT workspace folders shown in ChatGPT are not an
-API database and are not automatically accessible to this portal.
+Do not use `git add -f .env.local` and do not paste secrets into a commit.
 
-Chat history does not automatically train or permanently teach the OpenAI
-model. History provides conversation continuity. Durable client facts should
-enter `portal_knowledge_items` as pending, be reviewed by AOC, and only then be
-published to the client's retrieval store.
+If the GitHub repository is already connected to Vercel, a push to the
+configured production branch starts a deployment automatically.
 
 ## Deploy to Vercel
 
-### 1. Prepare the database locally
+### First deployment
 
-Point local `.env.local` at the same Neon database connected to Vercel, then
-run:
-
-```powershell
-npm run auth:migrate
-```
-
-Run `database/schema.sql` in Neon and create the test clients before or after
-deployment. Because the commands connect to remote Neon, accounts created
-locally are immediately available to the Vercel app using that same database.
-
-### 2. Import the private repository
-
-1. Push this project to a **private** Git repository.
-2. In Vercel, select **Add New → Project**.
-3. Import the repository.
+1. Push the repository to a private GitHub repository.
+2. In Vercel, choose **Add New -> Project**.
+3. Import the GitHub repository.
 4. Keep the detected framework as **Next.js**.
+5. Open **Project Settings -> Environment Variables**.
+6. Add the production environment variables listed below.
+7. Deploy.
 
-Do not upload `.env.local`.
+### Required Vercel environment variables
 
-### 3. Add Vercel environment variables
-
-In the Vercel project, open **Settings → Environment Variables** and add:
-
-| Name | Production value |
+| Variable | Production value |
 | --- | --- |
-| `DATABASE_URL` | The pooled Neon connection string/integration value |
-| `BETTER_AUTH_SECRET` | A new 32+ byte random value used only in production |
-| `BETTER_AUTH_URL` | The exact HTTPS portal origin, with no trailing slash |
-| `OPENAI_API_KEY` | A fresh server-side OpenAI API key |
-| `OPENAI_MODEL` | `gpt-5.4-mini` or another model available to the API project |
+| `DATABASE_URL` | Pooled Neon Postgres connection string |
+| `BETTER_AUTH_SECRET` | New random 32+ byte production secret |
+| `BETTER_AUTH_URL` | Exact production HTTPS origin, without a trailing slash |
+| `OPENAI_API_KEY` | Fresh server-side OpenAI API key |
+| `OPENAI_MODEL` | Preferred model available to the API project |
 
-Example `BETTER_AUTH_URL`:
+Example:
 
 ```text
-https://your-project-name.vercel.app
+BETTER_AUTH_URL=https://your-project-name.vercel.app
 ```
 
-If you add or change an environment variable after a deployment, redeploy so
-the new value is used. For a real client launch, use the stable custom portal
-domain as `BETTER_AUTH_URL`.
+Use `DATABASE_URL`, even if a Vercel/Neon integration also created a variable
+such as `env_DATABASE_URL`. The application reads `DATABASE_URL`.
 
-### 4. Deploy and test two accounts
+Select only the environments that should use each credential. Set the
+production `BETTER_AUTH_URL` for Production. A Preview deployment needs its own
+stable preview origin and matching Preview value; do not reuse the production
+origin for an unrelated preview URL. If an environment variable changes,
+redeploy the affected environment.
 
-Deploy, open the production URL, and repeat the isolation test from local setup
-step 9. Also confirm:
+### Database setup for Vercel
 
-- unauthenticated `/`, `/api/chat`, `/api/models`, and `/api/workspace`
-  requests are rejected;
-- signing out prevents the Back button from reopening private data;
-- ChurchBanners and CWR Enviro never see each other's folders or answers; and
-- the OpenAI API key and database URL never appear in browser developer tools.
+Vercel deployment does not create database tables. From a trusted local
+terminal whose `.env.local` points to the same production Neon database, run:
 
-Vercel hosting improves operational security, but it does not make an
-application automatically secure. Keep Vercel and Neon accounts protected with
-MFA, use least-privilege team access, rotate secrets, enable rate limiting
-before a public launch, and add audit logs and password reset/change tools
-before onboarding real clients.
+```cmd
+npm run auth:migrate
+npm run portal:migrate
+npm run admin:migrate
+```
+
+Then create the administrator and initial clients. Because these commands
+connect directly to Neon, their accounts become available to the Vercel app
+using that database.
+
+### Existing Vercel deployment
+
+For an ordinary source-code update:
+
+1. run lint and build locally;
+2. commit the changed files;
+3. push to the Vercel production branch;
+4. wait for the deployment status to become **Ready**; and
+5. test client and administrator login.
+
+Do not rerun migrations for every CSS or React change. Run the applicable
+migration only when a database schema file changed or when setting up a new
+database. Re-running the current migration scripts is safe, but it is still
+better to run them intentionally.
+
+### Production test checklist
+
+- Client and administrator login work over HTTPS.
+- The administrator is redirected to `/admin`.
+- Client accounts open only their assigned workspace.
+- Chat history survives sign-out and sign-in.
+- Two different clients cannot see each other's history.
+- Disabling AI in the admin portal locks the client's Assistant within about
+  four seconds.
+- Re-enabling AI restores the client interface automatically.
+- Monthly request-limit changes appear on the client.
+- `/api/ai-access`, `/api/chat`, `/api/models`, and `/api/workspace` reject
+  unauthenticated requests.
+- OpenAI and database credentials do not appear in browser developer tools.
+- The OpenAI API project has separate billing credit or quota.
+
+## Common troubleshooting
+
+### "Login setup is incomplete"
+
+Check that these exact Vercel variables exist:
+
+- `DATABASE_URL`
+- `BETTER_AUTH_SECRET`
+- `BETTER_AUTH_URL`
+
+After adding or changing them, redeploy. `BETTER_AUTH_URL` must match the exact
+site origin.
+
+### Login works locally but fails on Vercel
+
+Check that:
+
+- `BETTER_AUTH_URL` uses the production HTTPS URL without a trailing slash;
+- the deployment received all required variables;
+- all three migrations ran against the same Neon database; and
+- the login was created in that database.
+
+### Database table or column is missing
+
+```cmd
+npm run auth:migrate
+npm run portal:migrate
+npm run admin:migrate
+```
+
+Make sure `.env.local` points to the intended Neon database first.
+
+### AI Assistant says it is disabled
+
+Sign in as an AOC administrator, select the client, enable **AI assistant**, and
+choose **Save changes**. The client page should unlock automatically.
+
+### Monthly allowance reached
+
+In `/admin`, select the client and either increase the monthly request limit or
+reset the current monthly usage. This does not add OpenAI billing credit.
+
+### OpenAI quota or image generation fails
+
+The error can be genuine even when ChatGPT works. Confirm the OpenAI API
+project has billing credit, model access, and image-generation access. Review
+the HTTP status, OpenAI error code, and request ID shown in the chat.
+
+### Port 3000 is already in use on Windows
+
+Check the port in Command Prompt:
+
+```cmd
+netstat -ano | findstr :3000
+```
+
+Only a `LISTENING` row has a process that can be stopped. Use its PID:
+
+```cmd
+taskkill /PID PID_NUMBER /T /F
+```
+
+`TIME_WAIT` rows with PID `0` are already closed connections and disappear on
+their own. Do not try to kill PID `0`.
+
+### npm install warnings
+
+Deprecation or install-script review warnings are not automatically build
+failures. Run `npm run lint` and `npm run build`, review the named dependency,
+and update deliberately. Do not approve unknown install scripts blindly.
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
-| `npm install` | Install dependencies. |
-| `npm run auth:migrate` | Create or update Better Auth tables in Neon. |
-| `npm run portal:migrate` | Create or update the AOC portal tables in Neon. |
-| `npm run admin:migrate` | Create or update admin access, AI controls, and monthly usage tables. |
-| `npm run client:create -- USERNAME "DISPLAY NAME"` | Privately create one client login and membership. |
-| `npm run client:delete -- USERNAME --confirm-delete` | Permanently delete a client and its isolated data after typed confirmation. |
-| `npm run admin:create -- USERNAME "DISPLAY NAME"` | Prepare an AOC administrator account for the future admin portal. |
-| `npm run dev` | Run at `http://127.0.0.1:3000`. |
-| `npm run lint` | Check source code. |
-| `npm run build` | Verify the Vercel production build. |
-| `npm start` | Run the completed production build locally. |
+| `npm install` | Install dependencies |
+| `npm run auth:migrate` | Create or update Better Auth tables |
+| `npm run portal:migrate` | Create or update AOC portal tables |
+| `npm run admin:migrate` | Create or update admin controls and monthly usage tables |
+| `npm run admin:create -- USERNAME "DISPLAY NAME"` | Create an AOC administrator |
+| `npm run client:create -- USERNAME "DISPLAY NAME"` | Create a client login and membership |
+| `npm run client:delete -- USERNAME --confirm-delete` | Permanently delete a client after confirmation |
+| `npm run dev` | Start development at `http://127.0.0.1:3000` |
+| `npm run lint` | Run ESLint |
+| `npm run build` | Create and verify the Vercel production build |
+| `npm start` | Run an existing production build locally |
 
 ## Main files
 
-- `app/admin/page.js` - server-protected AOC administrator route.
-- `components/admin/admin-dashboard.js` - responsive client-control dashboard.
-- `lib/admin-data.js` - administrator authorization, client controls, and usage data.
-- `database/admin-schema.sql` - admin roles, AI limits, and monthly usage schema.
-
-- `lib/auth.js` — Better Auth, password, username, and session configuration.
-- `lib/portal-data.js` — authenticated membership and tenant data layer.
-- `app/login/page.js` — private client login screen.
-- `app/api/auth/[...all]/route.js` — Better Auth HTTP handler.
-- `app/api/chat/route.js` — authenticated OpenAI Responses API route.
-- `app/api/ai-access/route.js` — authenticated live AI-access and monthly-usage status route.
-- `app/api/workspace/route.js` — authenticated Neon chat-history route.
-- `scripts/create-client.mjs` — private local client provisioning command.
-- `database/schema.sql` — AOC portal schema.
-- `config/assistant.js` — global server-side assistant instructions.
-- `config/portal.js` — prototype dashboard content and assistant panel size.
+| Path | Purpose |
+| --- | --- |
+| `app/page.js` | Protected client portal entry and admin redirect |
+| `app/login/page.js` | Private login screen |
+| `app/admin/page.js` | Server-protected administrator portal |
+| `components/portal/client-portal.js` | Client dashboard shell |
+| `components/workspace.js` | Folders, threads, persistence, model state, and live AI access refresh |
+| `components/chat.js` | Chat UI, streaming events, generated assets, usage, and locked state |
+| `components/admin/admin-dashboard.js` | Administrator client-control dashboard |
+| `app/api/chat/route.js` | Authenticated OpenAI Responses API route |
+| `app/api/models/route.js` | Authenticated available-model catalog |
+| `app/api/workspace/route.js` | Authenticated Neon workspace load/save route |
+| `app/api/ai-access/route.js` | Authenticated live AI access and monthly usage route |
+| `app/api/admin/clients/route.js` | Protected admin client list/create/update route |
+| `app/api/admin/usage/route.js` | Protected monthly usage reset route |
+| `lib/auth.js` | Better Auth configuration |
+| `lib/portal-data.js` | Client membership, tenant data, history, and AI allowance logic |
+| `lib/admin-data.js` | Administrator authorization and client controls |
+| `config/assistant.js` | Global server-side assistant instructions |
+| `config/portal.js` | Prototype portal content and Assistant component sizing |
+| `database/schema.sql` | Core client portal schema |
+| `database/admin-schema.sql` | Administrator, AI control, and monthly usage schema |
+| `scripts/` | Local migrations and account-management commands |
 
 ## Current prototype limitations
 
-- Dashboard hours, goals, and project cards are not yet loaded from AOC project
-  systems.
-- There is no client password-change/reset screen yet. Do not edit password
-  hashes manually in Neon; add an authenticated Better Auth change/reset flow.
-- File uploads need private object storage, size/type validation, malware
-  scanning, tenant authorization, and retention policies before client use.
-- Rate limiting, audit logs, MFA, account lockout policy, legal/privacy review,
-  and automated tenant-isolation tests are still required for production.
-- The UI is a custom React interface using the OpenAI Responses API. It does not
-  currently use `@openai/chatkit-react` or the ChatKit server protocol.
+- Dashboard hours, goals, projects, and status cards are not connected to AOC
+  project-management systems.
+- Chat history is stored as a JSONB workspace snapshot rather than normalized
+  message tables.
+- Client password change/reset is not implemented.
+- General file uploads require private object storage, malware scanning,
+  tenant checks, validation, and retention rules.
+- The application does not automatically crawl client websites or synchronize
+  ChatGPT workspace project files.
+- Knowledge approval and vector-store publication are not yet automated.
+- Near-real-time AI access uses polling rather than push notifications.
+- Rate limiting beyond the monthly client allowance, audit logs, MFA, account
+  lockout policy, password recovery, legal/privacy review, and automated
+  tenant-isolation tests are still required before a full production launch.
+- The interface is custom React and does not currently use OpenAI ChatKit.
 
-Official references:
-
-- [Better Auth Next.js integration](https://better-auth.com/docs/integrations/next)
-- [Better Auth username plugin](https://better-auth.com/docs/plugins/username)
-- [Better Auth PostgreSQL adapter](https://better-auth.com/docs/adapters/postgresql)
-- [Better Auth database migrations](https://better-auth.com/docs/concepts/database)
-- [Connect Vercel and Neon](https://neon.com/docs/guides/vercel-manual)
-- [OpenAI File Search](https://developers.openai.com/api/docs/guides/tools-file-search)
+Vercel hosting, Neon, and signed authentication improve the security posture,
+but no platform makes an application automatically secure. Protect Vercel,
+Neon, GitHub, and OpenAI accounts with MFA and least-privilege access, rotate
+secrets, keep dependencies updated, and review logs before onboarding real
+clients.
