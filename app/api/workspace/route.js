@@ -1,5 +1,6 @@
 import {
   loadPortalWorkspace,
+  portalErrorResponse,
   savePortalWorkspace,
 } from "@/lib/portal-data";
 import { sanitizeWorkspace } from "@/lib/workspace-validation";
@@ -9,25 +10,13 @@ export const dynamic = "force-dynamic";
 
 const MAX_WORKSPACE_BYTES = 1_500_000;
 
-function databaseErrorResponse(error) {
-  const details = error?.publicDetails || {
-    code: "database_error",
-    message: "The portal database could not complete this request.",
-  };
-
-  return Response.json(
-    { error: details.message, code: details.code },
-    { status: details.code === "database_not_configured" ? 503 : 500 },
-  );
-}
-
-export async function GET() {
+export async function GET(request) {
   try {
-    return Response.json(await loadPortalWorkspace(), {
+    return Response.json(await loadPortalWorkspace(request.headers), {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
-    return databaseErrorResponse(error);
+    return portalErrorResponse(error);
   }
 }
 
@@ -60,9 +49,9 @@ export async function PUT(request) {
   }
 
   try {
-    const saved = await savePortalWorkspace(workspace);
+    const saved = await savePortalWorkspace(workspace, request.headers);
     return Response.json({ saved: true, ...saved });
   } catch (error) {
-    return databaseErrorResponse(error);
+    return portalErrorResponse(error);
   }
 }

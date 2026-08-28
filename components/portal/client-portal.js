@@ -1,6 +1,7 @@
 import Image from "next/image";
 
 import AiAssistantPanel from "@/components/ai-assistant/ai-assistant-panel";
+import AccountControls from "@/components/portal/account-controls";
 import aocIcon from "@/aoc-icon.png";
 import aocLogo from "@/aoc-logo.png";
 import { PORTAL_CONFIG } from "@/config/portal";
@@ -96,13 +97,11 @@ function PortalHeader({ portal }) {
         </svg>
       </button>
 
-      <div className={styles.accountSummary}>
-        <span>{portal.clientInitials}</span>
-        <div>
-          <strong>{portal.clientName}</strong>
-          <small>{portal.accountLabel}</small>
-        </div>
-      </div>
+      <AccountControls
+        client={portal.client}
+        memberships={portal.memberships}
+        user={portal.user}
+      />
     </header>
   );
 }
@@ -218,15 +217,35 @@ function QuickQuestions({ questions }) {
   );
 }
 
-export default function ClientPortal() {
+function clientInitials(name) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase() || "AOC";
+}
+
+export default function ClientPortal({ portalContext }) {
+  const portal = {
+    ...PORTAL_CONFIG,
+    clientName: portalContext.client.name,
+    clientInitials: clientInitials(portalContext.client.name),
+    accountLabel: portalContext.user.username || "Client Account",
+    client: portalContext.client,
+    memberships: portalContext.memberships,
+    user: portalContext.user,
+  };
+
   return (
     <div className={styles.portalShell}>
-      <PortalSidebar portal={PORTAL_CONFIG} />
+      <PortalSidebar portal={portal} />
       <div className={styles.portalMain}>
-        <PortalHeader portal={PORTAL_CONFIG} />
+        <PortalHeader portal={portal} />
         <main className={styles.dashboard} id="dashboard">
           <section className={styles.metrics} aria-label="Account overview">
-            {PORTAL_CONFIG.metrics.map((metric) => (
+            {portal.metrics.map((metric) => (
               <MetricCard metric={metric} key={metric.label} />
             ))}
           </section>
@@ -234,15 +253,16 @@ export default function ClientPortal() {
           <div className={styles.dashboardGrid}>
             <div className={styles.leftColumn}>
               <TimeOverview />
-              <ProjectProgress projects={PORTAL_CONFIG.projects} />
+              <ProjectProgress projects={portal.projects} />
             </div>
             <div className={styles.rightColumn}>
               <AiAssistantPanel
                 config={SITE_CONFIG}
-                height={PORTAL_CONFIG.assistantPanel.height}
-                minHeight={PORTAL_CONFIG.assistantPanel.minHeight}
+                height={portal.assistantPanel.height}
+                key={portal.client.slug}
+                minHeight={portal.assistantPanel.minHeight}
               />
-              <QuickQuestions questions={PORTAL_CONFIG.quickQuestions} />
+              <QuickQuestions questions={portal.quickQuestions} />
             </div>
           </div>
         </main>

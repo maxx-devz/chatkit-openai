@@ -541,22 +541,9 @@ export default function Workspace({ config, embedded = false }) {
     const controller = new AbortController();
 
     async function hydrateWorkspace() {
-      let browserWorkspace;
-      let browserWarning = "";
-
-      try {
-        const saved = window.localStorage.getItem(STORAGE_KEY);
-        browserWorkspace = saved
-          ? normalizeWorkspace(JSON.parse(saved))
-          : createDefaultWorkspace();
-      } catch {
-        browserWorkspace = createDefaultWorkspace();
-        browserWarning = "Saved browser history was damaged and has been reset.";
-      }
-
-      let nextWorkspace = browserWorkspace;
-      let nextMode = "browser";
-      let warning = browserWarning;
+      let nextWorkspace = createDefaultWorkspace();
+      let nextMode = "unavailable";
+      let warning = "";
 
       try {
         const response = await fetch("/api/workspace", {
@@ -583,14 +570,10 @@ export default function Workspace({ config, embedded = false }) {
           nextWorkspace = payload.workspace
             ? normalizeWorkspace(payload.workspace)
             : createDefaultWorkspace();
-          warning = "";
         }
       } catch (error) {
         if (error.name === "AbortError") return;
-        warning = [
-          browserWarning,
-          `${error.message || "Neon history could not be loaded."} Using browser history for now.`,
-        ].filter(Boolean).join(" ");
+        warning = `${error.message || "Neon history could not be loaded."} Chat history is unavailable until the secure account connection is restored.`;
       }
 
       setWorkspace(nextWorkspace);
@@ -694,8 +677,10 @@ export default function Workspace({ config, embedded = false }) {
             if (!response.ok) {
               throw new Error(payload?.error || "Account history could not be saved.");
             }
-          } else {
+          } else if (storageModeRef.current === "browser") {
             writeWorkspace(snapshot);
+          } else {
+            throw new Error("Secure account history is currently unavailable.");
           }
 
           setStorageWarning("");
@@ -963,13 +948,19 @@ export default function Workspace({ config, embedded = false }) {
           : "Saving on this device"
         : storageMode === "database"
           ? "Saved to client account"
-          : "Saved on this device";
+          : storageMode === "browser"
+            ? "Saved on this device"
+            : "Secure history unavailable";
   const storageDescription = storageMode === "database"
     ? `Private workspace for ${clientProfile.name || "this client"}. Conversations reload on another signed-in device.`
-    : "Browser-only prototype history. Clearing this site's data removes these chats.";
+    : storageMode === "browser"
+      ? "Browser-only prototype history. Clearing this site's data removes these chats."
+      : "No browser history is displayed while the private client database is unavailable.";
   const memoryLabel = storageMode === "database"
     ? `${knowledgeStats.approved} approved source${knowledgeStats.approved === 1 ? "" : "s"}`
-    : "Browser demo";
+    : storageMode === "browser"
+      ? "Browser demo"
+      : "Private memory unavailable";
 
   return (
     <section

@@ -2,11 +2,21 @@ import {
   getFallbackModelCatalog,
   getModelCatalog,
 } from "@/lib/openai-models";
+import {
+  portalErrorResponse,
+  resolvePortalContext,
+} from "@/lib/portal-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request) {
+  try {
+    await resolvePortalContext(request.headers);
+  } catch (error) {
+    return portalErrorResponse(error);
+  }
+
   if (!process.env.OPENAI_API_KEY) {
     return Response.json(
       { error: "OPENAI_API_KEY is not configured on the server." },

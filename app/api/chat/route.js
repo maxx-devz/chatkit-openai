@@ -6,7 +6,10 @@ import {
   getModelCatalog,
   resolveRequestedModel,
 } from "@/lib/openai-models";
-import { getPortalAiContext } from "@/lib/portal-data";
+import {
+  getPortalAiContext,
+  portalErrorResponse,
+} from "@/lib/portal-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -322,6 +325,7 @@ function completedUsage(response) {
 export async function POST(request) {
   let messages;
   let requestedModel;
+  let portalContext;
 
   try {
     const body = await readJsonBody(request);
@@ -338,6 +342,12 @@ export async function POST(request) {
       { error: error.message || "The request body is invalid." },
       { status },
     );
+  }
+
+  try {
+    portalContext = await getPortalAiContext(request.headers);
+  } catch (error) {
+    return portalErrorResponse(error);
   }
 
   const approvedBrandAsset = requestedApprovedBrandAsset(messages);
@@ -374,7 +384,6 @@ export async function POST(request) {
     return imageAccessResponse(catalog.verified);
   }
 
-  const portalContext = await getPortalAiContext();
   const clientInstructions = portalContext.instructions.slice(0, 12000);
   const requestInstructions = [
     ASSISTANT_INSTRUCTIONS,

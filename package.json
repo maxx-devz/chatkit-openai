@@ -2,16 +2,22 @@
   "name": "aoc-gpt-portal-prototype",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev -H 127.0.0.1 -p 3000",
     "build": "next build",
     "start": "next start -H 127.0.0.1 -p 3000",
-    "lint": "eslint app components config lib next.config.mjs"
+    "lint": "eslint app components config lib scripts next.config.mjs",
+    "auth:migrate": "node --env-file=.env.local scripts/migrate-auth.mjs",
+    "portal:migrate": "node --env-file=.env.local scripts/migrate-portal.mjs",
+    "client:create": "node --env-file=.env.local scripts/create-client.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "better-auth": "^1.7.2",
     "next": "^16.3.3",
     "openai": "^7.7.0",
+    "pg": "^8.23.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "server-only": "^0.0.1"
