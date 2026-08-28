@@ -19,6 +19,18 @@ const MAX_MESSAGE_ASSETS = 4;
 const MAX_ASSET_TEXT_LENGTH = 180;
 const MAX_ERROR_MESSAGE_LENGTH = 500;
 const MAX_REASONABLE_FUTURE_MS = 365 * 24 * 60 * 60 * 1000;
+const AI_ACCESS_REFRESH_MS = 4000;
+
+const DEFAULT_AI_ACCESS = {
+  enabled: true,
+  monthlyPromptLimit: 150,
+  requestsUsed: 0,
+  requestsRemaining: 150,
+  inputTokens: 0,
+  outputTokens: 0,
+  totalTokens: 0,
+  resetsAt: "",
+};
 
 const INITIAL_WORKSPACE = {
   version: STORAGE_VERSION,
@@ -61,6 +73,36 @@ function createThread(folderId, overrides = {}) {
 
 function cleanString(value, maxLength) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function normalizeAiAccess(value) {
+  if (!value || typeof value !== "object") return DEFAULT_AI_ACCESS;
+  const safeInteger = (field, fallback) =>
+    Number.isSafeInteger(value[field]) && value[field] >= 0
+      ? value[field]
+      : fallback;
+  const monthlyPromptLimit = Math.min(
+    100000,
+    Math.max(1, safeInteger("monthlyPromptLimit", 150)),
+  );
+  const requestsUsed = safeInteger("requestsUsed", 0);
+
+  return {
+    enabled: value.enabled !== false,
+    monthlyPromptLimit,
+    requestsUsed,
+    requestsRemaining: Math.max(
+      0,
+      Math.min(
+        monthlyPromptLimit,
+        safeInteger("requestsRemaining", monthlyPromptLimit - requestsUsed),
+      ),
+    ),
+    inputTokens: safeInteger("inputTokens", 0),
+    outputTokens: safeInteger("outputTokens", 0),
+    totalTokens: safeInteger("totalTokens", 0),
+    resetsAt: cleanString(value.resetsAt, 80),
+  };
 }
 
 function validTimestamp(value, fallback) {
@@ -518,6 +560,7 @@ export default function Workspace({ config, embedded = false }) {
   const [storageWarning, setStorageWarning] = useState("");
   const [clientProfile, setClientProfile] = useState({ name: "", slug: "" });
   const [knowledgeStats, setKnowledgeStats] = useState({ approved: 0, pending: 0 });
+  const [aiAccess, setAiAccess] = useState(DEFAULT_AI_ACCESS);
   const [folderName, setFolderName] = useState("");
   const [folderError, setFolderError] = useState("");
   const [announcement, setAnnouncement] = useState("");
@@ -530,6 +573,7 @@ export default function Workspace({ config, embedded = false }) {
   const folderInputRef = useRef(null);
   const mobileHistoryDialogRef = useRef(null);
   const workspaceRef = useRef(INITIAL_WORKSPACE);
+  const aiAccessRef = useRef(DEFAULT_AI_ACCESS);
   const hydratedRef = useRef(false);
   const storageModeRef = useRef("loading");
   const saveTimerRef = useRef(null);
@@ -564,6 +608,9 @@ export default function Workspace({ config, embedded = false }) {
           approved: Number(payload?.knowledge?.approved) || 0,
           pending: Number(payload?.knowledge?.pending) || 0,
         });
+        const nextAiAccess = normalizeAiAccess(payload?.ai);
+        aiAccessRef.current = nextAiAccess;
+        setAiAccess(nextAiAccess);
 
         if (payload?.mode === "database") {
           nextMode = "database";
@@ -623,6 +670,63 @@ export default function Workspace({ config, embedded = false }) {
     loadModels();
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    if (!hydrated || storageMode !== "database") return undefined;
+
+    let controller = null;
+    let requestInFlight = false;
+
+    async function refreshAiAccess() {
+      if (document.visibilityState === "hidden" || requestInFlight) return;
+
+      requestInFlight = true;
+      controller = new AbortController();
+
+      try {
+        const response = await fetch("/api/ai-access", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok || !payload?.ai) return;
+
+        const nextAccess = normalizeAiAccess(payload.ai);
+        if (aiAccessRef.current.enabled !== nextAccess.enabled) {
+          setAnnouncement(
+            nextAccess.enabled
+              ? "AI Assistant access has been restored."
+              : "AI Assistant access has been paused by your AOC administrator.",
+          );
+        }
+        aiAccessRef.current = nextAccess;
+        setAiAccess(nextAccess);
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          // Keep the last verified policy. The server still checks every request.
+        }
+      } finally {
+        requestInFlight = false;
+        controller = null;
+      }
+    }
+
+    function refreshWhenVisible() {
+      if (document.visibilityState === "visible") refreshAiAccess();
+    }
+
+    const intervalId = window.setInterval(refreshAiAccess, AI_ACCESS_REFRESH_MS);
+    window.addEventListener("focus", refreshAiAccess);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshAiAccess);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      controller?.abort();
+    };
+  }, [hydrated, storageMode]);
 
   useEffect(() => {
     workspaceRef.current = workspace;
@@ -1143,6 +1247,12 @@ export default function Workspace({ config, embedded = false }) {
             modelsNotice={modelsNotice}
             selectedModel={selectedModel}
             onModelChange={setSelectedModel}
+            aiAccess={aiAccess}
+            onAiUsageChange={(usage) => {
+              const nextAccess = normalizeAiAccess(usage);
+              aiAccessRef.current = nextAccess;
+              setAiAccess(nextAccess);
+            }}
           />
         ) : (
           <div className="workspace-loading" role="status">

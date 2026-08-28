@@ -10,7 +10,10 @@
     "lint": "eslint app components config lib scripts next.config.mjs",
     "auth:migrate": "node --env-file=.env.local scripts/migrate-auth.mjs",
     "portal:migrate": "node --env-file=.env.local scripts/migrate-portal.mjs",
-    "client:create": "node --env-file=.env.local scripts/create-client.mjs"
+    "admin:migrate": "node --env-file=.env.local scripts/migrate-admin.mjs",
+    "client:create": "node --env-file=.env.local scripts/create-client.mjs",
+    "client:delete": "node --env-file=.env.local scripts/delete-client.mjs",
+    "admin:create": "node --env-file=.env.local scripts/create-admin.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

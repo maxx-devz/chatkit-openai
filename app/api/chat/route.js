@@ -9,13 +9,15 @@ import {
 import {
   getPortalAiContext,
   portalErrorResponse,
+  recordPortalAiTokens,
+  reservePortalAiRequest,
 } from "@/lib/portal-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const MAX_MESSAGES = 30;
+const MAX_MESSAGES = 99;
 const MAX_MESSAGE_LENGTH = 12000;
 const MAX_TOTAL_LENGTH = 60000;
 const MAX_REQUEST_BYTES = 100000;
@@ -384,6 +386,13 @@ export async function POST(request) {
     return imageAccessResponse(catalog.verified);
   }
 
+  let clientUsage;
+  try {
+    clientUsage = await reservePortalAiRequest(portalContext);
+  } catch (error) {
+    return portalErrorResponse(error);
+  }
+
   const clientInstructions = portalContext.instructions.slice(0, 12000);
   const requestInstructions = [
     ASSISTANT_INSTRUCTIONS,
@@ -459,7 +468,11 @@ export async function POST(request) {
     });
     logApiError("OpenAI request failed", error, failure.diagnostic);
     return Response.json(
-      { error: failure.message, diagnostic: failure.diagnostic },
+      {
+        error: failure.message,
+        diagnostic: failure.diagnostic,
+        clientUsage,
+      },
       { status: error?.status >= 400 && error.status < 500 ? error.status : 502 },
     );
   }
@@ -482,6 +495,7 @@ export async function POST(request) {
         message: imageRequested
           ? "Preparing image generation..."
           : "Thinking...",
+        clientUsage,
       });
 
       try {
@@ -558,6 +572,7 @@ export async function POST(request) {
               type: "error",
               message: failure.message,
               diagnostic: failure.diagnostic,
+              clientUsage,
             });
             terminalEventSent = true;
             break;
@@ -566,6 +581,27 @@ export async function POST(request) {
           if (event.type === "response.completed") {
             const images = completedImages(event.response);
             const usage = completedUsage(event.response);
+            const updatedClientUsage = usage
+              ? {
+                  ...clientUsage,
+                  inputTokens: clientUsage.inputTokens + usage.inputTokens,
+                  outputTokens: clientUsage.outputTokens + usage.outputTokens,
+                  totalTokens: clientUsage.totalTokens + usage.totalTokens,
+                }
+              : clientUsage;
+
+            if (usage) {
+              await recordPortalAiTokens(
+                portalContext.clientId,
+                clientUsage.periodStart,
+                usage,
+              ).catch((error) => {
+                logApiError("Portal token usage recording failed", error, {
+                  category: "portal_usage_recording",
+                  stage: "Saving token usage",
+                });
+              });
+            }
 
             if (images.length > 0 && !textSent) {
               send({ type: "delta", delta: "I generated the image for you." });
@@ -591,12 +627,14 @@ export async function POST(request) {
               send({
                 type: "error",
                 message: "The request completed but did not return any text or file.",
+                clientUsage: updatedClientUsage,
               });
             } else {
               send({
                 type: "done",
                 model: selectedModel,
                 ...(usage ? { usage } : {}),
+                clientUsage: updatedClientUsage,
               });
             }
 
@@ -611,6 +649,7 @@ export async function POST(request) {
             message: requestTimedOut
               ? "The response took too long and was stopped. Please try again."
               : "The AI response ended unexpectedly.",
+            clientUsage,
           });
         }
       } catch (error) {
@@ -630,6 +669,7 @@ export async function POST(request) {
               ? "The response took too long and was stopped. Please try again."
               : failure.message,
             diagnostic: failure.diagnostic,
+            clientUsage,
           });
         }
       } finally {

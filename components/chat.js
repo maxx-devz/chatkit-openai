@@ -7,10 +7,9 @@ import aocIcon from "@/aoc-icon.png";
 import aocLogo from "@/aoc-logo.png";
 
 const MAX_INPUT_LENGTH = 12000;
-const MAX_HISTORY_MESSAGES = 30;
-const MAX_CONVERSATION_REPLIES = MAX_HISTORY_MESSAGES / 2;
 const MAX_ASSET_DATA_URL_LENGTH = 12_000_000;
 const CLIENT_TIMEOUT_MS = 55000;
+const MAX_CONTEXT_MESSAGES = 98;
 const LOCAL_ASSET_SOURCES = {
   "aoc-icon": aocIcon.src,
   "aoc-logo": aocLogo.src,
@@ -123,8 +122,49 @@ function normalizeUsage(value) {
     : { inputTokens, outputTokens, totalTokens };
 }
 
+function normalizeClientUsage(value) {
+  if (!value || typeof value !== "object") return null;
+  const wholeNumber = (field, fallback = 0) =>
+    Number.isSafeInteger(value[field]) && value[field] >= 0
+      ? value[field]
+      : fallback;
+  const monthlyPromptLimit = Math.min(
+    100000,
+    Math.max(1, wholeNumber("monthlyPromptLimit", 150)),
+  );
+  const requestsUsed = wholeNumber("requestsUsed");
+
+  return {
+    enabled: value.enabled !== false,
+    monthlyPromptLimit,
+    requestsUsed,
+    requestsRemaining: Math.max(
+      0,
+      Math.min(
+        monthlyPromptLimit,
+        wholeNumber("requestsRemaining", monthlyPromptLimit - requestsUsed),
+      ),
+    ),
+    inputTokens: wholeNumber("inputTokens"),
+    outputTokens: wholeNumber("outputTokens"),
+    totalTokens: wholeNumber("totalTokens"),
+    resetsAt: typeof value.resetsAt === "string" ? value.resetsAt : "",
+  };
+}
+
 function formatTokenCount(value) {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
+}
+
+function formatResetDate(value) {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) return "the next monthly reset";
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
 }
 
 function responseError(message, diagnostic) {
@@ -241,6 +281,8 @@ export default function Chat({
   modelsNotice,
   selectedModel,
   onModelChange,
+  aiAccess,
+  onAiUsageChange,
 }) {
   const [input, setInput] = useState("");
   const [status, setStatus] = useState("idle");
@@ -253,19 +295,10 @@ export default function Chat({
   const headingRef = useRef(null);
 
   const isStreaming = status === "streaming";
-  const completedReplies = completedRequestHistory(messages).length / 2;
-  const remainingReplies = Math.max(
-    0,
-    MAX_CONVERSATION_REPLIES - completedReplies,
-  );
-  const recordedUsage = messages.reduce(
-    (total, message) => ({
-      inputTokens: total.inputTokens + (message.usage?.inputTokens || 0),
-      outputTokens: total.outputTokens + (message.usage?.outputTokens || 0),
-      totalTokens: total.totalTokens + (message.usage?.totalTokens || 0),
-    }),
-    { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
-  );
+  const monthlyRemaining = Math.max(0, aiAccess?.requestsRemaining || 0);
+  const disabledByAdmin = aiAccess?.enabled === false;
+  const monthlyLimitReached = !disabledByAdmin && monthlyRemaining === 0;
+  const accessBlocked = disabledByAdmin || monthlyLimitReached;
   const lastUsage = messages.findLast((message) => message.usage)?.usage || null;
 
   useEffect(() => {
@@ -288,6 +321,19 @@ export default function Chat({
     return () => abortRef.current?.abort();
   }, []);
 
+  useEffect(() => {
+    if (!accessBlocked) return;
+
+    if (disabledByAdmin) abortRef.current?.abort();
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    messagesRef.current?.scrollTo({
+      top: 0,
+      behavior: reduceMotion ? "auto" : "smooth",
+    });
+  }, [accessBlocked, disabledByAdmin]);
+
   function updateAssistant(id, update) {
     onMessagesChange((current) =>
       current.map((message) =>
@@ -305,7 +351,8 @@ export default function Chat({
     const content = text.trim();
     if (!content || sendingRef.current) return;
 
-    const requestHistory = completedRequestHistory(messages);
+    const requestHistory = completedRequestHistory(messages)
+      .slice(-MAX_CONTEXT_MESSAGES);
 
     if (
       messages.some(
@@ -319,10 +366,13 @@ export default function Chat({
       return;
     }
 
-    if (requestHistory.length >= MAX_HISTORY_MESSAGES) {
-      setError(
-        "This chat reached the prototype history limit. Branch from an earlier response or start a new chat.",
-      );
+    if (disabledByAdmin) {
+      setError("The AI assistant is currently paused for this client.");
+      return;
+    }
+
+    if (monthlyRemaining <= 0) {
+      setError("This client has reached its monthly AI request allowance.");
       return;
     }
 
@@ -368,6 +418,10 @@ export default function Chat({
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
+        const nextClientUsage = normalizeClientUsage(
+          payload?.clientUsage || payload?.usage,
+        );
+        if (nextClientUsage) onAiUsageChange(nextClientUsage);
         throw responseError(
           payload?.error || "The assistant could not respond.",
           payload?.diagnostic,
@@ -375,6 +429,9 @@ export default function Chat({
       }
 
       await readJsonLines(response, (event) => {
+        const nextClientUsage = normalizeClientUsage(event.clientUsage);
+        if (nextClientUsage) onAiUsageChange(nextClientUsage);
+
         if (event.type === "status") {
           const progressMessage = typeof event.message === "string"
             ? event.message.slice(0, 180)
@@ -511,7 +568,10 @@ export default function Chat({
   }
 
   return (
-    <div className="chat" aria-busy={isStreaming}>
+    <div
+      className={`chat${accessBlocked ? " ai-access-restricted" : ""}`}
+      aria-busy={isStreaming}
+    >
       <div className="conversation-toolbar">
         <div className="conversation-heading" ref={headingRef} tabIndex={-1}>
           <p title={conversationTitle}>{conversationTitle}</p>
@@ -523,7 +583,12 @@ export default function Chat({
             <select
               value={selectedModel}
               onChange={(event) => onModelChange(event.target.value)}
-              disabled={isStreaming || modelsStatus === "loading" || !models.length}
+              disabled={
+                isStreaming
+                || accessBlocked
+                || modelsStatus === "loading"
+                || !models.length
+              }
               aria-label="OpenAI model"
             >
               {!models.length ? (
@@ -536,48 +601,49 @@ export default function Chat({
               ))}
             </select>
           </label>
-          <details className="usage-status">
-            <summary title="Conversation usage">
+          <details className={`usage-status${disabledByAdmin ? " is-paused" : ""}`}>
+            <summary title="Monthly AI request allowance">
               <span className="usage-status-dot" aria-hidden="true" />
-              {remainingReplies} left
+              {disabledByAdmin ? "AI paused" : `${monthlyRemaining} left`}
             </summary>
             <div className="usage-popover">
               <div className="usage-popover-heading">
                 <div>
-                  <span>Conversation usage</span>
-                  <strong>{remainingReplies} replies remaining</strong>
+                  <span>Monthly AI allowance</span>
+                  <strong>{monthlyRemaining} requests remaining</strong>
                 </div>
-                <span>{completedReplies}/{MAX_CONVERSATION_REPLIES}</span>
+                <span>{aiAccess?.requestsUsed || 0}/{aiAccess?.monthlyPromptLimit || 0}</span>
               </div>
               <div
                 className="usage-progress"
                 role="progressbar"
-                aria-label="Conversation replies used"
+                aria-label="Monthly AI requests used"
                 aria-valuemin="0"
-                aria-valuemax={MAX_CONVERSATION_REPLIES}
-                aria-valuenow={completedReplies}
+                aria-valuemax={aiAccess?.monthlyPromptLimit || 1}
+                aria-valuenow={aiAccess?.requestsUsed || 0}
               >
                 <span
                   style={{
                     width: `${Math.min(
                       100,
-                      (completedReplies / MAX_CONVERSATION_REPLIES) * 100,
+                      ((aiAccess?.requestsUsed || 0)
+                        / (aiAccess?.monthlyPromptLimit || 1)) * 100,
                     )}%`,
                   }}
                 />
               </div>
               <dl className="usage-metrics">
                 <div>
-                  <dt>Recorded tokens</dt>
-                  <dd>{formatTokenCount(recordedUsage.totalTokens)}</dd>
+                  <dt>Monthly input</dt>
+                  <dd>{formatTokenCount(aiAccess?.inputTokens || 0)}</dd>
                 </div>
                 <div>
-                  <dt>Input</dt>
-                  <dd>{formatTokenCount(recordedUsage.inputTokens)}</dd>
+                  <dt>Monthly output</dt>
+                  <dd>{formatTokenCount(aiAccess?.outputTokens || 0)}</dd>
                 </div>
                 <div>
-                  <dt>Output</dt>
-                  <dd>{formatTokenCount(recordedUsage.outputTokens)}</dd>
+                  <dt>Monthly total</dt>
+                  <dd>{formatTokenCount(aiAccess?.totalTokens || 0)}</dd>
                 </div>
               </dl>
               {lastUsage ? (
@@ -592,8 +658,8 @@ export default function Chat({
                 </p>
               )}
               <p className="usage-disclaimer">
-                This shows this chat&apos;s history capacity and recorded API tokens,
-                not the OpenAI billing-credit balance.
+                The request allowance is set by AOC and resets monthly. It is
+                separate from the OpenAI project&apos;s billing-credit balance.
               </p>
             </div>
           </details>
@@ -601,6 +667,8 @@ export default function Chat({
             className="new-chat-button"
             type="button"
             onClick={newConversation}
+            disabled={accessBlocked}
+            title={accessBlocked ? "New AI chats are unavailable while access is paused." : undefined}
           >
             New chat
           </button>
@@ -608,12 +676,40 @@ export default function Chat({
       </div>
 
       <div
-        className="messages"
+        className={`messages${accessBlocked ? " access-restricted" : ""}`}
         ref={messagesRef}
         role="log"
         aria-live="off"
       >
-        {messages.length === 0 ? (
+        {accessBlocked ? (
+          <section className="ai-access-notice" role="status">
+            <div className="ai-access-notice-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M7 10V8a5 5 0 0 1 10 0v2" />
+                <path d="M6 10h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Z" />
+                <path d="M12 14v3" />
+              </svg>
+            </div>
+            <span className="ai-access-notice-eyebrow">
+              {disabledByAdmin ? "Account access paused" : "Monthly allowance used"}
+            </span>
+            <h2>
+              {disabledByAdmin
+                ? "AI Assistant is currently disabled"
+                : "Monthly AI allowance reached"}
+            </h2>
+            <p>
+              {disabledByAdmin
+                ? "Your AOC administrator has paused new AI requests for this client. You can still review saved conversations, and this page will unlock automatically when access is restored."
+                : `New AI requests are paused until ${formatResetDate(aiAccess?.resetsAt)} or until AOC adjusts this account's allowance.`}
+            </p>
+            <div className="ai-access-notice-status">
+              <span><i aria-hidden="true" /> New AI requests blocked</span>
+              <small>Saved conversation history remains available</small>
+            </div>
+          </section>
+        ) : null}
+        {messages.length === 0 && !accessBlocked ? (
           <div className="welcome-state">
             <div className="assistant-avatar large" aria-hidden="true">
               <Image className="aoc-avatar-icon" src={aocIcon} alt="" />
@@ -629,6 +725,7 @@ export default function Chat({
                   key={starter}
                   type="button"
                   onClick={() => sendMessage(starter)}
+                  disabled={isStreaming || accessBlocked}
                 >
                   {starter}
                   <span aria-hidden="true">&rarr;</span>
@@ -636,7 +733,7 @@ export default function Chat({
               ))}
             </div>
           </div>
-        ) : (
+        ) : messages.length ? (
           messages.map((message, index) => (
             <article className={`message ${message.role}`} key={message.id}>
               <div className="message-avatar" aria-hidden="true">
@@ -780,12 +877,12 @@ export default function Chat({
               </div>
             </article>
           ))
-        )}
+        ) : null}
       </div>
 
       <p className="sr-only" aria-live="polite">{assistantAnnouncement}</p>
 
-      <div className="composer-area">
+      <div className={`composer-area${accessBlocked ? " access-restricted" : ""}`}>
         {error ? <p className="error-message">{error}</p> : null}
         <form className="composer" onSubmit={handleSubmit}>
           <textarea
@@ -800,11 +897,11 @@ export default function Chat({
                 event.preventDefault();
               }
             }}
-            placeholder="Ask AOC Assistant..."
+            placeholder={accessBlocked ? "AI Assistant is unavailable" : "Ask AOC Assistant..."}
             aria-label="Message AOC Assistant"
             maxLength={MAX_INPUT_LENGTH}
             rows={1}
-            disabled={isStreaming}
+            disabled={isStreaming || accessBlocked}
           />
           {isStreaming ? (
             <button
@@ -819,7 +916,7 @@ export default function Chat({
             <button
               className="send-button"
               type="submit"
-              disabled={!input.trim()}
+              disabled={!input.trim() || accessBlocked}
               aria-label="Send message"
             >
               <span aria-hidden="true">&uarr;</span>
@@ -827,8 +924,11 @@ export default function Chat({
           )}
         </form>
         <p className="composer-help">
-          Enter to send &middot; Models reflect this API key &middot; API usage may
-          be billed separately
+          {aiAccess?.enabled === false
+            ? "AI access is paused by your AOC administrator"
+            : monthlyRemaining === 0
+              ? "Monthly AI request allowance reached"
+              : "Enter to send · Models reflect this API key · API usage may be billed separately"}
         </p>
       </div>
     </div>

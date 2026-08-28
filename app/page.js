@@ -6,6 +6,7 @@ import aocLogo from "@/aoc-logo.png";
 import SignOutButton from "@/components/auth/sign-out-button";
 import loginStyles from "@/components/auth/login.module.css";
 import ClientPortal from "@/components/portal/client-portal";
+import { resolveAdminContext } from "@/lib/admin-data";
 import { isPortalAuthConfigured } from "@/lib/auth";
 import { resolvePortalContext } from "@/lib/portal-data";
 
@@ -15,11 +16,22 @@ export default async function HomePage() {
   if (!isPortalAuthConfigured()) redirect("/login");
 
   let portalContext;
+  const requestHeaders = await headers();
 
   try {
-    portalContext = await resolvePortalContext(await headers());
+    portalContext = await resolvePortalContext(requestHeaders);
   } catch (error) {
     if (error?.publicDetails?.status === 401) redirect("/login");
+
+    let isAdministrator = false;
+    try {
+      await resolveAdminContext(requestHeaders);
+      isAdministrator = true;
+    } catch {
+      // The original client-access error is more useful for non-admin users.
+    }
+
+    if (isAdministrator) redirect("/admin");
 
     return (
       <main className={loginStyles.page}>

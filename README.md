@@ -153,7 +153,45 @@ For testing, you can enter `cwrenviro123` for CWR Enviro. Each command creates:
 There is no web-based sign-up route, so a visitor cannot create their own
 account or assign themselves to a client.
 
-### 8. Start the portal
+### 8. Set up the AOC administrator portal
+
+Passwords must not be inserted manually into `database/schema.sql` or Neon.
+Better Auth stores a salted scrypt hash in its own authentication tables, while
+the portal tables store authorization and client membership only.
+
+Apply the administrator, client-control, and monthly AI-usage schema:
+
+```powershell
+npm run admin:migrate
+```
+
+You can alternatively run the entire `database/admin-schema.sql` file in the
+Neon SQL Editor. Create the first administrator locally with a hidden password
+prompt:
+
+```powershell
+npm run admin:create -- aocadmin "AOC Administrator"
+```
+
+Use a unique password of at least 12 characters. The command creates the Better
+Auth login, a `portal_users` link, and an active `portal_admins` authorization
+row. The account is redirected to `/admin`, where it can:
+
+- create private client logins;
+- enable or pause a client portal and AI assistant;
+- set monthly AI request allowances;
+- reset the current monthly request counter;
+- edit client-specific instructions and vector store IDs; and
+- review account, conversation, token, and knowledge totals.
+
+Every admin API request validates the Better Auth session, an active
+`portal_admins` record, and the configured portal origin. Administrator access
+does not automatically create a client membership or expose client chats.
+The signed-in client refreshes its AI access policy every four seconds while
+the page is visible and immediately when the browser window regains focus. A
+paused assistant blocks new requests without deleting saved conversations.
+
+### 9. Start the portal
 
 ```powershell
 npm run dev
@@ -161,7 +199,7 @@ npm run dev
 
 Open <http://127.0.0.1:3000>. Sign in with the client username and password.
 
-### 9. Verify isolation and saved history
+### 10. Verify isolation and saved history
 
 1. Sign in as `churchbanners`.
 2. Create a folder, send a message, and wait for the complete AI answer.
@@ -301,7 +339,10 @@ before onboarding real clients.
 | `npm install` | Install dependencies. |
 | `npm run auth:migrate` | Create or update Better Auth tables in Neon. |
 | `npm run portal:migrate` | Create or update the AOC portal tables in Neon. |
+| `npm run admin:migrate` | Create or update admin access, AI controls, and monthly usage tables. |
 | `npm run client:create -- USERNAME "DISPLAY NAME"` | Privately create one client login and membership. |
+| `npm run client:delete -- USERNAME --confirm-delete` | Permanently delete a client and its isolated data after typed confirmation. |
+| `npm run admin:create -- USERNAME "DISPLAY NAME"` | Prepare an AOC administrator account for the future admin portal. |
 | `npm run dev` | Run at `http://127.0.0.1:3000`. |
 | `npm run lint` | Check source code. |
 | `npm run build` | Verify the Vercel production build. |
@@ -309,11 +350,17 @@ before onboarding real clients.
 
 ## Main files
 
+- `app/admin/page.js` - server-protected AOC administrator route.
+- `components/admin/admin-dashboard.js` - responsive client-control dashboard.
+- `lib/admin-data.js` - administrator authorization, client controls, and usage data.
+- `database/admin-schema.sql` - admin roles, AI limits, and monthly usage schema.
+
 - `lib/auth.js` — Better Auth, password, username, and session configuration.
 - `lib/portal-data.js` — authenticated membership and tenant data layer.
 - `app/login/page.js` — private client login screen.
 - `app/api/auth/[...all]/route.js` — Better Auth HTTP handler.
 - `app/api/chat/route.js` — authenticated OpenAI Responses API route.
+- `app/api/ai-access/route.js` — authenticated live AI-access and monthly-usage status route.
 - `app/api/workspace/route.js` — authenticated Neon chat-history route.
 - `scripts/create-client.mjs` — private local client provisioning command.
 - `database/schema.sql` — AOC portal schema.
@@ -324,7 +371,6 @@ before onboarding real clients.
 
 - Dashboard hours, goals, and project cards are not yet loaded from AOC project
   systems.
-- There is no AOC administrator UI yet; client creation uses a local command.
 - There is no client password-change/reset screen yet. Do not edit password
   hashes manually in Neon; add an authenticated Better Auth change/reset flow.
 - File uploads need private object storage, size/type validation, malware
