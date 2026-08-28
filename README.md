@@ -14,15 +14,19 @@ deploy.
   client timeout so requests cannot display a permanent loading indicator.
 - Editable server-side assistant instructions.
 - Folders for organizing chats.
-- Saved browser-local chat history.
+- Saved chat history in Neon when connected, with a browser-only demo fallback.
 - Conversation branching from completed assistant responses.
 - A Next.js API route that keeps the OpenAI API key on the server.
+- Per-client assistant instructions and an optional client-specific OpenAI
+  vector-store connection.
 
 ## Requirements
 
 - Node.js 20.9 or newer. Node.js 22 LTS is recommended.
 - npm, which is included with Node.js.
 - An OpenAI API key from <https://platform.openai.com/api-keys>.
+- A Neon Postgres database for account-backed chat history. The interface still
+  runs in browser-demo mode while Neon is not configured.
 
 ## First-time local setup
 
@@ -63,6 +67,10 @@ Open `.env.local` and replace the placeholder with a fresh API key:
 ```dotenv
 OPENAI_API_KEY=sk-your-key-here
 OPENAI_MODEL=gpt-5.4-mini
+DATABASE_URL=
+PORTAL_CLIENT_SLUG=churchbanners
+PORTAL_CLIENT_NAME=ChurchBanners
+PORTAL_USER_ID=prototype-user
 ```
 
 Do not add quotes or spaces around the values. Never commit `.env.local`.
@@ -77,6 +85,159 @@ npm run dev
 
 Open <http://127.0.0.1:3000> in a browser. Press `Ctrl+C` in the terminal when
 you want to stop the server.
+
+## Connect Neon chat history step by step
+
+The portal works before this setup, but the memory indicator says **Browser
+demo**. Complete these steps to make it say **Account memory** and synchronize
+history through Neon.
+
+### 1. Copy the Neon connection string
+
+1. Open the Neon project shown in your Vercel Storage dashboard.
+2. Select **Connect to Project** or **Open in Neon**.
+3. Find the connection string named `DATABASE_URL`.
+4. Copy the complete value. It normally begins with `postgresql://`.
+
+The password inside this URL is a secret. Do not paste it into chat, source
+code, screenshots, or Git.
+
+### 2. Add the connection string locally
+
+Open `.env.local` and set:
+
+```dotenv
+DATABASE_URL=postgresql://your-neon-connection-string
+PORTAL_CLIENT_SLUG=churchbanners
+PORTAL_CLIENT_NAME=ChurchBanners
+PORTAL_USER_ID=prototype-user
+```
+
+`PORTAL_CLIENT_SLUG` identifies the prototype tenant. `PORTAL_USER_ID`
+identifies the prototype portal user inside that tenant. The browser never
+chooses these values.
+
+### 3. Install the database schema
+
+1. In Neon, open **SQL Editor**.
+2. Open `database/schema.sql` from this project.
+3. Copy the entire file into the Neon SQL Editor.
+4. Select **Run**.
+5. Confirm Neon reports that the tables and indexes were created.
+
+The schema creates:
+
+- `portal_clients` for each client account and its AI configuration.
+- `portal_users` and `portal_memberships` for tenant membership.
+- `portal_workspace_snapshots` for folders, branches, prompts, AI replies,
+  assets, errors, model metadata, and token usage.
+- `portal_knowledge_items` for pending and approved client facts or
+  corrections.
+
+### 4. Restart Next.js
+
+Environment changes require a restart:
+
+```powershell
+# Stop the old server with Ctrl+C, then run:
+npm run dev
+```
+
+Reload <http://127.0.0.1:3000>. The chat header should show **Account memory**.
+Send a test message, wait for the answer to finish, and refresh the page. Both
+the client prompt and AI response should return.
+
+### 5. Verify the saved record
+
+In the Neon SQL Editor, run:
+
+```sql
+SELECT
+  clients.slug,
+  users.external_id,
+  snapshots.revision,
+  snapshots.updated_at
+FROM portal_workspace_snapshots AS snapshots
+JOIN portal_clients AS clients ON clients.id = snapshots.client_id
+JOIN portal_users AS users ON users.id = snapshots.user_id
+ORDER BY snapshots.updated_at DESC;
+```
+
+You should see a `churchbanners` row. The `revision` number increases whenever
+the workspace is saved.
+
+## Give one client its own instructions
+
+Global AOC behavior remains in `config/assistant.js`. Client-specific behavior
+is stored separately in Neon. After opening the portal once, run this example
+in the Neon SQL Editor:
+
+```sql
+UPDATE portal_clients
+SET assistant_instructions =
+  'Help ChurchBanners with its ecommerce website and approved project records. Use a concise, friendly tone. If project evidence is missing, say that it is not in the connected client knowledge.'
+WHERE slug = 'churchbanners';
+```
+
+The server appends these approved instructions to the global AOC instructions
+for ChurchBanners only. Another client slug receives its own row and does not
+receive this text.
+
+## Add reviewed client knowledge
+
+The schema includes a review queue so an AI answer does not automatically
+become trusted knowledge. Add a proposed fact as `pending`:
+
+```sql
+INSERT INTO portal_knowledge_items (
+  client_id,
+  title,
+  content,
+  source_type,
+  status
+)
+SELECT
+  id,
+  'Primary website',
+  'The approved ChurchBanners website is https://www.churchbanners.com/.',
+  'website',
+  'pending'
+FROM portal_clients
+WHERE slug = 'churchbanners';
+```
+
+After an AOC administrator verifies it, approve it:
+
+```sql
+UPDATE portal_knowledge_items
+SET status = 'approved', approved_at = NOW(), updated_at = NOW()
+WHERE id = YOUR_KNOWLEDGE_ITEM_ID
+  AND client_id = (
+    SELECT id FROM portal_clients WHERE slug = 'churchbanners'
+  );
+```
+
+The UI displays the approved count. For searchable files, create a separate
+OpenAI vector store for the client, upload only approved files, and save its ID:
+
+```sql
+UPDATE portal_clients
+SET openai_vector_store_id = 'vs_your_client_vector_store_id'
+WHERE slug = 'churchbanners';
+```
+
+Once set, the existing chat route makes that vector store available through
+OpenAI File Search for this client. File upload, approval, and vector-store
+creation are deliberately not automated in this prototype yet; those need an
+authenticated AOC administrator screen, private object storage, validation,
+malware scanning, and retention controls.
+
+Official references:
+
+- [OpenAI conversation state](https://developers.openai.com/api/docs/guides/conversation-state)
+- [OpenAI File Search](https://developers.openai.com/api/docs/guides/tools-file-search)
+- [Neon serverless driver](https://neon.com/docs/serverless/serverless-driver)
+- [Postgres on Vercel](https://vercel.com/docs/postgres)
 
 ## Available commands
 
@@ -238,14 +399,19 @@ Do not upload `.env.local` to Vercel. Production secrets belong in Vercel's
 Environment Variables settings.
 
 For prototype testing, enable Vercel Deployment Protection. The current API
-route does not authenticate users, so the app must not be opened to clients or
-the public until portal authentication, server-side authorization, rate
-limiting, and client data isolation are implemented.
+routes use the fixed server-side `PORTAL_CLIENT_SLUG` and `PORTAL_USER_ID`; they
+do not authenticate users. Do not open the app to clients or the public until
+portal authentication, membership-based authorization, rate limiting, and
+client data-isolation tests are implemented.
 
 ## How chat history works
 
-Folders and conversations are currently stored in the browser with
-`localStorage`:
+When `DATABASE_URL` is configured and the schema is installed, folders and
+conversations are stored as a tenant-and-user-scoped JSONB workspace in Neon.
+Both user prompts and AI responses are included. The UI debounces saves to
+avoid writing once for every streamed text fragment.
+
+Without `DATABASE_URL`, the prototype falls back to browser `localStorage`:
 
 - They remain after refreshing on the same browser profile.
 - They do not synchronize between users, browsers, or devices.

@@ -6,6 +6,7 @@ import {
   getModelCatalog,
   resolveRequestedModel,
 } from "@/lib/openai-models";
+import { getPortalAiContext } from "@/lib/portal-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -299,6 +300,25 @@ function completedImages(response) {
   );
 }
 
+function completedUsage(response) {
+  const usage = response?.usage;
+  const inputTokens = Number.isSafeInteger(usage?.input_tokens)
+    ? usage.input_tokens
+    : null;
+  const outputTokens = Number.isSafeInteger(usage?.output_tokens)
+    ? usage.output_tokens
+    : null;
+  const totalTokens = Number.isSafeInteger(usage?.total_tokens)
+    ? usage.total_tokens
+    : null;
+
+  if (inputTokens === null || outputTokens === null || totalTokens === null) {
+    return null;
+  }
+
+  return { inputTokens, outputTokens, totalTokens };
+}
+
 export async function POST(request) {
   let messages;
   let requestedModel;
@@ -354,6 +374,41 @@ export async function POST(request) {
     return imageAccessResponse(catalog.verified);
   }
 
+  const portalContext = await getPortalAiContext();
+  const clientInstructions = portalContext.instructions.slice(0, 12000);
+  const requestInstructions = [
+    ASSISTANT_INSTRUCTIONS,
+    `Current client account: ${portalContext.clientName}.`,
+    clientInstructions
+      ? `Approved client-specific instructions:\n${clientInstructions}`
+      : "No approved client-specific instructions are connected yet.",
+    portalContext.vectorStoreId
+      ? "A client-specific approved knowledge base is connected. Use file search when it is relevant and do not claim that unreturned information exists."
+      : "No client-specific file knowledge base is connected yet.",
+  ].join("\n\n");
+  const tools = [];
+
+  if (portalContext.vectorStoreId) {
+    tools.push({
+      type: "file_search",
+      vector_store_ids: [portalContext.vectorStoreId],
+      max_num_results: 6,
+    });
+  }
+
+  if (catalog.imageModel && imageRequested) {
+    tools.push({
+      type: "image_generation",
+      action: "generate",
+      model: catalog.imageModel,
+      output_format: "webp",
+      output_compression: 82,
+      partial_images: 0,
+      quality: "medium",
+      size: "1024x1024",
+    });
+  }
+
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const upstreamController = new AbortController();
   let requestTimedOut = false;
@@ -373,27 +428,12 @@ export async function POST(request) {
     const result = await openai.responses.create(
       {
         model: selectedModel,
-        instructions: ASSISTANT_INSTRUCTIONS,
+        instructions: requestInstructions,
         input: messages,
         max_output_tokens: MAX_OUTPUT_TOKENS,
         stream: true,
         store: false,
-        ...(catalog.imageModel && imageRequested
-          ? {
-              tools: [
-                {
-                  type: "image_generation",
-                  action: imageRequested ? "generate" : "auto",
-                  model: catalog.imageModel,
-                  output_format: "webp",
-                  output_compression: 82,
-                  partial_images: 0,
-                  quality: "medium",
-                  size: "1024x1024",
-                },
-              ],
-            }
-          : {}),
+        ...(tools.length ? { tools } : {}),
       },
       { signal: upstreamController.signal },
     ).withResponse();
@@ -516,6 +556,7 @@ export async function POST(request) {
 
           if (event.type === "response.completed") {
             const images = completedImages(event.response);
+            const usage = completedUsage(event.response);
 
             if (images.length > 0 && !textSent) {
               send({ type: "delta", delta: "I generated the image for you." });
@@ -543,7 +584,11 @@ export async function POST(request) {
                 message: "The request completed but did not return any text or file.",
               });
             } else {
-              send({ type: "done", model: selectedModel });
+              send({
+                type: "done",
+                model: selectedModel,
+                ...(usage ? { usage } : {}),
+              });
             }
 
             terminalEventSent = true;

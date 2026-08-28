@@ -8,6 +8,7 @@ import aocLogo from "@/aoc-logo.png";
 
 const MAX_INPUT_LENGTH = 12000;
 const MAX_HISTORY_MESSAGES = 30;
+const MAX_CONVERSATION_REPLIES = MAX_HISTORY_MESSAGES / 2;
 const MAX_ASSET_DATA_URL_LENGTH = 12_000_000;
 const CLIENT_TIMEOUT_MS = 55000;
 const LOCAL_ASSET_SOURCES = {
@@ -99,6 +100,31 @@ function normalizeDiagnostic(value) {
   };
 
   return Object.values(diagnostic).some(Boolean) ? diagnostic : null;
+}
+
+function normalizeUsage(value) {
+  if (!value || typeof value !== "object") return null;
+
+  const inputTokens = Number.isSafeInteger(value.inputTokens)
+    && value.inputTokens >= 0
+    ? value.inputTokens
+    : null;
+  const outputTokens = Number.isSafeInteger(value.outputTokens)
+    && value.outputTokens >= 0
+    ? value.outputTokens
+    : null;
+  const totalTokens = Number.isSafeInteger(value.totalTokens)
+    && value.totalTokens >= 0
+    ? value.totalTokens
+    : null;
+
+  return inputTokens === null || outputTokens === null || totalTokens === null
+    ? null
+    : { inputTokens, outputTokens, totalTokens };
+}
+
+function formatTokenCount(value) {
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
 }
 
 function responseError(message, diagnostic) {
@@ -227,6 +253,20 @@ export default function Chat({
   const headingRef = useRef(null);
 
   const isStreaming = status === "streaming";
+  const completedReplies = completedRequestHistory(messages).length / 2;
+  const remainingReplies = Math.max(
+    0,
+    MAX_CONVERSATION_REPLIES - completedReplies,
+  );
+  const recordedUsage = messages.reduce(
+    (total, message) => ({
+      inputTokens: total.inputTokens + (message.usage?.inputTokens || 0),
+      outputTokens: total.outputTokens + (message.usage?.outputTokens || 0),
+      totalTokens: total.totalTokens + (message.usage?.totalTokens || 0),
+    }),
+    { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+  );
+  const lastUsage = messages.findLast((message) => message.usage)?.usage || null;
 
   useEffect(() => {
     if (autoFocusComposer) textAreaRef.current?.focus();
@@ -369,9 +409,13 @@ export default function Chat({
           }));
         }
 
-        if (event.type === "done" && typeof event.model === "string") {
+        if (event.type === "done") {
+          const usage = normalizeUsage(event.usage);
           updateAssistant(assistantMessage.id, {
-            modelId: event.model.slice(0, 100),
+            ...(typeof event.model === "string"
+              ? { modelId: event.model.slice(0, 100) }
+              : {}),
+            ...(usage ? { usage } : {}),
           });
         }
 
@@ -492,6 +536,67 @@ export default function Chat({
               ))}
             </select>
           </label>
+          <details className="usage-status">
+            <summary title="Conversation usage">
+              <span className="usage-status-dot" aria-hidden="true" />
+              {remainingReplies} left
+            </summary>
+            <div className="usage-popover">
+              <div className="usage-popover-heading">
+                <div>
+                  <span>Conversation usage</span>
+                  <strong>{remainingReplies} replies remaining</strong>
+                </div>
+                <span>{completedReplies}/{MAX_CONVERSATION_REPLIES}</span>
+              </div>
+              <div
+                className="usage-progress"
+                role="progressbar"
+                aria-label="Conversation replies used"
+                aria-valuemin="0"
+                aria-valuemax={MAX_CONVERSATION_REPLIES}
+                aria-valuenow={completedReplies}
+              >
+                <span
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      (completedReplies / MAX_CONVERSATION_REPLIES) * 100,
+                    )}%`,
+                  }}
+                />
+              </div>
+              <dl className="usage-metrics">
+                <div>
+                  <dt>Recorded tokens</dt>
+                  <dd>{formatTokenCount(recordedUsage.totalTokens)}</dd>
+                </div>
+                <div>
+                  <dt>Input</dt>
+                  <dd>{formatTokenCount(recordedUsage.inputTokens)}</dd>
+                </div>
+                <div>
+                  <dt>Output</dt>
+                  <dd>{formatTokenCount(recordedUsage.outputTokens)}</dd>
+                </div>
+              </dl>
+              {lastUsage ? (
+                <p className="last-response-usage">
+                  Last response: {formatTokenCount(lastUsage.inputTokens)} input
+                  <span aria-hidden="true"> + </span>
+                  {formatTokenCount(lastUsage.outputTokens)} output tokens
+                </p>
+              ) : (
+                <p className="last-response-usage">
+                  Token usage will appear after the next OpenAI response.
+                </p>
+              )}
+              <p className="usage-disclaimer">
+                This shows this chat&apos;s history capacity and recorded API tokens,
+                not the OpenAI billing-credit balance.
+              </p>
+            </div>
+          </details>
           <button
             className="new-chat-button"
             type="button"

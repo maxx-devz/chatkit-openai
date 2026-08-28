@@ -111,6 +111,7 @@ function workspaceForStorage(workspace) {
           ? { originMessageId: message.originMessageId }
           : {}),
         ...(message.modelId ? { modelId: message.modelId } : {}),
+        ...(message.usage ? { usage: message.usage } : {}),
         ...(Array.isArray(message.assets) && message.assets.length
           ? {
               assets: message.assets.slice(0, MAX_MESSAGE_ASSETS).map((asset) => ({
@@ -197,6 +198,27 @@ function normalizeDiagnostic(value) {
   return Object.values(diagnostic).some(Boolean) ? diagnostic : null;
 }
 
+function normalizeUsage(value) {
+  if (!value || typeof value !== "object") return null;
+
+  const inputTokens = Number.isSafeInteger(value.inputTokens)
+    && value.inputTokens >= 0
+    ? value.inputTokens
+    : null;
+  const outputTokens = Number.isSafeInteger(value.outputTokens)
+    && value.outputTokens >= 0
+    ? value.outputTokens
+    : null;
+  const totalTokens = Number.isSafeInteger(value.totalTokens)
+    && value.totalTokens >= 0
+    ? value.totalTokens
+    : null;
+
+  return inputTokens === null || outputTokens === null || totalTokens === null
+    ? null
+    : { inputTokens, outputTokens, totalTokens };
+}
+
 function normalizeMessages(value) {
   if (!Array.isArray(value)) return [];
 
@@ -252,6 +274,7 @@ function normalizeMessages(value) {
     }
 
     const assets = normalizeAssets(candidate?.assets);
+    const usage = normalizeUsage(candidate?.usage);
 
     messages.push({
       id,
@@ -259,6 +282,7 @@ function normalizeMessages(value) {
       content,
       status,
       ...(assets.length ? { assets } : {}),
+      ...(usage ? { usage } : {}),
       ...(cleanString(candidate?.modelId, 100)
         ? { modelId: cleanString(candidate.modelId, 100) }
         : {}),
@@ -490,7 +514,10 @@ export default function Workspace({ config, embedded = false }) {
   const [workspace, setWorkspace] = useState(INITIAL_WORKSPACE);
   const [hydrated, setHydrated] = useState(false);
   const [storageStatus, setStorageStatus] = useState("loading");
+  const [storageMode, setStorageMode] = useState("loading");
   const [storageWarning, setStorageWarning] = useState("");
+  const [clientProfile, setClientProfile] = useState({ name: "", slug: "" });
+  const [knowledgeStats, setKnowledgeStats] = useState({ approved: 0, pending: 0 });
   const [folderName, setFolderName] = useState("");
   const [folderError, setFolderError] = useState("");
   const [announcement, setAnnouncement] = useState("");
@@ -504,31 +531,78 @@ export default function Workspace({ config, embedded = false }) {
   const mobileHistoryDialogRef = useRef(null);
   const workspaceRef = useRef(INITIAL_WORKSPACE);
   const hydratedRef = useRef(false);
+  const storageModeRef = useRef("loading");
   const saveTimerRef = useRef(null);
   const saveStatusTimerRef = useRef(null);
+  const saveInFlightRef = useRef(false);
+  const saveQueuedRef = useRef(false);
 
   useEffect(() => {
-    const hydrationTimer = window.setTimeout(() => {
-      let nextWorkspace;
-      let warning = "";
+    const controller = new AbortController();
+
+    async function hydrateWorkspace() {
+      let browserWorkspace;
+      let browserWarning = "";
 
       try {
         const saved = window.localStorage.getItem(STORAGE_KEY);
-        nextWorkspace = saved
+        browserWorkspace = saved
           ? normalizeWorkspace(JSON.parse(saved))
           : createDefaultWorkspace();
       } catch {
-        nextWorkspace = createDefaultWorkspace();
-        warning = "Saved history was damaged and has been reset on this device.";
+        browserWorkspace = createDefaultWorkspace();
+        browserWarning = "Saved browser history was damaged and has been reset.";
+      }
+
+      let nextWorkspace = browserWorkspace;
+      let nextMode = "browser";
+      let warning = browserWarning;
+
+      try {
+        const response = await fetch("/api/workspace", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(payload?.error || "Account history could not be loaded.");
+        }
+
+        setClientProfile({
+          name: payload?.client?.name || "",
+          slug: payload?.client?.slug || "",
+        });
+        setKnowledgeStats({
+          approved: Number(payload?.knowledge?.approved) || 0,
+          pending: Number(payload?.knowledge?.pending) || 0,
+        });
+
+        if (payload?.mode === "database") {
+          nextMode = "database";
+          nextWorkspace = payload.workspace
+            ? normalizeWorkspace(payload.workspace)
+            : createDefaultWorkspace();
+          warning = "";
+        }
+      } catch (error) {
+        if (error.name === "AbortError") return;
+        warning = [
+          browserWarning,
+          `${error.message || "Neon history could not be loaded."} Using browser history for now.`,
+        ].filter(Boolean).join(" ");
       }
 
       setWorkspace(nextWorkspace);
+      setStorageMode(nextMode);
+      storageModeRef.current = nextMode;
       setStorageWarning(warning);
       setStorageStatus("saved");
       setHydrated(true);
-    }, 0);
+    }
 
-    return () => window.clearTimeout(hydrationTimer);
+    hydrateWorkspace();
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -576,35 +650,87 @@ export default function Workspace({ config, embedded = false }) {
   }, [hydrated]);
 
   useEffect(() => {
+    storageModeRef.current = storageMode;
+  }, [storageMode]);
+
+  useEffect(() => {
     if (!hydrated) return;
 
-    if (saveTimerRef.current !== null) return;
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+    }
+    if (saveStatusTimerRef.current !== null) {
+      window.clearTimeout(saveStatusTimerRef.current);
+    }
 
     saveStatusTimerRef.current = window.setTimeout(() => {
       saveStatusTimerRef.current = null;
       setStorageStatus("saving");
     }, 0);
 
-    saveTimerRef.current = window.setTimeout(() => {
+    saveTimerRef.current = window.setTimeout(async () => {
       saveTimerRef.current = null;
-      try {
-        writeWorkspace(workspaceRef.current);
-        setStorageStatus("saved");
-      } catch {
-        setStorageStatus("error");
+
+      if (saveInFlightRef.current) {
+        saveQueuedRef.current = true;
+        return;
       }
-    }, 350);
-  }, [hydrated, workspace]);
+
+      do {
+        saveQueuedRef.current = false;
+        saveInFlightRef.current = true;
+
+        try {
+          const snapshot = workspaceForStorage(workspaceRef.current);
+
+          if (storageModeRef.current === "database") {
+            const response = await fetch("/api/workspace", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ workspace: snapshot }),
+            });
+            const payload = await response.json().catch(() => null);
+
+            if (!response.ok) {
+              throw new Error(payload?.error || "Account history could not be saved.");
+            }
+          } else {
+            writeWorkspace(snapshot);
+          }
+
+          setStorageWarning("");
+          setStorageStatus("saved");
+        } catch (error) {
+          setStorageWarning(error.message || "Chat history could not be saved.");
+          setStorageStatus("error");
+        } finally {
+          saveInFlightRef.current = false;
+        }
+      } while (saveQueuedRef.current);
+    }, 700);
+
+    return () => {
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      if (saveStatusTimerRef.current !== null) {
+        window.clearTimeout(saveStatusTimerRef.current);
+        saveStatusTimerRef.current = null;
+      }
+    };
+  }, [hydrated, storageMode, workspace]);
 
   useEffect(() => {
     function flushWorkspace() {
       if (!hydratedRef.current) return;
 
-      try {
-        writeWorkspace(workspaceRef.current);
-      } catch {
-        // The page may be exiting, so there is no reliable place to show this
-        // error. Normal in-page saves still report failures visibly.
+      if (storageModeRef.current === "browser") {
+        try {
+          writeWorkspace(workspaceRef.current);
+        } catch {
+          // The page may be exiting, so normal saves report the error instead.
+        }
       }
     }
 
@@ -639,6 +765,22 @@ export default function Workspace({ config, embedded = false }) {
       .sort((a, b) => b.updatedAt - a.updatedAt),
     [workspace.activeFolderId, workspace.threads],
   );
+  const conversationGroups = useMemo(
+    () => workspace.folders.map((folder) => ({
+      ...folder,
+      threads: workspace.threads
+        .filter(
+          (thread) =>
+            thread.folderId === folder.id
+            && (thread.messages.length > 0 || thread.id === workspace.activeThreadId),
+        )
+        .sort((a, b) => b.updatedAt - a.updatedAt),
+    })).filter((folder) => folder.threads.length > 0),
+    [workspace.activeThreadId, workspace.folders, workspace.threads],
+  );
+  const savedConversationCount = workspace.threads.filter(
+    (thread) => thread.messages.length > 0,
+  ).length;
 
   function createNewChat(folderId = workspace.activeFolderId) {
     const draft = createThread(folderId);
@@ -816,8 +958,18 @@ export default function Workspace({ config, embedded = false }) {
     : storageStatus === "error"
       ? "History is not saving"
       : storageStatus === "saving"
-        ? "Saving on this device"
-      : "Saved on this device";
+        ? storageMode === "database"
+          ? "Saving to client account"
+          : "Saving on this device"
+        : storageMode === "database"
+          ? "Saved to client account"
+          : "Saved on this device";
+  const storageDescription = storageMode === "database"
+    ? `Private workspace for ${clientProfile.name || "this client"}. Conversations reload on another signed-in device.`
+    : "Browser-only prototype history. Clearing this site's data removes these chats.";
+  const memoryLabel = storageMode === "database"
+    ? `${knowledgeStats.approved} approved source${knowledgeStats.approved === 1 ? "" : "s"}`
+    : "Browser demo";
 
   return (
     <section
@@ -893,8 +1045,7 @@ export default function Workspace({ config, embedded = false }) {
             <i aria-hidden="true" /> {storageLabel}
           </span>
           <p>
-            Stored for this browser profile. Anyone using it can see these chats;
-            clearing this site&apos;s data removes them.
+            {storageDescription}
           </p>
           {storageWarning ? <p className="storage-warning">{storageWarning}</p> : null}
         </div>
@@ -907,27 +1058,76 @@ export default function Workspace({ config, embedded = false }) {
             <h1>{activeFolder?.name || config.name}</h1>
           </div>
 
-          <div className="mobile-workspace-controls">
-            <label>
-              <span className="sr-only">Current folder</span>
-              <select
-                value={workspace.activeFolderId}
-                onChange={(event) => selectFolder(event.target.value)}
+          {embedded ? (
+            <div className="embedded-conversation-controls">
+              <label className="embedded-conversation-picker">
+                <span className="embedded-history-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M7 7.5h10M7 11.5h7M5.5 18.5l2.7-2.7H18a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10.5a2 2 0 0 0 1.5 2Z" />
+                  </svg>
+                </span>
+                <span className="embedded-picker-copy">
+                  <span>Conversation history</span>
+                  <select
+                    value={workspace.activeThreadId || ""}
+                    onChange={(event) => selectThread(event.target.value)}
+                    disabled={!hydrated || !activeThread}
+                    aria-label="Switch conversation"
+                  >
+                    {!activeThread ? (
+                      <option value="">Loading conversations...</option>
+                    ) : null}
+                    {conversationGroups.length === 1
+                      ? conversationGroups[0].threads.map((thread) => (
+                          <option key={thread.id} value={thread.id}>
+                            {displayTitle(thread)}{thread.parentThreadId ? " (Branch)" : ""}
+                          </option>
+                        ))
+                      : conversationGroups.map((folder) => (
+                          <optgroup key={folder.id} label={folder.name}>
+                            {folder.threads.map((thread) => (
+                              <option key={thread.id} value={thread.id}>
+                                {displayTitle(thread)}{thread.parentThreadId ? " (Branch)" : ""}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                  </select>
+                </span>
+              </label>
+              <span className="embedded-history-count">
+                {savedConversationCount} saved
+              </span>
+              <span
+                className={`embedded-memory-status ${storageMode === "database" ? "connected" : ""}`}
+                title={storageDescription}
+              >
+                <i aria-hidden="true" /> {memoryLabel}
+              </span>
+            </div>
+          ) : (
+            <div className="mobile-workspace-controls">
+              <label>
+                <span className="sr-only">Current folder</span>
+                <select
+                  value={workspace.activeFolderId}
+                  onChange={(event) => selectFolder(event.target.value)}
+                  disabled={!hydrated}
+                >
+                  {workspace.folders.map((folder) => (
+                    <option key={folder.id} value={folder.id}>{folder.name}</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => mobileHistoryDialogRef.current?.showModal()}
                 disabled={!hydrated}
               >
-                {workspace.folders.map((folder) => (
-                  <option key={folder.id} value={folder.id}>{folder.name}</option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="button"
-              onClick={() => mobileHistoryDialogRef.current?.showModal()}
-              disabled={!hydrated}
-            >
-              Chats
-            </button>
-          </div>
+                Chats
+              </button>
+            </div>
+          )}
 
           <div className="connection-badge">
             <span aria-hidden="true" /> OpenAI API
@@ -1068,8 +1268,7 @@ export default function Workspace({ config, embedded = false }) {
         >
           <strong>{storageLabel}</strong>
           <p>
-            Stored for this browser profile. Anyone using it can see these chats;
-            clearing this site&apos;s data removes them.
+            {storageDescription}
           </p>
           {storageWarning ? <p>{storageWarning}</p> : null}
         </div>
