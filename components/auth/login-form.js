@@ -49,14 +49,14 @@ export default function LoginForm({ configured }) {
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
       <label>
-        <span>Client username</span>
+        <span>Username</span>
         <input
           autoCapitalize="none"
           autoComplete="username"
           autoCorrect="off"
           disabled={!configured || status === "submitting"}
           name="username"
-          placeholder="churchbanners"
+          placeholder="Username"
           required
           spellCheck="false"
           type="text"
