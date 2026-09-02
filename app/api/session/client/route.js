@@ -3,6 +3,8 @@ import {
   portalErrorResponse,
   resolvePortalContext,
 } from "@/lib/portal-data";
+import { readJsonRequest } from "@/lib/request-security";
+import { isValidUsername } from "@/lib/input-validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,8 +13,9 @@ export async function PUT(request) {
   let slug;
 
   try {
-    const body = await request.json();
+    const body = await readJsonRequest(request, 2_000);
     slug = typeof body?.slug === "string" ? body.slug.trim().toLowerCase() : "";
+    if (!isValidUsername(slug)) slug = "";
   } catch {
     return Response.json(
       { error: "The client selection is invalid.", code: "invalid_client" },

@@ -28,11 +28,15 @@ This working prototype includes:
 - per-client portal and AI Assistant enable/disable controls;
 - a professional locked Assistant state when AI access is paused;
 - near-real-time AI access updates on the client portal; and
+- optional server-side Hubstaff project sync for monthly hours and project tasks;
 - a production build compatible with Vercel serverless hosting.
 
-The hours, goals, project cards, and similar business metrics in
-`config/portal.js` are still prototype content. Client identity, access,
-assistant settings, monthly usage, and saved chat history are database-backed.
+When Hubstaff is configured for a client, the first two metric cards and the
+Project Progress board use that client's Hubstaff project. Without a Hubstaff
+project URL or server token, the portal safely shows its prototype fallback
+content. “This Month at a Glance” intentionally remains prototype content for
+now. Client identity, access, assistant settings, monthly usage, and saved chat
+history are database-backed.
 
 ## Important implementation note
 
@@ -50,6 +54,7 @@ Browser
      -> AOC portal, membership, history, and usage tables in Neon
      -> OpenAI Responses API
         -> optional client-specific OpenAI vector store
+     -> optional Hubstaff API (server-side project/task/time reads)
 ```
 
 The main request flow is:
@@ -122,6 +127,10 @@ OPENAI_MODEL=gpt-5.4-mini
 DATABASE_URL=postgresql://your-pooled-neon-connection-string
 BETTER_AUTH_SECRET=replace-with-a-long-random-secret
 BETTER_AUTH_URL=http://127.0.0.1:3000
+# Optional: server-only Hubstaff organization access token
+HUBSTAFF_ACCESS_TOKEN=
+# Optional fallback when a project has no monthly hours budget
+HUBSTAFF_MONTHLY_HOURS_DEFAULT=
 ```
 
 Use the exact name `DATABASE_URL`. Do not rename it to `env_DATABASE_URL` or
@@ -139,6 +148,12 @@ browser origin and must not have a trailing slash. This project uses
 
 Use the pooled Neon connection string for `DATABASE_URL`. It normally contains
 `-pooler` in the hostname.
+
+`HUBSTAFF_ACCESS_TOKEN` is optional. Leave it blank while the Hubstaff
+integration is not in use. Never prefix it with `NEXT_PUBLIC_`: the token must
+remain on the server and must not be sent to a browser. The fallback hours
+value is also optional; leaving it blank makes the remaining-hours card show an
+em dash when the Hubstaff project has no monthly hours budget.
 
 ### 4. Run all database migrations
 
@@ -232,6 +247,75 @@ The administrator portal is available at `/admin`. An administrator can:
 - review user, conversation, and knowledge totals.
 
 Changes are saved only after selecting **Save changes**.
+
+### Hubstaff live project sync
+
+Each client can have one Hubstaff project URL. In **Add client** or the
+selected client's controls, paste the complete URL, for example:
+
+```text
+https://tasks.hubstaff.com/app/organizations/14952/projects/803599
+```
+
+The server validates and stores a canonical allow-listed URL, then reads the
+numeric organization/project IDs server-side. The client browser never
+receives the Hubstaff credential. On each
+authenticated client dashboard, the server requests:
+
+- the project record (`GET /v2/projects/{project_id}`) for the name and budget;
+- project tasks (`GET /v2/projects/{project_id}/tasks`) for the task board; and
+- daily project activities (`GET /v2/projects/{project_id}/activities/daily`)
+  for tracked seconds from the first day of the current month through today.
+
+The dashboard fetches the data when it opens, when the tab regains focus, and
+about every 30 seconds while visible. This is near-live polling, not a
+WebSocket stream. Hubstaff documents that activity data can be delayed by up
+to 20 minutes, so “real time” here means the portal updates automatically as
+Hubstaff publishes new data.
+
+The prototype sends UTC month boundaries. Hubstaff aggregates daily activity
+by the organization's timezone, so a small difference can appear around the
+first or last day of a month; make the organization's timezone the source of
+truth for billing decisions.
+
+#### Hubstaff credential setup
+
+For this single AOC server integration, use a Hubstaff **organization access
+token** created by an organization owner/manager under **Settings ->
+Organization -> API tokens**. It is sent as a server-side bearer token and
+should be allowed to see every project you assign to clients. Store the value
+only as `HUBSTAFF_ACCESS_TOKEN` in `.env.local` and in Vercel Environment
+Variables. Do not put it in a client row, a `NEXT_PUBLIC_*` variable, or a
+React component.
+
+The alternative personal-access-token flow is short-lived and requires a
+refresh-token exchange. It is not implemented by this prototype; use an
+organization token for the initial integration, or add a server-side token
+refresh store before choosing PATs.
+
+Hubstaff's current API documents `hubstaff:read` for API V2 and `tasks:read`
+for task data when using OAuth/PAT credentials. The organization-token flow
+instead acts with the assigned member's current organization permissions.
+
+After adding the database column to an existing Neon database, run:
+
+```cmd
+npm run admin:migrate
+```
+
+Then add or edit a client in `/admin`, paste its own project URL, and select
+**Save changes**. Different clients may point to different projects. If the
+URL is blank, invalid, or the token cannot access that project, the client sees
+the safe static fallback and a non-sensitive refresh message rather than any
+Hubstaff credential or raw upstream response.
+
+Remaining hours are calculated only from a Hubstaff project budget whose type
+is `hours` and whose recurrence is monthly (or from the optional
+`HUBSTAFF_MONTHLY_HOURS_DEFAULT`). A project with no monthly budget shows an
+em dash for remaining hours so the portal does not invent a limit. The task
+API supplies task status and metadata; if a connected integration does not
+return custom board-column names, the board groups tasks into “In progress” and
+“Done” instead of pretending to know the Hubstaff board layout.
 
 ### Live AI access behavior
 
@@ -417,6 +501,8 @@ configured production branch starts a deployment automatically.
 | `BETTER_AUTH_URL` | Exact production HTTPS origin, without a trailing slash |
 | `OPENAI_API_KEY` | Fresh server-side OpenAI API key |
 | `OPENAI_MODEL` | Preferred model available to the API project |
+| `HUBSTAFF_ACCESS_TOKEN` | Optional server-only Hubstaff organization access token |
+| `HUBSTAFF_MONTHLY_HOURS_DEFAULT` | Optional fallback hours limit when no monthly project budget exists |
 
 Example:
 
@@ -426,6 +512,11 @@ BETTER_AUTH_URL=https://your-project-name.vercel.app
 
 Use `DATABASE_URL`, even if a Vercel/Neon integration also created a variable
 such as `env_DATABASE_URL`. The application reads `DATABASE_URL`.
+
+For live Hubstaff cards, add `HUBSTAFF_ACCESS_TOKEN` to the same Vercel
+environment(s) as the portal and redeploy. Do not add it as a public variable.
+If you use the optional fallback, add `HUBSTAFF_MONTHLY_HOURS_DEFAULT` as a
+positive number such as `15`.
 
 Select only the environments that should use each credential. Set the
 production `BETTER_AUTH_URL` for Production. A Preview deployment needs its own
@@ -516,6 +607,25 @@ Make sure `.env.local` points to the intended Neon database first.
 Sign in as an AOC administrator, select the client, enable **AI assistant**, and
 choose **Save changes**. The client page should unlock automatically.
 
+### Hubstaff cards show the fallback
+
+Check that:
+
+- `HUBSTAFF_ACCESS_TOKEN` exists in the environment used by the running server;
+- the latest deployment was restarted after changing the variable;
+- the client has a complete `tasks.hubstaff.com/app/organizations/.../projects/...` URL;
+- the token's assigned Hubstaff member can access that organization/project; and
+- the Hubstaff organization is on an active plan with API access.
+
+The browser only receives a short, safe error message. The server log and the
+Hubstaff response status/code identify authentication, permission, rate-limit,
+or missing-project problems without exposing the token.
+
+If the response is `HTTP 401` with `invalid_token`, check the credential type
+first. A value beginning with `eyJ` is normally a PAT/OAuth JWT or refresh
+token, not the direct organization token expected by this prototype. Replace
+it with the `hsoat_...` organization access token, then restart or redeploy.
+
 ### Monthly allowance reached
 
 In `/admin`, select the client and either increase the monthly request limit or
@@ -561,6 +671,7 @@ and update deliberately. Do not approve unknown install scripts blindly.
 | `npm run admin:create -- USERNAME "DISPLAY NAME"` | Create an AOC administrator |
 | `npm run client:create -- USERNAME "DISPLAY NAME"` | Create a client login and membership |
 | `npm run client:delete -- USERNAME --confirm-delete` | Permanently delete a client after confirmation |
+| `npm run list:client` | List client names, usernames, and current portal/AI status (read-only) |
 | `npm run dev` | Start development at `http://127.0.0.1:3000` |
 | `npm run lint` | Run ESLint |
 | `npm run build` | Create and verify the Vercel production build |
@@ -574,6 +685,7 @@ and update deliberately. Do not approve unknown install scripts blindly.
 | `app/login/page.js` | Private login screen |
 | `app/admin/page.js` | Server-protected administrator portal |
 | `components/portal/client-portal.js` | Client dashboard shell |
+| `components/portal/hubstaff-live.js` | Near-live Hubstaff metrics and task board |
 | `components/workspace.js` | Folders, threads, persistence, model state, and live AI access refresh |
 | `components/chat.js` | Chat UI, streaming events, generated assets, usage, and locked state |
 | `components/admin/admin-dashboard.js` | Administrator client-control dashboard |
@@ -581,10 +693,12 @@ and update deliberately. Do not approve unknown install scripts blindly.
 | `app/api/models/route.js` | Authenticated available-model catalog |
 | `app/api/workspace/route.js` | Authenticated Neon workspace load/save route |
 | `app/api/ai-access/route.js` | Authenticated live AI access and monthly usage route |
+| `app/api/hubstaff/route.js` | Authenticated server-side Hubstaff project data route |
 | `app/api/admin/clients/route.js` | Protected admin client list/create/update route |
 | `app/api/admin/usage/route.js` | Protected monthly usage reset route |
 | `lib/auth.js` | Better Auth configuration |
 | `lib/portal-data.js` | Client membership, tenant data, history, and AI allowance logic |
+| `lib/hubstaff.js` | Validated Hubstaff URL parsing, API calls, and response normalization |
 | `lib/admin-data.js` | Administrator authorization and client controls |
 | `config/assistant.js` | Global server-side assistant instructions |
 | `config/portal.js` | Prototype portal content and Assistant component sizing |
@@ -594,8 +708,11 @@ and update deliberately. Do not approve unknown install scripts blindly.
 
 ## Current prototype limitations
 
-- Dashboard hours, goals, projects, and status cards are not connected to AOC
-  project-management systems.
+- Hubstaff sync is optional and read-only in this prototype. Without a valid
+  server token/project URL, the portal uses fallback content; “This Month at a
+  Glance” is intentionally static.
+- Hubstaff activity data may lag, and the task API may not expose every custom
+  board-column label used by an external task integration.
 - Chat history is stored as a JSONB workspace snapshot rather than normalized
   message tables.
 - Client password change/reset is not implemented.

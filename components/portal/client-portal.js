@@ -2,6 +2,10 @@ import Image from "next/image";
 
 import AiAssistantPanel from "@/components/ai-assistant/ai-assistant-panel";
 import AccountControls from "@/components/portal/account-controls";
+import HubstaffProvider, {
+  HubstaffMetrics,
+  HubstaffProjectProgress,
+} from "@/components/portal/hubstaff-live";
 import aocIcon from "@/aoc-icon.png";
 import aocLogo from "@/aoc-logo.png";
 import { PORTAL_CONFIG } from "@/config/portal";
@@ -106,35 +110,6 @@ function PortalHeader({ portal }) {
   );
 }
 
-function MetricCard({ metric }) {
-  const iconName = metric.tone === "purple"
-    ? "target"
-    : metric.tone === "green"
-      ? "check"
-      : "clock";
-
-  return (
-    <article className={`${styles.metricCard} ${styles[metric.tone]}`}>
-      <span className={styles.metricIcon}>
-        <PortalIcon name={iconName} />
-      </span>
-      <div className={styles.metricBody}>
-        <p>{metric.label}</p>
-        <div className={styles.metricValue}>
-          <strong>{metric.value}</strong>
-          {metric.suffix ? <b>{metric.suffix}</b> : null}
-        </div>
-        <span>{metric.detail}</span>
-        {Number.isFinite(metric.progress) ? (
-          <div className={styles.metricProgress}>
-            <i style={{ width: `${metric.progress}%` }} />
-          </div>
-        ) : null}
-      </div>
-    </article>
-  );
-}
-
 function TimeOverview() {
   return (
     <section className={styles.card} aria-labelledby="time-overview-title">
@@ -166,35 +141,6 @@ function TimeOverview() {
             <text x={48 + index * 124} y="232" key={label}>{label}</text>
           ))}
         </svg>
-      </div>
-    </section>
-  );
-}
-
-function ProjectProgress({ projects }) {
-  return (
-    <section className={styles.card} aria-labelledby="projects-title">
-      <header className={styles.cardHeader}>
-        <span><PortalIcon name="clipboard" /></span>
-        <h2 id="projects-title">Project Progress</h2>
-      </header>
-      <div className={styles.projectList}>
-        {projects.map((project) => (
-          <article key={project.name}>
-            <span className={styles.projectIcon}><PortalIcon name="clipboard" /></span>
-            <div className={styles.projectName}>
-              <strong>{project.name}</strong>
-              <small>{project.detail}</small>
-            </div>
-            <span className={project.status === "Completed" ? styles.completed : styles.inProgress}>
-              {project.status}
-            </span>
-            <div className={styles.projectProgress}>
-              <i style={{ width: `${project.progress}%` }} />
-            </div>
-            <b>{project.progress}%</b>
-          </article>
-        ))}
       </div>
     </section>
   );
@@ -243,29 +189,29 @@ export default function ClientPortal({ portalContext }) {
       <PortalSidebar portal={portal} />
       <div className={styles.portalMain}>
         <PortalHeader portal={portal} />
-        <main className={styles.dashboard} id="dashboard">
-          <section className={styles.metrics} aria-label="Account overview">
-            {portal.metrics.map((metric) => (
-              <MetricCard metric={metric} key={metric.label} />
-            ))}
-          </section>
+        <HubstaffProvider projectConfigured={Boolean(portal.client.hubstaffProjectUrl)}>
+          <main className={styles.dashboard} id="dashboard">
+            <section className={styles.metrics} aria-label="Account overview">
+              <HubstaffMetrics fallbackMetrics={portal.metrics} />
+            </section>
 
-          <div className={styles.dashboardGrid}>
-            <div className={styles.leftColumn}>
-              <TimeOverview />
-              <ProjectProgress projects={portal.projects} />
+            <div className={styles.dashboardGrid}>
+              <div className={styles.leftColumn}>
+                <TimeOverview />
+                <HubstaffProjectProgress fallbackProjects={portal.projects} />
+              </div>
+              <div className={styles.rightColumn}>
+                <AiAssistantPanel
+                  config={SITE_CONFIG}
+                  height={portal.assistantPanel.height}
+                  key={portal.client.slug}
+                  minHeight={portal.assistantPanel.minHeight}
+                />
+                <QuickQuestions questions={portal.quickQuestions} />
+              </div>
             </div>
-            <div className={styles.rightColumn}>
-              <AiAssistantPanel
-                config={SITE_CONFIG}
-                height={portal.assistantPanel.height}
-                key={portal.client.slug}
-                minHeight={portal.assistantPanel.minHeight}
-              />
-              <QuickQuestions questions={portal.quickQuestions} />
-            </div>
-          </div>
-        </main>
+          </main>
+        </HubstaffProvider>
         <footer className={styles.footer}>
           <span>© 2026 Always Open Commerce. Prototype client portal.</span>
           <span>Privacy Policy <i /> Terms of Service</span>

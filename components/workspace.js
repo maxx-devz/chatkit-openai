@@ -518,7 +518,13 @@ function FolderList({ folders, activeFolderId, threads, onSelect, disabled }) {
   );
 }
 
-function HistoryList({ threads, activeThreadId, onSelect, emptyMessage }) {
+function HistoryList({
+  threads,
+  activeThreadId,
+  onSelect,
+  onDelete,
+  emptyMessage,
+}) {
   if (!threads.length) {
     return <p className="history-empty">{emptyMessage}</p>;
   }
@@ -529,23 +535,38 @@ function HistoryList({ threads, activeThreadId, onSelect, emptyMessage }) {
         const title = displayTitle(thread);
 
         return (
-          <button
+          <div
             className="history-row"
             key={thread.id}
-            type="button"
-            onClick={() => onSelect(thread.id)}
-            aria-current={thread.id === activeThreadId ? "true" : undefined}
           >
-            <span className="history-title" title={title}>{title}</span>
-            <span className="history-meta">
-              {thread.parentThreadId ? (
-                <span className="branch-label">Branch</span>
-              ) : null}
-              <time dateTime={new Date(thread.updatedAt).toISOString()}>
-                {formatUpdated(thread.updatedAt)}
-              </time>
-            </span>
-          </button>
+            <button
+              className="history-select"
+              type="button"
+              onClick={() => onSelect(thread.id)}
+              aria-current={thread.id === activeThreadId ? "true" : undefined}
+            >
+              <span className="history-title" title={title}>{title}</span>
+              <span className="history-meta">
+                {thread.parentThreadId ? (
+                  <span className="branch-label">Branch</span>
+                ) : null}
+                <time dateTime={new Date(thread.updatedAt).toISOString()}>
+                  {formatUpdated(thread.updatedAt)}
+                </time>
+              </span>
+            </button>
+            {onDelete ? (
+              <button
+                className="history-delete"
+                type="button"
+                onClick={() => onDelete(thread.id)}
+                aria-label={`Delete ${title}`}
+                title="Delete conversation"
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
         );
       })}
     </div>
@@ -937,6 +958,61 @@ export default function Workspace({ config, embedded = false }) {
     mobileHistoryDialogRef.current?.close();
   }
 
+  function deleteThread(threadId) {
+    const target = workspace.threads.find((thread) => thread.id === threadId);
+    if (!target || !target.messages.length) return;
+
+    const approved = window.confirm(
+      `Delete “${displayTitle(target)}”? This conversation cannot be recovered.`,
+    );
+    if (!approved) return;
+
+    setWorkspace((current) => {
+      const remaining = current.threads.filter((thread) => thread.id !== threadId);
+      const replacement = remaining.some(
+        (thread) => thread.id === current.activeThreadId,
+      )
+        ? remaining.find((thread) => thread.id === current.activeThreadId)
+        : remaining
+          .filter((thread) => thread.folderId === current.activeFolderId)
+          .sort((first, second) => second.updatedAt - first.updatedAt)[0];
+      const nextThread = replacement || createThread(current.activeFolderId);
+      const threads = remaining.some((thread) => thread.id === nextThread.id)
+        ? remaining
+        : [...remaining, nextThread];
+
+      return {
+        ...current,
+        threads,
+        activeFolderId: nextThread.folderId,
+        activeThreadId: nextThread.id,
+      };
+    });
+    setAnnouncement("Conversation deleted.");
+    mobileHistoryDialogRef.current?.close();
+  }
+
+  function clearAllChats() {
+    const savedCount = workspace.threads.filter((thread) => thread.messages.length).length;
+    if (!savedCount) return;
+
+    const approved = window.confirm(
+      `Delete all ${savedCount} saved conversation${savedCount === 1 ? "" : "s"} in this client workspace? This cannot be undone.`,
+    );
+    if (!approved) return;
+
+    setWorkspace((current) => {
+      const draft = createThread(current.activeFolderId);
+      return {
+        ...current,
+        threads: [draft],
+        activeThreadId: draft.id,
+      };
+    });
+    setAnnouncement("All saved conversations were deleted.");
+    mobileHistoryDialogRef.current?.close();
+  }
+
   function updateThreadMessages(threadId, update) {
     setWorkspace((current) => ({
       ...current,
@@ -1112,13 +1188,25 @@ export default function Workspace({ config, embedded = false }) {
           <section className="navigation-section history-section" aria-labelledby="chats-heading">
             <div className="navigation-heading">
               <h2 id="chats-heading">Chats</h2>
-              <span>{visibleThreads.length}</span>
+              <div className="history-heading-actions">
+                <span>{visibleThreads.length}</span>
+                <button
+                  className="history-clear-button"
+                  type="button"
+                  onClick={clearAllChats}
+                  disabled={!savedConversationCount || !hydrated}
+                  title="Delete all saved conversations"
+                >
+                  Clear
+                </button>
+              </div>
             </div>
             {hydrated ? (
               <HistoryList
                 threads={visibleThreads}
                 activeThreadId={workspace.activeThreadId}
                 onSelect={selectThread}
+                onDelete={deleteThread}
                 emptyMessage="No saved chats in this folder yet."
               />
             ) : (
@@ -1193,6 +1281,22 @@ export default function Workspace({ config, embedded = false }) {
               <span className="embedded-history-count">
                 {savedConversationCount} saved
               </span>
+              <button
+                className="embedded-history-action"
+                type="button"
+                onClick={() => deleteThread(activeThread.id)}
+                disabled={!activeThread?.messages.length || !hydrated}
+              >
+                Delete
+              </button>
+              <button
+                className="embedded-history-action embedded-history-action--danger"
+                type="button"
+                onClick={clearAllChats}
+                disabled={!savedConversationCount || !hydrated}
+              >
+                Clear all
+              </button>
               <span
                 className={`embedded-memory-status ${storageMode === "database" ? "connected" : ""}`}
                 title={storageDescription}
@@ -1346,10 +1450,19 @@ export default function Workspace({ config, embedded = false }) {
         >
           + New chat
         </button>
+        <button
+          className="mobile-clear-chats"
+          type="button"
+          onClick={clearAllChats}
+          disabled={!savedConversationCount || !hydrated}
+        >
+          Clear all saved chats
+        </button>
         <HistoryList
           threads={visibleThreads}
           activeThreadId={workspace.activeThreadId}
           onSelect={selectThread}
+          onDelete={deleteThread}
           emptyMessage="No saved chats in this folder yet."
         />
         <button

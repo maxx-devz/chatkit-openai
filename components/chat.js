@@ -10,6 +10,8 @@ const MAX_INPUT_LENGTH = 12000;
 const MAX_ASSET_DATA_URL_LENGTH = 12_000_000;
 const CLIENT_TIMEOUT_MS = 55000;
 const MAX_CONTEXT_MESSAGES = 98;
+const PAUSED_RESPONSE_MESSAGE =
+  "Response paused when you switched chats. Return here and choose Retry response to continue.";
 const LOCAL_ASSET_SOURCES = {
   "aoc-icon": aocIcon.src,
   "aoc-logo": aocLogo.src,
@@ -289,6 +291,7 @@ export default function Chat({
   const [error, setError] = useState("");
   const [assistantAnnouncement, setAssistantAnnouncement] = useState("");
   const abortRef = useRef(null);
+  const requestMetaRef = useRef(null);
   const sendingRef = useRef(false);
   const messagesRef = useRef(null);
   const textAreaRef = useRef(null);
@@ -318,7 +321,26 @@ export default function Chat({
   }, [messages]);
 
   useEffect(() => {
-    return () => abortRef.current?.abort();
+    return () => {
+      const activeRequest = requestMetaRef.current;
+      if (activeRequest) {
+        activeRequest.paused = true;
+        onMessagesChange((current) => current.map((message) => (
+          message.id === activeRequest.assistantMessageId
+            ? {
+                ...message,
+                content: message.content?.trim() || PAUSED_RESPONSE_MESSAGE,
+                errorMessage: PAUSED_RESPONSE_MESSAGE,
+                status: "stopped",
+                phase: "stopped",
+                progressMessage: "",
+              }
+            : message
+        )));
+        requestMetaRef.current = null;
+      }
+      abortRef.current?.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -347,11 +369,23 @@ export default function Chat({
     );
   }
 
-  async function sendMessage(text) {
+  async function sendMessage(text, { retryAssistantId = "" } = {}) {
     const content = text.trim();
     if (!content || sendingRef.current) return;
 
-    const requestHistory = completedRequestHistory(messages)
+    const retryIndex = retryAssistantId
+      ? messages.findIndex((message) => message.id === retryAssistantId)
+      : -1;
+    const retryUserMessage = retryIndex > 0 ? messages[retryIndex - 1] : null;
+    const retrying = Boolean(
+      retryUserMessage?.role === "user"
+      && messages[retryIndex]?.role === "assistant"
+      && ["stopped", "failed"].includes(messages[retryIndex]?.status),
+    );
+    const baseMessages = retrying
+      ? messages.filter((message) => message.id !== retryUserMessage.id && message.id !== retryAssistantId)
+      : messages;
+    const requestHistory = completedRequestHistory(baseMessages)
       .slice(-MAX_CONTEXT_MESSAGES);
 
     if (
@@ -390,13 +424,24 @@ export default function Chat({
     setStatus("streaming");
     setAssistantAnnouncement("Assistant is responding.");
     onMessagesChange((current) => [
-      ...current,
+      ...(retrying
+        ? current.filter(
+            (message) => message.id !== retryUserMessage.id
+              && message.id !== retryAssistantId,
+          )
+        : current),
       userMessage,
       assistantMessage,
     ]);
 
     const controller = new AbortController();
     abortRef.current = controller;
+    const requestMeta = {
+      controller,
+      assistantMessageId: assistantMessage.id,
+      paused: false,
+    };
+    requestMetaRef.current = requestMeta;
     let receivedContent = "";
     let receivedAssets = 0;
     let requestTimedOut = false;
@@ -498,12 +543,14 @@ export default function Chat({
       const stopped = requestError.name === "AbortError" && !requestTimedOut;
       const failureMessage = requestTimedOut
         ? "The response took too long and was stopped. Please try again."
-        : stopped
-          ? "Response stopped."
+        : requestMeta.paused
+          ? PAUSED_RESPONSE_MESSAGE
+          : stopped
+            ? "Response stopped. Choose Retry response to continue."
           : requestError.message || "Something went wrong.";
       setError("");
       setAssistantAnnouncement(
-        stopped ? "Response stopped." : "Response incomplete.",
+        requestMeta.paused || stopped ? "Response paused." : "Response incomplete.",
       );
 
       onMessagesChange((current) => {
@@ -515,7 +562,7 @@ export default function Chat({
           message.id === assistantMessage.id
             ? {
                 ...message,
-                content: assistant?.content.trim() ? assistant.content : "",
+                content: assistant?.content.trim() ? assistant.content : failureMessage,
                 errorMessage: failureMessage,
                 ...(normalizeDiagnostic(requestError.diagnostic)
                   ? { diagnostic: normalizeDiagnostic(requestError.diagnostic) }
@@ -531,6 +578,7 @@ export default function Chat({
       window.clearTimeout(clientTimeout);
       if (abortRef.current === controller) {
         abortRef.current = null;
+        requestMetaRef.current = null;
         sendingRef.current = false;
         setStatus("idle");
         textAreaRef.current?.focus();
@@ -541,6 +589,18 @@ export default function Chat({
   function handleSubmit(event) {
     event.preventDefault();
     sendMessage(input);
+  }
+
+  function retryMessage(assistantMessageId) {
+    const index = messages.findIndex((message) => message.id === assistantMessageId);
+    const previous = index > 0 ? messages[index - 1] : null;
+    if (
+      previous?.role !== "user"
+      || messages[index]?.role !== "assistant"
+      || !["stopped", "failed"].includes(messages[index]?.status)
+    ) return;
+
+    sendMessage(previous.content, { retryAssistantId: assistantMessageId });
   }
 
   function handleKeyDown(event) {
@@ -563,6 +623,23 @@ export default function Chat({
   }
 
   function newConversation() {
+    const activeRequest = requestMetaRef.current;
+    if (activeRequest) {
+      activeRequest.paused = true;
+      onMessagesChange((current) => current.map((message) => (
+        message.id === activeRequest.assistantMessageId
+          ? {
+              ...message,
+              content: message.content?.trim() || PAUSED_RESPONSE_MESSAGE,
+              errorMessage: PAUSED_RESPONSE_MESSAGE,
+              status: "stopped",
+              phase: "stopped",
+              progressMessage: "",
+            }
+          : message
+      )));
+      requestMetaRef.current = null;
+    }
     abortRef.current?.abort();
     onNewConversation();
   }
@@ -795,14 +872,32 @@ export default function Chat({
                   </span>
                 ) : null}
                 {message.role === "assistant" && message.status === "stopped" ? (
-                  <span className="message-status">Response stopped</span>
+                  <div className="message-status message-status--retryable">
+                    <span>{message.errorMessage || "Response paused. Choose Retry response to continue."}</span>
+                    <button
+                      type="button"
+                      onClick={() => retryMessage(message.id)}
+                      disabled={isStreaming}
+                    >
+                      Retry response
+                    </button>
+                  </div>
                 ) : null}
                 {message.role === "assistant" && message.status === "failed" ? (
-                  <span className="message-status error">
-                    Response incomplete: {message.errorMessage
-                      || message.content
-                      || "Please try again."}
-                  </span>
+                  <div className="message-status error message-status--retryable">
+                    <span>
+                      Response incomplete: {message.errorMessage
+                        || message.content
+                        || "Please try again."}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => retryMessage(message.id)}
+                      disabled={isStreaming}
+                    >
+                      Retry response
+                    </button>
+                  </div>
                 ) : null}
                 {message.role === "assistant"
                   && message.status === "failed"

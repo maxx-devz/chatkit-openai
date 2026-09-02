@@ -3,6 +3,7 @@ import {
   assertTrustedAdminMutation,
   resetAdminClientUsage,
 } from "@/lib/admin-data";
+import { readJsonRequest, requestSecurityErrorResponse } from "@/lib/request-security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,10 +11,10 @@ export const dynamic = "force-dynamic";
 export async function POST(request) {
   try {
     assertTrustedAdminMutation(request.headers);
-    const body = await request.json();
+    const body = await readJsonRequest(request, 4_000);
     const client = await resetAdminClientUsage(body?.slug, request.headers);
     return Response.json({ reset: true, client });
   } catch (error) {
-    return adminErrorResponse(error);
+    return requestSecurityErrorResponse(error) || adminErrorResponse(error);
   }
 }

@@ -1,0 +1,522 @@
+.card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #dce7f1;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 14px 38px rgba(31, 74, 115, 0.08);
+}
+
+.card::before {
+  position: absolute;
+  top: -140px;
+  right: -95px;
+  width: 360px;
+  height: 360px;
+  border: 1px solid rgba(22, 147, 214, 0.14);
+  border-radius: 50%;
+  box-shadow: 0 0 0 36px rgba(22, 147, 214, 0.035), 0 0 0 74px rgba(22, 147, 214, 0.025);
+  content: "";
+  pointer-events: none;
+}
+
+.header,
+.body,
+.notice {
+  position: relative;
+  z-index: 1;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 23px 26px 19px;
+  border-bottom: 1px solid #e7eef5;
+}
+
+.heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 13px;
+}
+
+.headingIcon,
+.emptyIcon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #c7e1f5;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #eef8ff, #dceeff);
+}
+
+.headingIcon { width: 48px; height: 48px; }
+
+.heading p,
+.heading h2,
+.heading > div > span,
+.contextControls label span,
+.emptyState h3,
+.emptyState p,
+.privacyNote { margin: 0; }
+
+.heading p {
+  color: #1389c8;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+.heading h2 {
+  margin-top: 2px;
+  color: #19324e;
+  font-size: 20px;
+  letter-spacing: -.025em;
+}
+
+.heading > div > span {
+  display: block;
+  margin-top: 3px;
+  color: #7d8ea2;
+  font-size: 12px;
+}
+
+.contextControls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  gap: 9px;
+}
+
+.contextControls label {
+  display: grid;
+  gap: 5px;
+}
+
+.contextControls label span {
+  color: #73869d;
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.contextControls select {
+  min-width: 150px;
+  height: 35px;
+  padding: 0 28px 0 10px;
+  border: 1px solid #d2e0ec;
+  border-radius: 8px;
+  outline: 0;
+  background: #fbfdff;
+  color: #334b65;
+  font: inherit;
+  font-size: 11px;
+}
+
+.contextControls select:focus {
+  border-color: #168bce;
+  box-shadow: 0 0 0 3px rgba(22, 139, 206, .12);
+}
+
+.notice {
+  margin: 0;
+  padding: 9px 26px;
+  border-bottom: 1px solid #f1e5c6;
+  background: #fffaf0;
+  color: #8b6a30;
+  font-size: 11px;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 20px;
+  padding: 0 26px 20px;
+}
+
+.history {
+  min-width: 0;
+  padding: 20px 0 0;
+  border-right: 1px solid #edf2f6;
+  padding-right: 17px;
+}
+
+.historyHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 11px;
+}
+
+.historyHeader span,
+.historyHeader h3,
+.historyNote,
+.noHistory { margin: 0; }
+
+.historyHeader span {
+  color: #8798a9;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+
+.historyHeader h3 {
+  margin-top: 2px;
+  color: #334e68;
+  font-size: 14px;
+}
+
+.historyActions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.historyHeader .clearHistory {
+  min-height: 25px;
+  padding: 4px 7px;
+  border: 1px solid #e4cfcf;
+  border-radius: 6px;
+  background: #fff9f9;
+  color: #a25b5b;
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 720;
+}
+
+.historyHeader .clearHistory:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.historyActions > button:last-child {
+  display: grid;
+  width: 29px;
+  height: 29px;
+  place-items: center;
+  border: 1px solid #cae1ef;
+  border-radius: 8px;
+  background: #f4fbff;
+  color: #087fc6;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.historyList {
+  display: grid;
+  max-height: 310px;
+  gap: 5px;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.historyList > div {
+  display: flex;
+  min-width: 0;
+  align-items: stretch;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.historyList > div:hover,
+.historyList > div.activeSession {
+  border-color: #d8e8f2;
+  background: #f7fbfe;
+}
+
+.historyList > div.activeSession {
+  border-color: #c6e4f5;
+  background: #edf8ff;
+}
+
+.historyList > div > button:first-child {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #405971;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  text-align: left;
+}
+
+.historyList > div > button:first-child:hover { background: transparent; }
+
+.deleteSession {
+  width: 29px;
+  flex: 0 0 29px;
+  margin: 5px 5px 5px 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #8b9aab;
+  cursor: pointer;
+  font: inherit;
+  font-size: 17px;
+  line-height: 1;
+  opacity: 0;
+}
+
+.historyList > div:hover .deleteSession,
+.deleteSession:focus-visible { opacity: 1; }
+
+.deleteSession:hover { background: #fff0f0; color: #ac5757; }
+
+.historyList strong {
+  overflow: hidden;
+  color: #38536e;
+  font-size: 11px;
+  font-weight: 730;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyList small {
+  overflow: hidden;
+  color: #8a9cad;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.noHistory { padding: 10px; color: #8a9cad; font-size: 10px; }
+
+.historyNote {
+  margin-top: 12px;
+  color: #9aa8b6;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.chatColumn { min-width: 0; }
+
+.conversation {
+  min-height: 235px;
+  max-height: 420px;
+  overflow: auto;
+  padding: 22px 5px 15px;
+}
+
+.emptyState {
+  display: grid;
+  place-items: center;
+  padding: 22px 12px 16px;
+  text-align: center;
+}
+
+.emptyIcon { width: 64px; height: 64px; border-radius: 18px; }
+
+.emptyState h3 {
+  margin-top: 12px;
+  color: #203750;
+  font-size: 17px;
+}
+
+.emptyState p {
+  max-width: 480px;
+  margin-top: 5px;
+  color: #7b8ca0;
+  font-size: 12px;
+}
+
+.starters {
+  display: flex;
+  max-width: 850px;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.starters button {
+  flex: 1;
+  min-height: 52px;
+  padding: 9px 11px;
+  border: 1px solid #d5e3ef;
+  border-radius: 10px;
+  background: #fcfeff;
+  color: #45617b;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: left;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.starters button:hover { border-color: #79bce5; background: #f4fbff; transform: translateY(-1px); }
+
+.messageRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 9px;
+  margin: 0 0 13px;
+}
+
+.userRow { justify-content: flex-end; }
+
+.messageAvatar {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 9px;
+  background: #eaf6ff;
+}
+
+.messageBubble {
+  max-width: min(720px, 82%);
+  padding: 10px 13px;
+  border: 1px solid #e1eaf2;
+  border-radius: 13px 13px 13px 4px;
+  background: #fff;
+}
+
+.userRow .messageBubble {
+  border-color: #d8ebfa;
+  border-radius: 13px 13px 4px 13px;
+  background: #eef8ff;
+}
+
+.messageAuthor {
+  display: block;
+  margin-bottom: 4px;
+  color: #1884c0;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.userRow .messageAuthor { color: #55708a; text-align: right; }
+
+.messageBubble p {
+  margin: 0;
+  color: #2e455d;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.interruptedMessage {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid #e8eef4;
+  color: #7a8da1;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.interruptedMessage button {
+  padding: 5px 8px;
+  border: 1px solid #b9d8eb;
+  border-radius: 7px;
+  background: #f2faff;
+  color: #0b73b6;
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 760;
+}
+
+.interruptedMessage button:hover { background: #e2f4ff; }
+.interruptedMessage button:disabled { cursor: not-allowed; opacity: .55; }
+
+.error {
+  margin: 0 0 10px;
+  padding: 9px 11px;
+  border: 1px solid #f0c6c6;
+  border-radius: 8px;
+  background: #fff5f5;
+  color: #a33c3c;
+  font-size: 11px;
+}
+
+.composer {
+  display: flex;
+  align-items: stretch;
+  gap: 9px;
+  padding-top: 13px;
+  border-top: 1px solid #edf2f6;
+}
+
+.composer textarea {
+  min-height: 48px;
+  flex: 1;
+  resize: vertical;
+  padding: 11px 12px;
+  border: 1px solid #cbdde9;
+  border-radius: 10px;
+  outline: 0;
+  background: #fbfdff;
+  color: #243d57;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.composer textarea:focus { border-color: #178dce; box-shadow: 0 0 0 3px rgba(23, 141, 206, .11); }
+
+.composer button {
+  align-self: stretch;
+  min-width: 116px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #087fc6, #07579b);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 780;
+  transition: filter 150ms ease, opacity 150ms ease;
+}
+
+.composer button:hover:not(:disabled) { filter: brightness(1.08); }
+.composer button:disabled { cursor: not-allowed; opacity: .5; }
+
+.privacyNote {
+  margin-top: 10px;
+  color: #8b9bad;
+  font-size: 10px;
+  text-align: right;
+}
+
+@media (max-width: 820px) {
+  .header { display: grid; }
+  .contextControls { align-items: stretch; }
+  .contextControls label { flex: 1; }
+  .contextControls select { width: 100%; }
+  .starters { display: grid; width: 100%; }
+}
+
+@media (max-width: 520px) {
+  .header, .body { padding-right: 16px; padding-left: 16px; }
+  .body { display: block; }
+  .history { padding: 16px 0 12px; border-right: 0; border-bottom: 1px solid #edf2f6; }
+  .historyList { display: flex; max-height: none; overflow-x: auto; padding-bottom: 3px; }
+  .historyList > div { min-width: 180px; }
+  .historyList > div .deleteSession { opacity: 1; }
+  .contextControls { display: grid; }
+  .composer { display: grid; }
+  .composer button { min-height: 40px; }
+}

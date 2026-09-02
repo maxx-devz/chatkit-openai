@@ -487,6 +487,151 @@
   font-size: 12px;
 }
 
+.liveBadge {
+  margin-left: auto;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #e9f8f1;
+  color: #20855a;
+  font-size: 8px;
+  font-weight: 760;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+
+.liveProjectMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 16px 8px;
+}
+
+.liveProjectMeta strong,
+.liveProjectMeta span {
+  display: block;
+}
+
+.liveProjectMeta strong {
+  color: #25344a;
+  font-size: 10px;
+}
+
+.liveProjectMeta span {
+  margin-top: 3px;
+  color: #8490a1;
+  font-size: 8px;
+}
+
+.liveProjectMeta a {
+  flex: 0 0 auto;
+  color: #176be7;
+  font-size: 9px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.liveProjectMeta a:hover { text-decoration: underline; }
+
+.taskBoard {
+  display: flex;
+  gap: 9px;
+  padding: 5px 16px 14px;
+  overflow-x: auto;
+}
+
+.taskColumn {
+  display: grid;
+  min-width: 145px;
+  flex: 1 0 145px;
+  align-content: start;
+  overflow: hidden;
+  border: 1px solid #e2eaf2;
+  border-radius: 9px;
+  background: #f7fafd;
+}
+
+.taskColumn > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  padding: 8px 9px;
+  background: #edf5fb;
+}
+
+.taskColumn > header strong {
+  overflow: hidden;
+  color: #48617a;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.taskColumn > header span {
+  display: grid;
+  min-width: 17px;
+  height: 17px;
+  place-items: center;
+  border-radius: 999px;
+  background: #dcebf7;
+  color: #4c7694;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.taskColumn > div {
+  display: grid;
+  gap: 6px;
+  padding: 7px;
+}
+
+.taskCard {
+  display: grid;
+  gap: 5px;
+  padding: 8px;
+  border: 1px solid #e2e9f1;
+  border-radius: 7px;
+  background: #fff;
+  box-shadow: 0 3px 9px rgba(32, 68, 106, .045);
+}
+
+.taskCard strong {
+  color: #2d425b;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.taskCard small {
+  color: #7e8ea1;
+  font-size: 8px;
+  text-transform: capitalize;
+}
+
+.liveEmpty,
+.liveLoading,
+.liveWarning {
+  margin: 0;
+  padding: 11px 16px;
+  color: #7b8b9e;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.liveLoading { color: #176be7; }
+
+.liveWarning {
+  border-top: 1px solid #f3e2bf;
+  background: #fffaf0;
+  color: #946f2d;
+}
+
+.liveWarning small {
+  font-size: inherit;
+  font-weight: 650;
+}
+
 .glanceStats {
   display: grid;
   padding: 19px 18px;

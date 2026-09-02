@@ -13,6 +13,7 @@
     "admin:migrate": "node --env-file=.env.local scripts/migrate-admin.mjs",
     "client:create": "node --env-file=.env.local scripts/create-client.mjs",
     "client:delete": "node --env-file=.env.local scripts/delete-client.mjs",
+    "list:client": "node --env-file=.env.local scripts/list-clients.mjs",
     "admin:create": "node --env-file=.env.local scripts/create-admin.mjs"
   },
   "dependencies": {

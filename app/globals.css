@@ -221,6 +221,33 @@ input:focus-visible {
   font-size: 10px;
 }
 
+.history-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.history-clear-button {
+  padding: 3px 6px;
+  border: 1px solid rgba(194, 211, 228, 0.18);
+  border-radius: 5px;
+  background: transparent;
+  color: #9aa8ba;
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px;
+}
+
+.history-clear-button:hover:not(:disabled) {
+  border-color: rgba(247, 155, 155, 0.45);
+  color: #ffc4c4;
+}
+
+.history-clear-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .icon-button {
   display: grid;
   width: 28px;
@@ -332,10 +359,57 @@ input:focus-visible {
 .history-row {
   display: flex;
   min-height: 48px;
-  justify-content: center;
-  flex-direction: column;
-  gap: 5px;
+  align-items: stretch;
+  gap: 3px;
+  padding: 0;
+}
+
+.history-select {
+  min-width: 0;
+  flex: 1;
   padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.history-select:hover {
+  background: rgba(255, 255, 255, 0.055);
+  color: #fff;
+}
+
+.history-select[aria-current="true"] {
+  background: rgba(126, 214, 184, 0.12);
+  color: #e3fff5;
+}
+
+.history-delete {
+  width: 29px;
+  flex: 0 0 29px;
+  margin: 5px 5px 5px 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #8492a5;
+  cursor: pointer;
+  font: inherit;
+  font-size: 17px;
+  line-height: 1;
+  opacity: 0;
+}
+
+.history-row:hover .history-delete,
+.history-delete:focus-visible {
+  opacity: 1;
+}
+
+.history-delete:hover {
+  background: rgba(227, 112, 112, 0.14);
+  color: #ffb5b5;
 }
 
 .history-title {
@@ -785,6 +859,37 @@ input:focus-visible {
   font-size: 9px;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.embedded-history-action {
+  min-height: 28px;
+  padding: 5px 8px;
+  border: 1px solid #dce7f3;
+  border-radius: 7px;
+  background: #fff;
+  color: #657991;
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 720;
+  white-space: nowrap;
+}
+
+.embedded-history-action:hover:not(:disabled) {
+  border-color: #a9cde4;
+  background: #f4fbff;
+  color: #146d9e;
+}
+
+.embedded-history-action--danger:hover:not(:disabled) {
+  border-color: #efc1c1;
+  background: #fff6f6;
+  color: #a64c4c;
+}
+
+.embedded-history-action:disabled {
+  cursor: not-allowed;
+  opacity: .45;
 }
 
 .embedded-memory-status {
@@ -1603,6 +1708,9 @@ input:focus-visible {
 
 .message-status {
   display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 10px;
   padding: 3px 7px;
   border-radius: 6px;
@@ -1622,6 +1730,22 @@ input:focus-visible {
   line-height: 1.4;
   text-transform: none;
 }
+
+.message-status--retryable button {
+  padding: 4px 7px;
+  border: 1px solid rgba(29, 104, 173, .28);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .7);
+  color: #1765a5;
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 750;
+  text-transform: none;
+}
+
+.message-status--retryable button:hover { background: #fff; }
+.message-status--retryable button:disabled { cursor: not-allowed; opacity: .55; }
 
 .request-diagnostic {
   margin-top: 9px;
@@ -1978,16 +2102,25 @@ dialog::backdrop {
 
 .mobile-history-dialog .history-row {
   min-height: 56px;
-  padding: 9px 11px;
   border: 1px solid #e8ebef;
   background: #f8f9fa;
   color: #3c485c;
 }
 
-.mobile-history-dialog .history-row[aria-current="true"] {
+.mobile-history-dialog .history-select {
+  padding: 9px 11px;
+}
+
+.mobile-history-dialog .history-select[aria-current="true"] {
   border-color: #b9d9cd;
   background: var(--accent-soft);
   color: var(--accent-dark);
+}
+
+.mobile-history-dialog .history-delete {
+  margin: 5px 5px 5px 0;
+  color: #8996a5;
+  opacity: 1;
 }
 
 .mobile-history-dialog .history-title {
@@ -1999,7 +2132,8 @@ dialog::backdrop {
 }
 
 .mobile-new-chat,
-.mobile-add-folder {
+.mobile-add-folder,
+.mobile-clear-chats {
   min-height: 44px;
   padding: 10px 13px;
   border-radius: 10px;
@@ -2011,6 +2145,17 @@ dialog::backdrop {
   border: 1px solid var(--accent);
   background: var(--accent);
   color: #fff;
+}
+
+.mobile-clear-chats {
+  border: 1px solid #efcaca;
+  background: #fff7f7;
+  color: #a75151;
+}
+
+.mobile-clear-chats:disabled {
+  cursor: not-allowed;
+  opacity: .45;
 }
 
 .mobile-add-folder {

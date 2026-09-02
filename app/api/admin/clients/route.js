@@ -5,6 +5,7 @@ import {
   loadAdminDashboard,
   updateAdminClient,
 } from "@/lib/admin-data";
+import { readJsonRequest, requestSecurityErrorResponse } from "@/lib/request-security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,25 +16,25 @@ export async function GET(request) {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
-    return adminErrorResponse(error);
+    return requestSecurityErrorResponse(error) || adminErrorResponse(error);
   }
 }
 
 export async function POST(request) {
   try {
     assertTrustedAdminMutation(request.headers);
-    const body = await request.json();
+    const body = await readJsonRequest(request, 32_000);
     const client = await createAdminClient(body, request.headers);
     return Response.json({ created: true, client }, { status: 201 });
   } catch (error) {
-    return adminErrorResponse(error);
+    return requestSecurityErrorResponse(error) || adminErrorResponse(error);
   }
 }
 
 export async function PATCH(request) {
   try {
     assertTrustedAdminMutation(request.headers);
-    const body = await request.json();
+    const body = await readJsonRequest(request, 32_000);
     const client = await updateAdminClient(body, request.headers);
     return Response.json({ saved: true, client });
   } catch (error) {

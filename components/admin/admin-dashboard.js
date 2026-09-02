@@ -6,6 +6,7 @@ import { useMemo, useRef, useState } from "react";
 import aocIcon from "@/aoc-icon.png";
 import aocLogo from "@/aoc-logo.png";
 import SignOutButton from "@/components/auth/sign-out-button";
+import AdminAssistant from "@/components/admin/admin-assistant";
 import styles from "./admin-dashboard.module.css";
 
 const ICONS = {
@@ -60,6 +61,7 @@ function settingsFromClient(client) {
         monthlyPromptLimit: client.monthlyPromptLimit,
         assistantInstructions: client.assistantInstructions,
         vectorStoreId: client.vectorStoreId,
+        hubstaffProjectUrl: client.hubstaffProjectUrl || "",
       }
     : null;
 }
@@ -199,6 +201,7 @@ export default function AdminDashboard({ initialData }) {
           name: form.get("name"),
           password: form.get("password"),
           monthlyPromptLimit: Number(form.get("monthlyPromptLimit")),
+          hubstaffProjectUrl: form.get("hubstaffProjectUrl"),
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -235,7 +238,8 @@ export default function AdminDashboard({ initialData }) {
         <nav aria-label="Administrator portal">
           <a className={styles.activeNav} href="#overview"><Icon name="overview" />Overview</a>
           <a href="#clients"><Icon name="clients" />Client controls</a>
-          <a href="#ai-controls"><Icon name="spark" />AI allowances</a>
+          <a href="#assistant"><Icon name="spark" />AI assistant</a>
+          <a href="#ai-controls"><Icon name="activity" />AI allowances</a>
           <a href="#security"><Icon name="shield" />Access & security</a>
         </nav>
 
@@ -297,6 +301,8 @@ export default function AdminDashboard({ initialData }) {
               tone="green"
             />
           </section>
+
+          <AdminAssistant clients={clients} />
 
           <section className={styles.workspace} id="clients">
             <aside className={styles.clientDirectory}>
@@ -493,6 +499,16 @@ export default function AdminDashboard({ initialData }) {
                         />
                         <small>Optional approved file-search knowledge base for this client only.</small>
                       </label>
+                      <label className={styles.vectorField}>
+                        <span>Hubstaff project URL</span>
+                        <input
+                          type="url"
+                          placeholder="https://tasks.hubstaff.com/app/organizations/14952/projects/803599"
+                          value={draft.hubstaffProjectUrl}
+                          onChange={(event) => updateDraft("hubstaffProjectUrl", event.target.value)}
+                        />
+                        <small>Optional. Only this client&apos;s project is queried for monthly hours and task progress.</small>
+                      </label>
                     </section>
 
                     <section className={`${styles.settingsCard} ${styles.wideCard}`}>
@@ -550,6 +566,14 @@ export default function AdminDashboard({ initialData }) {
             <label><span>Username</span><input name="username" minLength="3" maxLength="50" required pattern="[a-z0-9][a-z0-9._-]{2,49}" placeholder="churchbanners" /></label>
             <label className={styles.dialogWide}><span>Temporary password</span><input name="password" type="password" minLength="12" maxLength="128" required autoComplete="new-password" placeholder="At least 12 characters" /></label>
             <label className={styles.dialogWide}><span>Monthly requests</span><input name="monthlyPromptLimit" type="number" min="1" max="100000" defaultValue="150" required /></label>
+            <label className={styles.dialogWide}>
+              <span>Hubstaff project URL</span>
+              <input
+                name="hubstaffProjectUrl"
+                type="url"
+                placeholder="https://tasks.hubstaff.com/app/organizations/14952/projects/803599"
+              />
+            </label>
           </div>
           {createError ? <p className={styles.dialogError} role="alert">{createError}</p> : null}
           <footer>
