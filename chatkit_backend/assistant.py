@@ -11,6 +11,7 @@ from chatkit.types import UserMessageItem
 
 from store import Context
 from generation import generation_tools
+from provider_errors import provider_issue
 from usage_tracking import record_usage
 
 logger = logging.getLogger(__name__)
@@ -66,8 +67,10 @@ class PortalChatKitServer(ChatKitServer[Context]):
             async for event in stream_agent_response(agent_context, result):
                 yield event
         except Exception as error:
-            logger.error("Assistant response failed: %s", type(error).__name__)
-            raise CustomStreamError("The assistant could not finish this reply. Please try again.", allow_retry=True) from None
+            issue = provider_issue(error)
+            # Log only our known code, never the provider body, prompt or API key.
+            logger.error("Assistant response failed: %s code=%s", type(error).__name__, issue.code)
+            raise CustomStreamError(issue.message, allow_retry=issue.allow_retry) from None
         finally:
             if result:
                 if not result.is_complete:

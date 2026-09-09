@@ -283,6 +283,15 @@ domain registration, or deployment health. Those need a real client test.
   tool. Instructions alone do not enable it.
 - **Reply/image fails:** check API billing and access to the configured models.
   Image generation is separately billed and can exceed the bounded request time.
+- **OpenAI `200 OK`, then `Error streaming response` / `APIError`:** HTTP 200
+  only means the response stream opened. An error event can still stop the reply.
+  Deploy the latest Python backend to see a specific inline ChatKit message for
+  credits, quota/billing limits, temporary rate limits, or model access. Backend
+  logs now include a safe code, for example
+  `Assistant response failed: APIError code=credit_balance_exhausted`.
+  Billing and configuration failures do not offer an immediate Retry button;
+  after the account owner fixes the problem, send the message again. Temporary
+  failures remain retryable. No raw provider messages or credentials are exposed.
 - **`429 credit_balance_exhausted`:** add API credits in your API Platform billing
   settings, then retry. Your ChatGPT Business subscription does not fund API
   requests. Increasing a client's portal allowance does not resolve this error.
