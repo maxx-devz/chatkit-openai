@@ -5,8 +5,11 @@ client login, a tenant-isolated AOC AI Assistant, saved conversations in Neon
 Postgres, and an administrator dashboard for managing clients and monthly AI
 allowances.
 
-The application is one JavaScript/Next.js project. It does not require Python
-or a separate application server.
+The client assistant now uses OpenAI ChatKit with a Python backend. The website
+and administrator interface remain Next.js. Start with
+[the ChatKit setup guide](docs/CHATKIT_SETUP.md) for local setup, credentials,
+the additional database migration, and deploying the Python service on Vercel.
+The older assistant remains available through `CLIENT_ASSISTANT_UI=legacy`.
 
 ## Current status
 
@@ -16,11 +19,10 @@ This working prototype includes:
 - no public account-registration page;
 - dynamic client accounts stored in Neon Postgres;
 - server-side client membership and administrator authorization checks;
-- per-client folders, chat history, conversation branches, replies, generated
-  image references, errors, models, and usage metadata;
+- ChatKit conversations with persistent history, rename, delete, and retries;
+- a read-only archive of conversations from the earlier assistant;
 - streaming OpenAI Responses API output;
-- a model selector populated from models available to the configured OpenAI
-  API project;
+- a server-configured model for ChatKit (the older interface retains its selector);
 - global AOC instructions, per-client instructions, and optional per-client
   OpenAI vector stores;
 - monthly AI request and token-usage tracking;
@@ -40,10 +42,11 @@ history are database-backed.
 
 ## Important implementation note
 
-The chat interface is a custom React interface using the OpenAI Responses API.
-It does not currently use `@openai/chatkit-react` or the hosted ChatKit server
-protocol. This keeps the prototype as a single Next.js application, but moving
-to the ChatKit component later would require a separate integration pass.
+The client uses `@openai/chatkit-react` and the official Python ChatKit SDK,
+connected to the Agents SDK and Responses API. Administrator screens are unchanged.
+Agent Builder is being retired; this integration uses a custom server instead.
+See [ChatKit setup and feature differences](docs/CHATKIT_SETUP.md) before deployment.
+The older model/image-generation instructions below apply to the legacy assistant.
 
 ## Architecture
 
@@ -52,8 +55,10 @@ Browser
   -> Next.js pages and authenticated API routes on Vercel
      -> Better Auth session tables in Neon
      -> AOC portal, membership, history, and usage tables in Neon
-     -> OpenAI Responses API
-        -> optional client-specific OpenAI vector store
+     -> signed request to the Python ChatKit service on Vercel
+        -> ChatKit history in Neon and the existing monthly allowance tables
+        -> Agents SDK / OpenAI Responses API
+           -> optional client-specific OpenAI vector store
      -> optional Hubstaff API (server-side project/task/time reads)
 ```
 
@@ -92,7 +97,8 @@ document, revoke or rotate it before using the portal with real clients.
 
 ## Requirements
 
-- Node.js 20.9 or newer; Node.js 22 LTS is recommended.
+- Node.js 22 or newer (required by the installed OpenAI SDK).
+- Python 3.13 for the ChatKit backend.
 - npm.
 - A Neon Postgres database.
 - An OpenAI API key from <https://platform.openai.com/api-keys>.
@@ -672,7 +678,9 @@ and update deliberately. Do not approve unknown install scripts blindly.
 | `npm run client:create -- USERNAME "DISPLAY NAME"` | Create a client login and membership |
 | `npm run client:delete -- USERNAME --confirm-delete` | Permanently delete a client after confirmation |
 | `npm run list:client` | List client names, usernames, and current portal/AI status (read-only) |
-| `npm run dev` | Start development at `http://127.0.0.1:3000` |
+| `npm run dev` | Start Next.js at `http://127.0.0.1:3000` and the local Python service |
+| `npm run dev:web` | Start only Next.js; the Python service must already be running |
+| `npm run chatkit:migrate` | Add ChatKit tables without changing earlier conversations |
 | `npm run lint` | Run ESLint |
 | `npm run build` | Create and verify the Vercel production build |
 | `npm start` | Run an existing production build locally |
@@ -725,7 +733,8 @@ and update deliberately. Do not approve unknown install scripts blindly.
 - Rate limiting beyond the monthly client allowance, audit logs, MFA, account
   lockout policy, password recovery, legal/privacy review, and automated
   tenant-isolation tests are still required before a full production launch.
-- The interface is custom React and does not currently use OpenAI ChatKit.
+- ChatKit initially supports text and configured file search. Uploads, generated
+  images, custom actions, and migration of old folders/branches need a follow-up.
 
 Vercel hosting, Neon, and signed authentication improve the security posture,
 but no platform makes an application automatically secure. Protect Vercel,

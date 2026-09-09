@@ -1,0 +1,29 @@
+.root { display: flex; flex-direction: column; height: 100%; min-height: 0; color: #203752; }
+.toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 8px 14px; border-bottom: 1px solid #e4ebf3; background: #f8fafd; }
+.tabs { display: flex; gap: 4px; }
+.tabs button, .reload, .back { padding: 7px 10px; border: 0; border-radius: 7px; background: transparent; color: #536880; font: inherit; font-size: 12px; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: #e5efff; color: #155bbb; font-weight: 650; }
+.tabs button:focus-visible, .reload:focus-visible, .back:focus-visible, .threadList button:focus-visible { outline: 2px solid #1765ca; outline-offset: 2px; }
+.allowance { margin-left: auto; color: #64748b; font-size: 11px; }
+.reload { color: #1765ca; }
+.content { flex: 1; min-height: 0; position: relative; }
+.content[hidden] { display: none; }
+.surface { display: flex; flex-direction: column; height: 100%; position: relative; min-height: 0; }
+.chat { display: block; width: 100%; height: 100%; min-height: 0; flex: 1; }
+.error { padding: 10px 16px; background: #fff5e9; color: #774318; font-size: 12px; line-height: 1.5; }
+.loading { position: absolute; top: 45%; width: 100%; text-align: center; pointer-events: none; color: #64748b; font-size: 13px; }
+.state { display: grid; place-content: center; height: 100%; padding: 32px; text-align: center; color: #64748b; font-size: 14px; line-height: 1.7; }
+.archive { height: 100%; overflow: auto; padding: 18px 24px; }
+.archiveNote { margin: 0 0 16px; color: #64748b; font-size: 12px; line-height: 1.6; }
+.threadList { margin: 0; padding: 0; list-style: none; }
+.threadList button { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; padding: 16px 12px; text-align: left; background: white; border: 0; border-bottom: 1px solid #e4ebf3; color: #203752; cursor: pointer; }
+.threadList span { white-space: nowrap; color: #64748b; font-size: 11px; }
+.message { margin: 16px 0; padding: 16px; border: 1px solid #e4ebf3; border-radius: 12px; }
+.message strong { font-size: 12px; color: #1765ca; }
+.message p { margin-bottom: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.65; }
+@media (max-width: 600px) {
+  .toolbar { gap: 4px 8px; padding: 6px 8px; }
+  .allowance { order: 3; width: 100%; margin: 0; padding: 3px 10px; }
+  .reload { margin-left: auto; }
+  .archive { padding: 12px; }
+}

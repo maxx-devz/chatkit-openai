@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 export function proxy(request) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDevelopment = process.env.NODE_ENV === "development";
+  const chatkitFrame = request.nextUrl.pathname === "/" && process.env.CLIENT_ASSISTANT_UI !== "legacy"
+    ? " https://cdn.platform.openai.com" : "";
   const policy = `
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDevelopment ? " 'unsafe-eval'" : ""};
@@ -10,6 +12,7 @@ export function proxy(request) {
     img-src 'self' blob: data:;
     font-src 'self' data:;
     connect-src 'self';
+    frame-src 'self'${chatkitFrame};
     media-src 'self' blob: data:;
     worker-src 'self' blob:;
     object-src 'none';

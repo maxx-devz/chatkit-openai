@@ -203,6 +203,9 @@ export default function ClientPortal({ portalContext }) {
               <div className={styles.rightColumn}>
                 <AiAssistantPanel
                   config={SITE_CONFIG}
+                  clientId={portalContext.client.id}
+                  clientName={portalContext.client.name}
+                  userId={portalContext.user.id}
                   height={portal.assistantPanel.height}
                   key={portal.client.slug}
                   minHeight={portal.assistantPanel.minHeight}

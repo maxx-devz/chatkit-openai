@@ -1,0 +1,7 @@
+openai-chatkit==1.6.5
+openai-agents==0.22.1
+openai==3.10.0
+fastapi==0.141.1
+uvicorn==0.52.4
+psycopg[binary]==3.3.5
+python-dotenv==1.2.3

@@ -40,3 +40,9 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# ChatKit Python environment and local questionnaire
+/.venv/
+__pycache__/
+*.pyc
+/answer.txt

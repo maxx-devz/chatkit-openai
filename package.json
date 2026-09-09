@@ -4,20 +4,27 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev -H 127.0.0.1 -p 3000",
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "next dev -H 127.0.0.1 -p 3000",
     "build": "next build",
     "start": "next start -H 127.0.0.1 -p 3000",
-    "lint": "eslint app components config lib scripts next.config.mjs",
+    "lint": "eslint app components config lib scripts next.config.mjs proxy.js",
     "auth:migrate": "node --env-file=.env.local scripts/migrate-auth.mjs",
     "portal:migrate": "node --env-file=.env.local scripts/migrate-portal.mjs",
     "admin:migrate": "node --env-file=.env.local scripts/migrate-admin.mjs",
+    "chatkit:migrate": "node --env-file=.env.local scripts/migrate-chatkit.mjs",
+    "test:chatkit": "node --test tests/chatkit-security.test.mjs",
     "client:create": "node --env-file=.env.local scripts/create-client.mjs",
     "client:delete": "node --env-file=.env.local scripts/delete-client.mjs",
     "list:client": "node --env-file=.env.local scripts/list-clients.mjs",
     "admin:create": "node --env-file=.env.local scripts/create-admin.mjs"
   },
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "@openai/chatkit-react": "1.6.1",
     "better-auth": "^1.7.2",
     "next": "^16.3.3",
     "openai": "^7.7.0",
