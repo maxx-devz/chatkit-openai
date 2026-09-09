@@ -8,6 +8,7 @@ requests. Neon stores client settings, conversations, usage, and generated files
 **Start here: [Local setup and Vercel deployment](docs/CHATKIT_SETUP.md).**
 **Configure replies: [Assistant settings](docs/BUILDER_SETUP.md).**
 **Transfer your custom GPT: [AOC-GPT configuration](docs/AOC_GPT_SETUP.md).**
+**Monitor usage: [Portal usage and allowances](docs/PORTAL_USAGE.md).**
 
 The portal's AOC-GPT is an API assistant. Your team's existing custom GPT inside
 ChatGPT Business does not automatically connect or synchronize with it. Transfer
@@ -43,6 +44,7 @@ command. The setup guide covers credentials and migrations for a fresh checkout.
 - Staff-only settings at `/builder`: drafts, tests, publishing, versions,
   greeting, colors, and starter prompts.
 - Existing administrator dashboard and staff assistant at `/admin`.
+- Staff usage panel with client allowances and recorded client/admin/draft tokens.
 - Optional Hubstaff project, task, and time reads for the client dashboard.
 
 ChatKit is the client assistant interface. The old client chat UI, its model/chat
@@ -66,6 +68,7 @@ Existing accounts, client records, conversations, and administrator tools are re
 | `npm run admin:migrate` | Staff access and monthly usage schema |
 | `npm run chatkit:migrate` | ChatKit conversations and request leases |
 | `npm run builder:migrate` | Assistant configuration, tools, and generated files |
+| `npm run usage:migrate` | Anonymous AI activity totals, independent of allowance resets |
 | `npm run admin:create -- USERNAME "DISPLAY NAME"` | Create a staff login; password is prompted privately |
 | `npm run client:create -- USERNAME "DISPLAY NAME"` | Create a client login |
 | `npm run list:client` | List current client accounts |

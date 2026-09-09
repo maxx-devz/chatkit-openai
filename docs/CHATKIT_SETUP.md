@@ -95,6 +95,7 @@ For an existing portal, add the ChatKit/settings tables:
 ```powershell
 npm run chatkit:migrate
 npm run builder:migrate
+npm run usage:migrate
 npm run setup:check
 ```
 
@@ -141,6 +142,12 @@ The existing custom GPT does not synchronize automatically.
 
 ## 5. Deploy on your existing Vercel URL
 
+Your answers identify a **free Hobby plan**. Vercel restricts Hobby to personal,
+noncommercial use. This AOC client portal is a business application, so arrange
+a plan that permits commercial use (such as Pro) for production. This is separate
+from OpenAI API billing. No hosting plan or subscription was changed here.
+[Vercel Hobby plan terms](https://vercel.com/docs/plans/hobby).
+
 The existing Next.js project keeps **https://quantum-project-xi.vercel.app/**.
 The Python backend is a second Vercel project using the same GitHub repository.
 Vercel supports FastAPI, Python 3.13, and streaming responses.
@@ -157,7 +164,8 @@ and branch names; do not push an incomplete setup straight to production.
    containing these changes for the initial backend deployment. The folder
    contains `app.py`, pinned requirements, `.python-version`, and `vercel.json`.
 3. Set the Python environment variables from the table below. Use the same Neon
-   database as the target frontend. Apply the two new migrations to that database
+   database as the target frontend. Apply `chatkit:migrate`, `builder:migrate`,
+   and `usage:migrate` to that database
    before connecting the frontend.
 4. Deploy Python. Its `/health` endpoint should return
    `{"status":"ok","service":"aoc-chatkit"}`. A health response proves startup;
@@ -210,6 +218,7 @@ npm run lint
 npm test
 .venv\Scripts\python.exe -m unittest discover -s chatkit_backend/tests -v
 node --env-file=.env.local scripts/check-builder-database.mjs
+node --env-file=.env.local scripts/check-usage-database.mjs
 .venv\Scripts\python.exe scripts/check-chatkit-database.py
 npm run build
 ```
@@ -238,6 +247,19 @@ verifies configuration and table presence, not billing, matching remote secrets,
 domain registration, or deployment health. Those need a real client test.
 
 ## Troubleshooting
+
+- **Grey frame: “This content is blocked”:** the old login-page Content Security
+  Policy blocked OpenAI's frame after client-side sign-in. The corrected
+  `proxy.js` permits `https://cdn.platform.openai.com` as a frame source on all
+  portal pages. Deploy the corrected frontend, then press **Ctrl+Shift+R** to
+  replace the old document policy. The ChatKit **Reconnect** button alone cannot
+  replace it. If it persists, inspect the live `/login` response's
+  `Content-Security-Policy` and confirm `frame-src` includes that exact origin;
+  also verify the current domain is registered with ChatKit.
+- **Usage figures or API balance:** open `/admin` → **AI usage** and follow
+  [the usage guide](PORTAL_USAGE.md). Portal limits and token totals do not show
+  your remaining OpenAI credit balance. No Admin API key is needed for the
+  current portal-only dashboard.
 
 - **Chat is being set up:** check the domain key, restart/redeploy Next.js, and
   confirm the domain is registered. A nonempty key alone does not prove validity.

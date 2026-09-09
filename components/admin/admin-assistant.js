@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import aocIcon from "@/aoc-icon.png";
 import styles from "./admin-assistant.module.css";
+import { openaiIssue, OPENAI_BILLING_URL } from "@/lib/openai-issues";
 
 const STARTERS = [
   "Give me a concise operations summary for the selected client.",
@@ -62,6 +63,7 @@ function normalizeHistory(value) {
             ...(typeof message.errorMessage === "string" && message.errorMessage.trim()
               ? { errorMessage: message.errorMessage.trim().slice(0, 500) }
               : {}),
+            ...(typeof message.errorCode === "string" ? { errorCode: message.errorCode.slice(0, 80) } : {}),
           }];
         })
       : [];
@@ -191,6 +193,7 @@ function labelForModel(model) {
 function AdminMessage({ message, onRetry }) {
   const isUser = message.role === "user";
   const canRetry = !isUser && !message.pending && (message.paused || message.errorMessage);
+  const issue = message.errorCode ? openaiIssue({ code: message.errorCode }) : null;
 
   return (
     <div className={`${styles.messageRow} ${isUser ? styles.userRow : styles.assistantRow}`}>
@@ -201,12 +204,14 @@ function AdminMessage({ message, onRetry }) {
       ) : null}
       <div className={styles.messageBubble}>
         <span className={styles.messageAuthor}>{isUser ? "You" : "AOC Admin Assistant"}</span>
-        <p>{message.content || (message.pending ? "Thinking..." : "No response was received.")}</p>
+        {message.content || message.pending ? <p>{message.content || "Thinking..."}</p> : null}
+        {message.errorMessage ? <p role="alert">{message.errorMessage}</p> : null}
+        {issue?.billing ? <a href={OPENAI_BILLING_URL} target="_blank" rel="noreferrer">Open OpenAI billing</a> : null}
         {canRetry ? (
           <div className={styles.interruptedMessage}>
-            <span>{message.errorMessage ? "The response was incomplete." : "This response is paused."}</span>
+            {!message.errorMessage ? <span>This response is paused.</span> : null}
             <button type="button" onClick={() => onRetry(message.id)} disabled={!onRetry}>
-              Retry response
+              {issue?.retryLabel || "Retry response"}
             </button>
           </div>
         ) : null}
@@ -486,7 +491,7 @@ export default function AdminAssistant({ clients }) {
           const diagnostic = payload?.diagnostic?.requestId
             ? ` (Request ID: ${payload.diagnostic.requestId})`
             : "";
-          throw new Error(`${payload?.error || "The assistant could not respond."}${diagnostic}`);
+          throw Object.assign(new Error(`${payload?.error || "The assistant could not respond."}${diagnostic}`), { code: payload?.code });
         }
         return response;
       })
@@ -503,7 +508,7 @@ export default function AdminAssistant({ clients }) {
             )));
           }
           if (event.type === "error") {
-            throw new Error(event.message || "The response stream failed.");
+            throw Object.assign(new Error(event.message || "The response stream failed."), { code: event.code });
           }
           if (event.type === "done") {
             setMessages((current) => current.map((message) => (
@@ -522,18 +527,19 @@ export default function AdminAssistant({ clients }) {
           candidate.id === assistantMessageId
             ? {
                 ...candidate,
-                content: "",
                 pending: false,
                 errorMessage: message,
+                errorCode: requestError.code || "",
               }
             : candidate
         )));
-        setError(message);
+        setError("");
       })
       .finally(() => {
         if (activeRequestRef.current?.id !== requestId) return;
         activeRequestRef.current = null;
         setBusy(false);
+        window.dispatchEvent(new Event("aoc:ai-usage-changed"));
       });
   }
 

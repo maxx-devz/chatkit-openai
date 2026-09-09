@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 export function proxy(request) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDevelopment = process.env.NODE_ENV === "development";
-  const chatkitFrame = request.nextUrl.pathname === "/"
-    ? " https://cdn.platform.openai.com" : "";
+  // Client-side navigation keeps the initial document's CSP. Login and staff
+  // pages must allow the same ChatKit frame as the client workspace.
   const policy = `
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDevelopment ? " 'unsafe-eval'" : ""};
@@ -12,7 +12,7 @@ export function proxy(request) {
     img-src 'self' blob: data:;
     font-src 'self' data:;
     connect-src 'self';
-    frame-src 'self'${chatkitFrame};
+    frame-src 'self' https://cdn.platform.openai.com;
     media-src 'self' blob: data:;
     worker-src 'self' blob:;
     object-src 'none';

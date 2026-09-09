@@ -1,6 +1,7 @@
 """ChatKit's official Agents SDK bridge drives streaming and tool rendering."""
 import logging
 import os
+from datetime import datetime, timezone
 
 from agents import Agent, FileSearchTool, ModelSettings, RunConfig, Runner
 from chatkit.agents import AgentContext, simple_to_agent_input, stream_agent_response
@@ -10,6 +11,7 @@ from chatkit.types import UserMessageItem
 
 from store import Context
 from generation import generation_tools
+from usage_tracking import record_usage
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,7 @@ def make_agent(context, emit=None):
 class PortalChatKitServer(ChatKitServer[Context]):
     async def respond(self, thread, input_user_message, context):
         result = None
+        started_at = datetime.now(timezone.utc)
         try:
             page = await self.store.load_thread_items(thread.id, None, 40, "desc", context)
             # Bound model input to recent messages, then align to a user turn.
@@ -70,6 +73,7 @@ class PortalChatKitServer(ChatKitServer[Context]):
                 if not result.is_complete:
                     result.cancel()
                 usage = result.context_wrapper.usage
+                await record_usage(context.db, "client", started_at, usage)
                 if context.period_start and usage.total_tokens:
                     try:
                         await context.db.execute("""

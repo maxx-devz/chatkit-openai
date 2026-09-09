@@ -14,6 +14,7 @@
     "admin:migrate": "node --env-file=.env.local scripts/migrate-admin.mjs",
     "chatkit:migrate": "node --env-file=.env.local scripts/migrate-chatkit.mjs",
     "builder:migrate": "node --env-file=.env.local scripts/migrate-builder.mjs",
+    "usage:migrate": "node --env-file=.env.local scripts/migrate-usage.mjs",
     "test:builder": "node --test tests/builder-config.test.mjs",
     "test:chatkit": "node --test tests/chatkit-security.test.mjs",
     "client:create": "node --env-file=.env.local scripts/create-client.mjs",

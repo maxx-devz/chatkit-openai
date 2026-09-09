@@ -56,6 +56,7 @@ if (configured("DATABASE_URL")) {
       "portal:migrate": ["portal_clients", "portal_memberships", "portal_workspace_snapshots"],
       "admin:migrate": ["portal_admins", "portal_ai_usage_monthly"],
       "chatkit:migrate": ["portal_chatkit_threads", "portal_chatkit_items", "portal_chatkit_leases"],
+      "usage:migrate": ["portal_ai_activity_monthly", "portal_ai_provider_status"],
       "builder:migrate": ["portal_assistant_configs", "portal_assistant_versions", "portal_assistant_files", "portal_assistant_tool_usage", "portal_assistant_preview_usage"],
     };
     for (const [migration, tables] of Object.entries(groups)) {

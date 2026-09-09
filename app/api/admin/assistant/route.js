@@ -1,4 +1,7 @@
 import OpenAI from "openai";
+import { recordAdminUsage } from "@/lib/portal-usage";
+import { openaiIssue } from "@/lib/openai-issues";
+import { consumeAdminResponse } from "@/lib/admin-response-stream";
 
 import { ADMIN_ASSISTANT_INSTRUCTIONS } from "@/config/assistant";
 import {
@@ -173,7 +176,7 @@ export async function POST(request) {
         }]
       : [];
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0 });
     const upstreamController = new AbortController();
     const timeout = setTimeout(() => {
       upstreamController.abort(new Error("Admin assistant request timed out."));
@@ -185,6 +188,7 @@ export async function POST(request) {
     );
 
     let result;
+    const startedAt = new Date().toISOString();
     try {
       result = await openai.responses.create(
         {
@@ -200,6 +204,7 @@ export async function POST(request) {
       ).withResponse();
     } catch (error) {
       clearTimeout(timeout);
+      await recordAdminUsage(startedAt, null, { code: openaiIssue(error).code, model });
       throw error;
     }
 
@@ -209,7 +214,8 @@ export async function POST(request) {
     };
     const stream = new ReadableStream({
       async start(controller) {
-        let sentText = false;
+        let usage = null;
+        let failure = null;
         try {
           sendLine(controller, {
             type: "status",
@@ -217,32 +223,19 @@ export async function POST(request) {
             message: "Thinking...",
           });
 
-          for await (const event of result.data) {
-            if (event.type === "response.output_text.delta" && typeof event.delta === "string") {
-              sentText = true;
-              sendLine(controller, { type: "delta", delta: event.delta });
-            }
-          }
-
-          sendLine(controller, {
-            type: "done",
-            model,
-            requestId: result.request_id || "",
-            ...(sentText ? {} : { message: "The assistant returned an empty response." }),
+          await consumeAdminResponse(result.data, {
+            onUsage: value => { usage = value; },
+            onDelta: delta => sendLine(controller, { type: "delta", delta }),
           });
         } catch (error) {
-          try {
-            sendLine(controller, {
-              type: "error",
-              message: "The admin assistant could not complete this response.",
-              diagnostic: diagnostic(error, model),
-            });
-          } catch {
-            // The browser may have already cancelled the response stream.
-          }
+          failure = openaiIssue(error);
         } finally {
           clearTimeout(timeout);
+          await recordAdminUsage(startedAt, usage, { code: failure?.code || "ready", model });
           try {
+            sendLine(controller, failure
+              ? { type: "error", message: failure.message, code: failure.code }
+              : { type: "done", model, requestId: result.request_id || "" });
             controller.close();
           } catch {
             // The browser may have cancelled the stream already.
@@ -255,15 +248,15 @@ export async function POST(request) {
   } catch (error) {
     const model = typeof body?.model === "string" ? body.model.slice(0, 120) : "";
     console.error("Admin assistant request failed", diagnostic(error, model));
+    if (error?.publicDetails) return adminErrorResponse(error);
+    const issue = openaiIssue(error);
     return Response.json(
       {
-        error: error?.message && error?.status >= 400 && error?.status < 500
-          ? error.message
-          : "The admin assistant could not complete this response.",
-        code: error?.code || "admin_assistant_error",
+        error: issue.message,
+        code: issue.code,
         diagnostic: diagnostic(error, model),
       },
-      { status: error?.status >= 400 && error.status < 500 ? error.status : 502 },
+      { status: issue.httpStatus, headers: { "Cache-Control": "private, no-store" } },
     );
   }
 }

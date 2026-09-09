@@ -8,6 +8,7 @@ import aocIcon from "@/aoc-icon.png";
 import aocLogo from "@/aoc-logo.png";
 import SignOutButton from "@/components/auth/sign-out-button";
 import AdminAssistant from "@/components/admin/admin-assistant";
+import PortalUsage from "@/components/admin/portal-usage";
 import styles from "./admin-dashboard.module.css";
 
 const ICONS = {
@@ -238,6 +239,7 @@ export default function AdminDashboard({ initialData }) {
 
         <nav aria-label="Administrator portal">
           <a className={styles.activeNav} href="#overview"><Icon name="overview" />Overview</a>
+          <a href="#portal-usage"><Icon name="activity" />AI usage</a>
           <a href="#clients"><Icon name="clients" />Client controls</a>
           <a href="#assistant"><Icon name="spark" />AI assistant</a>
           <Link href="/builder"><Icon name="spark" />Assistant settings</Link>
@@ -304,6 +306,7 @@ export default function AdminDashboard({ initialData }) {
             />
           </section>
 
+          <PortalUsage />
           <AdminAssistant clients={clients} />
 
           <section className={styles.workspace} id="clients">

@@ -1,6 +1,7 @@
 """Signed, staff-only draft tests. Never write to client ChatKit threads."""
 import asyncio
 import os
+from datetime import datetime, timezone
 
 import psycopg
 from agents import Runner, RunConfig
@@ -14,6 +15,7 @@ from assistant import make_agent
 from builder_config import AssistantConfig
 from security import verify_signature
 from store import Context
+from usage_tracking import record_usage
 
 router = APIRouter()
 HEADERS = {"Cache-Control": "private, no-store"}
@@ -74,8 +76,16 @@ async def preview(request: Request):
                 context = Context(db, data.client_id, data.user_id, data.instructions, client,
                     config=AssistantConfig.model_validate(client["draft"]).model_dump(), preview=True,
                     portal_origin=data.portal_origin.rstrip("/"))
-                result = await Runner.run(make_agent(context), [item.model_dump() for item in data.messages],
+                started_at = datetime.now(timezone.utc)
+                result = Runner.run_streamed(make_agent(context), [item.model_dump() for item in data.messages],
                     context=context, max_turns=5, run_config=RunConfig(tracing_disabled=True, trace_include_sensitive_data=False))
+                try:
+                    async for _ in result.stream_events():
+                        pass
+                finally:
+                    if not result.is_complete:
+                        result.cancel()
+                    await record_usage(db, "preview", started_at, result.context_wrapper.usage)
                 return JSONResponse({"text": str(result.final_output), "files": context.artifacts}, headers=HEADERS)
     except Exception:
         # API/provider/database exceptions can contain prompts or configuration.
