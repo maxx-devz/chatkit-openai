@@ -55,8 +55,12 @@ def validate_payload(payload):
         if not text.strip() or len(text) + len(message.quoted_text or "") > 12_000:
             raise ValueError("Invalid message length")
     limit = getattr(parsed.params, "limit", None)
-    if limit is not None and not 1 <= limit <= 100:
-        raise ValueError("Invalid page size")
+    if limit is not None:
+        if limit < 1:
+            raise ValueError("Invalid page size")
+        # ChatKit requests 9999 threads on startup. Return a bounded page with
+        # the Store's has_more/after cursor instead of rejecting the request.
+        parsed.params.limit = min(limit, 100)
     title = getattr(parsed.params, "title", None)
     if title is not None and (not title.strip() or len(title) > 160):
         raise ValueError("Invalid title")

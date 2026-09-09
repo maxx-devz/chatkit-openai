@@ -265,6 +265,11 @@ domain registration, or deployment health. Those need a real client test.
   confirm the domain is registered. A nonempty key alone does not prove validity.
 - **Assistant cannot connect:** verify Python `/health`, its logs, matching
   backend secrets, the HTTPS origin, and any deployment protection token.
+- **"This chat request is not supported" immediately on opening ChatKit:**
+  older backend releases rejected the browser's history request for 9,999
+  conversations. Deploy the current Python backend, which caps each page at
+  100 conversations and preserves pagination. Then refresh the portal. This
+  initial history request does not use OpenAI credits or the client allowance.
 - **Login fails:** preserve the existing auth secret, use the exact frontend
   origin, and confirm both projects target the intended database.
 - **Word/image tool is unavailable:** save and publish that client's enabled
