@@ -3,16 +3,15 @@ import asyncio
 import os
 from datetime import datetime, timezone
 
-import psycopg
 from agents import Runner, RunConfig
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from psycopg.rows import dict_row
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal
 
 from assistant import make_agent
 from builder_config import AssistantConfig
+from database import connect_database
 from security import verify_signature
 from store import Context
 from usage_tracking import record_usage
@@ -55,8 +54,7 @@ async def preview(request: Request):
         return JSONResponse({"error": "Invalid preview"}, 400, headers=HEADERS)
     try:
         async with asyncio.timeout(95):
-            async with await psycopg.AsyncConnection.connect(os.environ["DATABASE_URL"], autocommit=True,
-                    row_factory=dict_row, connect_timeout=8, options="-c statement_timeout=10000") as db:
+            async with await connect_database(os.environ["DATABASE_URL"]) as db:
                 # Verify staff status independently even though Next.js signed this request.
                 cursor = await db.execute("SELECT user_id FROM portal_admins WHERE user_id=%s AND is_active=TRUE", (data.user_id,))
                 if not await cursor.fetchone():

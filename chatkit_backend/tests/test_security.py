@@ -94,7 +94,7 @@ class EndpointTests(unittest.IsolatedAsyncioTestCase):
         pages = [Page(data=first, has_more=True, after=first[-1].id), Page(data=[last])]
         db = AsyncMock()
         with patch.dict(os.environ, {"CHATKIT_BACKEND_SECRET": SECRET, "DATABASE_URL": "test-only"}), \
-                patch("app.psycopg.AsyncConnection.connect", new_callable=AsyncMock, return_value=db), \
+                patch("app.connect_database", new_callable=AsyncMock, return_value=db), \
                 patch("app.load_client", new_callable=AsyncMock, return_value={}), \
                 patch("app.load_config", new_callable=AsyncMock, return_value={}), \
                 patch("app.store.load_threads", new_callable=AsyncMock, side_effect=pages) as load_threads, \
@@ -121,12 +121,12 @@ class EndpointTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(db.close.await_count, 2)
 
     async def test_unsigned_direct_backend_request_never_opens_database(self):
-        with patch.dict(os.environ, {"CHATKIT_BACKEND_SECRET": SECRET}), patch("app.psycopg.AsyncConnection.connect", new_callable=AsyncMock) as connect:
+        with patch.dict(os.environ, {"CHATKIT_BACKEND_SECRET": SECRET}), patch("app.connect_database", new_callable=AsyncMock) as connect:
             self.assertEqual(await post(b'{"client_id":"1","user_id":"2"}'), 401)
             connect.assert_not_awaited()
 
     async def test_oversized_request_is_rejected_before_database(self):
-        with patch.dict(os.environ, {"CHATKIT_BACKEND_SECRET": SECRET}), patch("app.psycopg.AsyncConnection.connect", new_callable=AsyncMock) as connect:
+        with patch.dict(os.environ, {"CHATKIT_BACKEND_SECRET": SECRET}), patch("app.connect_database", new_callable=AsyncMock) as connect:
             self.assertEqual(await post(b"x" * 150001), 413)
             connect.assert_not_awaited()
 

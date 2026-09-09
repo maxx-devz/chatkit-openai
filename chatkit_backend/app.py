@@ -6,19 +6,18 @@ import os
 from uuid import uuid4
 
 import anyio
-import psycopg
 from chatkit.server import StreamingResult
 from chatkit.store import NotFoundError
 from chatkit.types import ChatKitReq, ErrorEvent, UserMessageItem
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
-from psycopg.rows import dict_row
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from assistant import PortalChatKitServer
 from security import verify_signature
 from store import Context, PostgresStore
 from builder_config import load_config
+from database import connect_database
 from preview import router as preview_router
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
@@ -157,10 +156,7 @@ async def chatkit(request: Request):
     token = None
     streaming = False
     try:
-        db = await psycopg.AsyncConnection.connect(
-            os.environ["DATABASE_URL"], autocommit=True, row_factory=dict_row,
-            connect_timeout=8, options="-c statement_timeout=10000",
-        )
+        db = await connect_database(os.environ["DATABASE_URL"])
         client = await load_client(db, envelope)
         context = Context(db, envelope.client_id, envelope.user_id, envelope.instructions, client)
         context.config = await load_config(db, client)

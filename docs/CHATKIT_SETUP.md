@@ -265,6 +265,13 @@ domain registration, or deployment health. Those need a real client test.
   confirm the domain is registered. A nonempty key alone does not prove validity.
 - **Assistant cannot connect:** verify Python `/health`, its logs, matching
   backend secrets, the HTTPS origin, and any deployment protection token.
+- **`ChatKit request failed: OperationalError` with a Neon pooled URL:** older
+  backends sent `statement_timeout` as a startup option, which Neon's pooler
+  rejects. Deploy the current Python backend; client chat and staff preview
+  use a shared connection helper with an 8-second connection timeout and a
+  10-second statement timeout set inside each query's transaction. Keep the
+  existing database URL. Other `OperationalError` causes still require checking
+  database credentials and connectivity.
 - **"This chat request is not supported" immediately on opening ChatKit:**
   older backend releases rejected the browser's history request for 9,999
   conversations. Deploy the current Python backend, which caps each page at
