@@ -109,7 +109,9 @@ your production branch. Do not commit `.env.local`, credentials, or `answer.txt`
 
 ## Current boundaries
 
-Tools create structured Word documents and square WebP images. Uploads, arbitrary
+Tools create structured Word documents and square WebP images. Clients can attach
+supported documents, spreadsheets, text/data files, and images; see the
+[upload setup and usage guide](docs/UPLOADS_SETUP.md). Arbitrary
 file formats, Google Drive delivery, third-party actions, and per-output approval
 queues are not implemented. Staff approve instructions/tools before publishing;
 generated files can then be downloaded immediately by their requesting user.

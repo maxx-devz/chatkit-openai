@@ -3,6 +3,7 @@
 import { ChatKit, useChatKit } from "@openai/chatkit-react";
 import Script from "next/script";
 import { useCallback, useEffect, useState } from "react";
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_COUNT, UPLOAD_ACCEPT } from "@/lib/chatkit-uploads";
 import styles from "./chatkit-assistant.module.css";
 
 function EarlierChats() {
@@ -55,7 +56,7 @@ function EarlierChats() {
   );
 }
 
-function ChatSurface({ clientId, clientName, domainKey, nonce, refreshAccess, appearance }) {
+function ChatSurface({ clientId, clientName, domainKey, nonce, refreshAccess, appearance, uploadsEnabled }) {
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const fetchChatKit = useCallback(async (input, init) => {
@@ -73,7 +74,8 @@ function ChatSurface({ clientId, clientName, domainKey, nonce, refreshAccess, ap
     return response;
   }, [clientId, refreshAccess]);
   const { control } = useChatKit({
-    api: { url: "/api/chatkit", domainKey, fetch: fetchChatKit },
+    api: { url: "/api/chatkit", domainKey, fetch: fetchChatKit,
+      ...(uploadsEnabled ? { uploadStrategy: { type: "direct", uploadUrl: "/api/chatkit/upload" } } : {}) },
     theme: {
       colorScheme: "light", radius: "soft", density: "normal",
       color: { accent: { primary: appearance?.accent || "#1765ca", level: 2 } },
@@ -90,7 +92,8 @@ function ChatSurface({ clientId, clientName, domainKey, nonce, refreshAccess, ap
         { label: "Draft a message", prompt: "Help me write a clear message to the AOC team about my project.", icon: "write" },
       ],
     },
-    composer: { placeholder: "Ask a question or share an idea…", attachments: { enabled: false } },
+    composer: { placeholder: uploadsEnabled ? "Ask a question or attach a file…" : "Ask a question or share an idea…",
+      attachments: { enabled: Boolean(uploadsEnabled), maxSize: MAX_UPLOAD_BYTES, maxCount: MAX_UPLOAD_COUNT, accept: UPLOAD_ACCEPT } },
     threadItemActions: { feedback: false, retry: true },
     widgets: { onAction: async (action) => {
       if (action.type === "download_file" && /^[0-9a-f-]{36}$/i.test(action.payload?.id || "")) {
@@ -174,7 +177,7 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
       </div>
       <div id="assistant-chat" role="tabpanel" aria-labelledby="chat-tab" className={styles.content} hidden={tab !== "chat"}>
         {blocked ? <div className={styles.state} role="status">{blocked}</div> : (
-          <ChatSurface key={attempt} clientId={clientId} clientName={clientName} domainKey={domainKey} nonce={nonce} refreshAccess={refreshAccess} appearance={appearance} />
+          <ChatSurface key={attempt} clientId={clientId} clientName={clientName} domainKey={domainKey} nonce={nonce} refreshAccess={refreshAccess} appearance={appearance} uploadsEnabled={access.uploadsEnabled} />
         )}
       </div>
       {tab === "archive" && <div id="assistant-archive" role="tabpanel" aria-labelledby="archive-tab" className={styles.content}><EarlierChats /></div>}

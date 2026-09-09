@@ -103,9 +103,10 @@ access is separate from API billing.
   require a separate per-file approval step under the current configuration.
 - Flexible DOCX and image generation remain available when staff enable and
   publish them for a client. Client chat history stays until deleted.
-- **Uploads remain disabled**, as requested, until a malware-scanning approach
-  is selected. No scanner or automatic malicious-upload account blocking is
-  implemented. An AI model is not a replacement for a scanner.
+- Client attachments are now supported; follow [upload setup](UPLOADS_SETUP.md).
+  You subsequently requested removal of the external virus-scan API. Format and
+  size validation remain, with no malware scanner or malware-based automatic
+  account blocking. An AI model is not a replacement for a scanner.
 - Approved company/client documents have not been supplied. Google Drive and
   spreadsheet generation remain future integrations. Existing Hubstaff portal
   views do not give the ChatKit agent live Hubstaff access automatically.

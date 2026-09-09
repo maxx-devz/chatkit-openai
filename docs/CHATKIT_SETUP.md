@@ -94,6 +94,7 @@ For an existing portal, add the ChatKit/settings tables:
 
 ```powershell
 npm run chatkit:migrate
+npm run uploads:migrate
 npm run builder:migrate
 npm run usage:migrate
 npm run setup:check
@@ -165,7 +166,7 @@ and branch names; do not push an incomplete setup straight to production.
    contains `app.py`, pinned requirements, `.python-version`, and `vercel.json`.
 3. Set the Python environment variables from the table below. Use the same Neon
    database as the target frontend. Apply `chatkit:migrate`, `builder:migrate`,
-   and `usage:migrate` to that database
+   `uploads:migrate`, and `usage:migrate` to that database
    before connecting the frontend.
 4. Deploy Python. Its `/health` endpoint should return
    `{"status":"ok","service":"aoc-chatkit"}`. A health response proves startup;
@@ -191,6 +192,7 @@ and branch names; do not push an incomplete setup straight to production.
 | `OPENAI_API_KEY` | Required by the existing admin assistant | Required for client replies and draft tests |
 | `OPENAI_MODEL` | Existing admin model | Client text model, default `gpt-5.4-mini` |
 | `OPENAI_IMAGE_MODEL` | Not needed for client generation | `gpt-image-2` |
+| `CHATKIT_UPLOADS_ENABLED` | Optional; defaults to `true` | Optional; defaults to `true` |
 | `NEXT_PUBLIC_CHATKIT_DOMAIN_KEY` | Key registered for this frontend | Not needed |
 | `CHATKIT_BACKEND_URL` | Python HTTPS origin | Not needed |
 | `CHATKIT_BACKEND_SECRET` | New production shared secret | Identical secret |
@@ -283,6 +285,9 @@ domain registration, or deployment health. Those need a real client test.
   tool. Instructions alone do not enable it.
 - **Reply/image fails:** check API billing and access to the configured models.
   Image generation is separately billed and can exceed the bounded request time.
+- **Attachments:** follow [the upload guide](UPLOADS_SETUP.md). Run
+  `npm run uploads:migrate` once against the shared database and deploy both
+  projects. No scanner key, OpenAI Admin key, or storage service is required.
 - **OpenAI `200 OK`, then `Error streaming response` / `APIError`:** HTTP 200
   only means the response stream opened. An error event can still stop the reply.
   Deploy the latest Python backend to see a specific inline ChatKit message for

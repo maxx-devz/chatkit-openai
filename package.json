@@ -13,6 +13,7 @@
     "portal:migrate": "node --env-file=.env.local scripts/migrate-portal.mjs",
     "admin:migrate": "node --env-file=.env.local scripts/migrate-admin.mjs",
     "chatkit:migrate": "node --env-file=.env.local scripts/migrate-chatkit.mjs",
+    "uploads:migrate": "node --env-file=.env.local scripts/migrate-uploads.mjs",
     "builder:migrate": "node --env-file=.env.local scripts/migrate-builder.mjs",
     "usage:migrate": "node --env-file=.env.local scripts/migrate-usage.mjs",
     "test:builder": "node --test tests/builder-config.test.mjs",
@@ -22,7 +23,7 @@
     "list:client": "node --env-file=.env.local scripts/list-clients.mjs",
     "admin:create": "node --env-file=.env.local scripts/create-admin.mjs",
     "setup:check": "node scripts/check-setup.mjs",
-    "test": "node --test tests",
+    "test": "node --test \"tests/*.test.mjs\"",
     "test:http": "node scripts/check-builder-http.mjs"
   },
   "engines": {

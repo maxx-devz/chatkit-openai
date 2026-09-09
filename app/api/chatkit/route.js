@@ -1,6 +1,7 @@
 import { ASSISTANT_INSTRUCTIONS } from "@/config/assistant";
 import { chatKitBackendUrl, signChatKitRequest } from "@/lib/chatkit-security";
 import { getPortalAiContext, portalErrorResponse } from "@/lib/portal-data";
+import { uploadErrorMessage } from "@/lib/chatkit-uploads";
 import {
   assertTrustedOrigin, readJsonRequest, requestSecurityErrorResponse,
 } from "@/lib/request-security";
@@ -55,6 +56,8 @@ export async function POST(request) {
     });
     const contentType = upstream.headers.get("content-type") || "";
     if (!upstream.ok) {
+      const details = await upstream.json().catch(() => ({}));
+      const uploadMessage = uploadErrorMessage(details.code);
       // Do not forward hosting-provider HTML, headers, or internal diagnostics.
       const messages = {
         400: "This chat request is not supported. Please start a new conversation.",
@@ -64,9 +67,8 @@ export async function POST(request) {
         429: "Your account has reached its monthly AI allowance. Contact Always Open Commerce.",
       };
       console.error("ChatKit backend request failed", { status: upstream.status });
-      await upstream.body?.cancel();
-      return Response.json({ error: messages[upstream.status] || "The assistant could not connect. Please try again shortly." }, {
-        status: messages[upstream.status] ? upstream.status : 503, headers: noStore,
+      return Response.json({ error: uploadMessage || messages[upstream.status] || "The assistant could not connect. Please try again shortly." }, {
+        status: uploadMessage || messages[upstream.status] ? upstream.status : 503, headers: noStore,
       });
     }
     if (!contentType.startsWith("text/event-stream") && !contentType.startsWith("application/json")) {

@@ -1,5 +1,6 @@
 """Private FastAPI backend for the Next.js /api/chatkit proxy."""
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -19,15 +20,17 @@ from store import Context, PostgresStore
 from builder_config import load_config
 from database import connect_database
 from preview import router as preview_router
+from uploads import (MAX_ATTACHMENTS, MAX_FILE_BYTES, UPLOAD_ID, PrivateAttachmentStore,
+                     UploadError, load_upload, upload_file, uploads_enabled)
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(preview_router)
 store = PostgresStore()
-server = PortalChatKitServer(store)
+server = PortalChatKitServer(store, attachment_store=PrivateAttachmentStore())
 logger = logging.getLogger(__name__)
 NO_STORE = {"Cache-Control": "private, no-store", "X-Accel-Buffering": "no"}
 GENERATE = {"threads.create", "threads.add_user_message", "threads.retry_after_item"}
-MUTATE = GENERATE | {"threads.update", "threads.delete"}
+MUTATE = GENERATE | {"threads.update", "threads.delete", "attachments.delete"}
 ALLOWED = MUTATE | {"threads.list", "threads.get_by_id", "items.list"}
 
 
@@ -46,12 +49,16 @@ def validate_payload(payload):
         raise ValueError("Unsupported chat operation")
     message = getattr(parsed.params, "input", None)
     if message is not None:
-        if message.attachments or message.inference_options.model or message.inference_options.tool_choice:
-            raise ValueError("Client model overrides and uploads are not enabled")
+        if message.inference_options.model or message.inference_options.tool_choice:
+            raise ValueError("Client model overrides are not enabled")
+        if (len(message.attachments) > MAX_ATTACHMENTS
+                or len(set(message.attachments)) != len(message.attachments)
+                or any(not UPLOAD_ID.fullmatch(identifier) for identifier in message.attachments)):
+            raise ValueError("Invalid attachments")
         if any(part.type != "input_text" for part in message.content):
             raise ValueError("Only text messages are enabled")
         text = "".join(part.text for part in message.content)
-        if not text.strip() or len(text) + len(message.quoted_text or "") > 12_000:
+        if (not text.strip() and not message.attachments) or len(text) + len(message.quoted_text or "") > 12_000:
             raise ValueError("Invalid message length")
     limit = getattr(parsed.params, "limit", None)
     if limit is not None:
@@ -174,6 +181,14 @@ async def chatkit(request: Request):
         if parsed.type in GENERATE:
             if not os.getenv("OPENAI_API_KEY"):
                 raise HTTPException(503, "Backend is not configured")
+            message = getattr(parsed.params, "input", None)
+            if message and message.attachments:
+                if not uploads_enabled():
+                    raise UploadError("uploads_not_configured", 503)
+                for identifier in message.attachments:
+                    attachment = await load_upload(context, identifier)
+                    if attachment["thread_id"] is not None and attachment["thread_id"] != thread_id:
+                        raise UploadError("upload_already_attached", 409)
             await reserve_request(context)
         # Strip unused browser metadata before handing the request to the SDK.
         data = parsed.model_dump(mode="json")
@@ -196,6 +211,8 @@ async def chatkit(request: Request):
             streaming = True
             return StreamingResponse(events(), media_type="text/event-stream", headers=NO_STORE)
         return Response(result.json, media_type="application/json", headers=NO_STORE)
+    except UploadError as error:
+        return JSONResponse({"code": error.code}, status_code=error.status, headers=NO_STORE)
     except NotFoundError:
         return JSONResponse({"error": "Conversation not found"}, status_code=404, headers=NO_STORE)
     except HTTPException as error:
@@ -206,3 +223,42 @@ async def chatkit(request: Request):
     finally:
         if db and not streaming:
             await cleanup(db, context, token)
+
+
+@app.post("/chatkit/upload")
+async def upload(request: Request):
+    # JSON/base64 is used only between the two authenticated servers, staying
+    # below Vercel's body limit. Browser uploads use ChatKit's direct multipart API.
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > 2_900_000:
+            return JSONResponse({"code": "upload_too_large"}, 413, headers=NO_STORE)
+    if not verify_signature(bytes(body), request.headers.get("x-chatkit-timestamp", ""),
+                            request.headers.get("x-chatkit-signature", ""), os.getenv("CHATKIT_BACKEND_SECRET", "")):
+        return JSONResponse({"error": "Unauthorized"}, 401, headers=NO_STORE)
+    try:
+        envelope = Envelope.model_validate_json(body)
+        payload = envelope.payload
+        if set(payload) != {"filename", "content"} or not isinstance(payload["content"], str):
+            raise ValueError("Invalid upload")
+        content = base64.b64decode(payload["content"], validate=True)
+        if len(content) > MAX_FILE_BYTES:
+            raise UploadError("upload_too_large", 413)
+        async with asyncio.timeout(40):
+            async with await connect_database(os.environ["DATABASE_URL"]) as db:
+                client = await load_client(db, envelope)
+                context = Context(db, envelope.client_id, envelope.user_id, "", client)
+                attachment = await upload_file(context, payload["filename"], content)
+                return JSONResponse(attachment.model_dump(mode="json", exclude_none=True,
+                    context={"exclude_metadata": True}), headers=NO_STORE)
+    except UploadError as error:
+        return JSONResponse({"code": error.code}, error.status, headers=NO_STORE)
+    except (ValueError, ValidationError):
+        return JSONResponse({"code": "upload_invalid_file"}, 400, headers=NO_STORE)
+    except HTTPException as error:
+        return JSONResponse({"error": error.detail}, error.status_code, headers=NO_STORE)
+    except Exception as error:
+        logger.error("ChatKit upload failed: %s", type(error).__name__)
+        code = "uploads_not_configured" if getattr(error, "sqlstate", None) == "42P01" else "upload_failed"
+        return JSONResponse({"code": code}, 503, headers=NO_STORE)

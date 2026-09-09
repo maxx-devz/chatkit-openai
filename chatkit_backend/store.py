@@ -8,6 +8,7 @@ from psycopg import AsyncConnection
 from psycopg.sql import SQL
 from psycopg.types.json import Jsonb
 from pydantic import TypeAdapter
+from uploads import attachment_metadata, load_upload, UploadError
 
 ITEM = TypeAdapter(ThreadItem)
 
@@ -141,10 +142,21 @@ class PostgresStore(Store[Context]):
         """, (*context.scope, thread_id, item_id))
 
     async def save_attachment(self, attachment, context):
-        raise ValueError("Uploads are not enabled")
+        row = await load_upload(context, attachment.id)
+        if not attachment.thread_id or row["thread_id"] not in (None, attachment.thread_id):
+            raise UploadError("upload_already_attached", 409)
+        await self.load_thread(attachment.thread_id, context)
+        cursor = await context.db.execute("""UPDATE portal_chatkit_uploads SET thread_id=%s
+            WHERE client_id=%s AND user_id=%s AND id=%s AND (thread_id IS NULL OR thread_id=%s)
+            RETURNING id""", (attachment.thread_id, *context.scope, attachment.id, attachment.thread_id))
+        if not await cursor.fetchone():
+            raise NotFoundError("Attachment not found")
 
     async def load_attachment(self, attachment_id, context):
-        raise NotFoundError("Attachment not found")
+        return attachment_metadata(await load_upload(context, attachment_id))
 
     async def delete_attachment(self, attachment_id, context):
-        raise NotFoundError("Attachment not found")
+        # The AttachmentStore deletes unattached bytes first. Attached files are
+        # removed with their conversation by the database foreign key.
+        await context.db.execute("DELETE FROM portal_chatkit_uploads WHERE client_id=%s AND user_id=%s AND id=%s AND thread_id IS NULL",
+                                 (*context.scope, attachment_id))
