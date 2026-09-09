@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 
 import aocIcon from "@/aoc-icon.png";
@@ -239,6 +240,7 @@ export default function AdminDashboard({ initialData }) {
           <a className={styles.activeNav} href="#overview"><Icon name="overview" />Overview</a>
           <a href="#clients"><Icon name="clients" />Client controls</a>
           <a href="#assistant"><Icon name="spark" />AI assistant</a>
+          <Link href="/builder"><Icon name="spark" />Assistant settings</Link>
           <a href="#ai-controls"><Icon name="activity" />AI allowances</a>
           <a href="#security"><Icon name="shield" />Access & security</a>
         </nav>

@@ -1,301 +1,259 @@
-# ChatKit setup for the AOC client portal
+# ChatKit setup and deployment
 
-Verified on September 9, 2026. The client UI uses `@openai/chatkit-react` **1.6.1**
-(ChatKit types **1.9.0**) and `openai-chatkit` **1.6.5**. These were the current
-published package releases checked during implementation; npm returned no
-deprecation notice for the two JavaScript packages. Versions are pinned for repeatable installs.
-The browser runtime is loaded from OpenAI's maintained ChatKit CDN.
+Verified September 9, 2026. Installed releases: `@openai/chatkit-react 1.6.1`,
+`@openai/chatkit 1.9.0`, and `openai-chatkit 1.6.5`. The React and Python SDK
+versions match the current npm/PyPI releases checked during implementation.
+The browser loads OpenAI's maintained ChatKit CDN runtime.
 
-For this local checkout, dependencies and the ChatKit database migration have
-already been run. Missing ChatKit settings were appended to `.env.local`,
-including a randomly generated local backend secret. The public domain key is
-still blank and must be supplied from your OpenAI account. No GitHub push or
-Vercel deployment has been performed.
+ChatKit remains available, and OpenAI recommends a custom server for new work.
+Agent Builder is scheduled to shut down November 30, 2026. This project uses
+ChatKit's custom-server integration and does not require Agent Builder.
+Future availability cannot be guaranteed.
+[Official ChatKit guidance](https://developers.openai.com/api/docs/guides/chatkit).
 
-OpenAI says ChatKit remains available. **Agent Builder is being deprecated and
-is scheduled to shut down November 30, 2026.** This implementation follows the
-recommended custom-server path. No vendor can guarantee a product will never
-be removed. [Official ChatKit guidance](https://developers.openai.com/api/docs/guides/chatkit).
+## 1. Prepare local development
 
-## What is installed
+Use Node.js **22** and Python **3.13**. This machine's system Node was 20.18.1
+during implementation. Update Node to 22 and reopen the terminal before using
+the regular commands. An isolated Node 22 test does not update your system.
 
-- The client assistant panel embeds the real ChatKit UI: streaming replies,
-  history, new conversations, rename, delete, and retry.
-- Better Auth still handles login. Next.js verifies the current client, then
-  signs each request to the Python backend. The browser cannot select another
-  account by supplying a client ID or access Python directly without that signature.
-- Python rechecks membership and AI access, stores conversations in Neon, and
-  enforces the existing client-wide monthly allowance. Admin screens are unchanged.
-- Global instructions come from `config/assistant.js`. Approved client instructions
-  and the client's vector store still come from the existing database fields.
-- Earlier conversations remain in the old tables and are readable under
-  **Earlier chats**. They are not converted to ChatKit threads or deleted.
-
-The architecture is:
-
-```text
-Client browser / ChatKit
-  -> existing Next.js website: /api/chatkit (login + origin + current account checks)
-  -> signed HTTPS request to Python /chatkit
-  -> Neon (scoped history, membership, monthly allowance)
-  -> Agents SDK / Responses API (reply + optional file search)
-```
-
-The two services can run on Vercel. This repository prepares a separate FastAPI
-project for Python so the existing Next.js site's URL and framework configuration
-can stay in place. Vercel supports FastAPI and streaming Python responses.
-[Vercel Python runtime](https://vercel.com/docs/functions/runtimes/python).
-
-## 1. Check the local runtimes
-
-Stop the old development command with **Ctrl+C** first.
-
-Open PowerShell in the repository:
+Stop any existing dev process with Ctrl+C, then:
 
 ```powershell
 cd "C:\Users\AOC-DEV 2\chatkit\chatkit-nextjs"
 node --version
 py -3.13 --version
+npm ci
 ```
 
-Use **Node.js 22 or newer** and **Python 3.13**. Your machine was running Node
-20.18.1 when this change was made; update Node and reopen the terminal. Python
-3.13 was already available through `py -3.13`.
-
-## 2. Install dependencies
+Only if `.venv` does not exist:
 
 ```powershell
-npm install
 py -3.13 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r chatkit_backend/requirements.txt
 ```
 
-The project-local `.venv` was created during implementation. On this same
-machine you can reuse it; creating it is necessary on a fresh checkout.
-No Python activation command is required. On macOS/Linux use `python3.13` to
-create `.venv`, and `.venv/bin/python` instead of the Windows executable path.
+Install the Python dependencies:
 
-## 3. Configure `.env.local`
-
-Keep your existing `.env.local`. **Do not overwrite it with `.env.example`.**
-The existing `OPENAI_API_KEY`, `OPENAI_MODEL`, `DATABASE_URL`,
-`BETTER_AUTH_SECRET`, and `BETTER_AUTH_URL` remain in use.
-
-Append these settings, also documented in the root `.env.example`:
-
-```dotenv
-CLIENT_ASSISTANT_UI=chatkit
-NEXT_PUBLIC_CHATKIT_DOMAIN_KEY=
-CHATKIT_BACKEND_URL=http://127.0.0.1:8000
-CHATKIT_BACKEND_SECRET=
-CHATKIT_VERCEL_PROTECTION_BYPASS=
+```powershell
+.venv\Scripts\python.exe -m pip install -r chatkit_backend/requirements.txt
 ```
 
-| Setting | What to provide |
+On macOS/Linux use `python3.13` and `.venv/bin/python`.
+
+## 2. Configure credentials
+
+Keep the existing `.env.local`; do not overwrite working values with examples.
+For a fresh checkout, copy `.env.example` to `.env.local` and fill the values.
+
+| Variable | Local value/purpose |
 | --- | --- |
-| `NEXT_PUBLIC_CHATKIT_DOMAIN_KEY` | The public domain key from OpenAI's ChatKit domain registration. Register the exact frontend domains/origins used by your app. This is not a secret API key. |
-| `CHATKIT_BACKEND_URL` | Local origin above; later the HTTPS origin of the Python Vercel project, with no `/chatkit` suffix. |
-| `CHATKIT_BACKEND_SECRET` | A random secret of at least 32 characters, identical on both services. When blank locally, `npm run dev` creates a temporary secret and passes it to both processes. |
-| `CHATKIT_VERCEL_PROTECTION_BYPASS` | Optional automation bypass token if the Python Vercel deployment is protected. Only the Next.js server needs it. |
+| `DATABASE_URL` | Existing Neon connection string |
+| `BETTER_AUTH_SECRET` | Existing login secret, at least 32 characters |
+| `BETTER_AUTH_URL` | `http://127.0.0.1:3000` exactly |
+| `OPENAI_API_KEY` | Server-only OpenAI API project key |
+| `OPENAI_MODEL` | Available text model; default `gpt-5.4-mini` |
+| `OPENAI_IMAGE_MODEL` | `gpt-image-2` when enabling images |
+| `NEXT_PUBLIC_CHATKIT_DOMAIN_KEY` | Public ChatKit domain key |
+| `CHATKIT_BACKEND_URL` | `http://127.0.0.1:8000` |
+| `CHATKIT_BACKEND_SECRET` | Random 32+ character secret shared by both services |
+| `CHATKIT_VERCEL_PROTECTION_BYPASS` | Leave blank locally |
+| `HUBSTAFF_ACCESS_TOKEN` | Optional existing server-only Hubstaff organization token |
+| `HUBSTAFF_MONTHLY_HOURS_DEFAULT` | Optional existing hours fallback |
 
-In the OpenAI API Platform, find the ChatKit/domain registration settings for
-your organization/project. Register **127.0.0.1** for the local origin
-`http://127.0.0.1:3000` and your production frontend
-`https://quantum-project-xi.vercel.app`. Also register any custom or preview
-frontend domain you intend to test. Follow the settings screen's requested
-hostname/origin format. Copy the resulting public key into
-`NEXT_PUBLIC_CHATKIT_DOMAIN_KEY`. If you cannot find this setting, describe what
-you see in question 7 of `answer.txt`; account availability and dashboard labels
-cannot be verified without your account. The installed SDK requires `api.domainKey`.
+Create/manage your API key in the [API Platform](https://platform.openai.com/api-keys).
+ChatGPT Business and API usage have separate billing. An existing custom GPT's
+link, ChatGPT login cookie, or Business subscription cannot replace an API key.
 
-You do **not** need an Agent Builder workflow ID or a manually copied ChatKit
-session token. Your existing OpenAI API key supplies model access on Python.
-Do not put `OPENAI_API_KEY`, `DATABASE_URL`, or the shared backend secret in a
-`NEXT_PUBLIC_*` variable or `answer.txt`.
+In the API Platform's ChatKit domain registration settings, register your actual
+frontend domains, including local `127.0.0.1` and
+`quantum-project-xi.vercel.app`. Follow the screen's hostname/origin format and
+copy the generated **public domain key**. Register any additional preview/custom
+domains before testing there. Restart Next.js after changing the key.
 
-For production, generate a separate shared secret:
+Only the domain key belongs in a `NEXT_PUBLIC_*` variable. All API keys,
+database credentials, and backend secrets stay server-side. No Agent Builder
+workflow ID or manually copied ChatKit session token is needed.
+
+If the local backend secret is blank, `npm run dev` creates an ephemeral secret
+for its two child services. Production must have a persistent shared secret.
+Generate a separate production value locally:
 
 ```powershell
 node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ```
 
-Copy the result into the environment settings for both services. A public
-domain key is different from this secret. I cannot issue an OpenAI domain key
-or account API key for you.
+The previous `CLIENT_ASSISTANT_UI` switch is no longer used and can be removed
+from local/Vercel settings. The client always uses ChatKit.
 
-## 4. Add the database tables
+## 3. Check database tables
 
-Check that `.env.local` points to the intended Neon database. Prefer a Neon
-development branch for local testing.
+Migrations use the database in `.env.local`. Prefer a development Neon branch
+locally. Confirm which database you are targeting before running a migration.
+
+For an existing portal, add the ChatKit/settings tables:
 
 ```powershell
 npm run chatkit:migrate
+npm run builder:migrate
+npm run setup:check
 ```
 
-This adds three tables: `portal_chatkit_threads`, `portal_chatkit_items`, and
-`portal_chatkit_leases`, plus indexes. It preserves earlier chat snapshots and
-does not change existing client accounts. It is safe to rerun. The database
-must already have the portal and admin migrations from the main README.
+For a brand-new database, run `auth:migrate`, `portal:migrate`, and
+`admin:migrate` first, in that order. Existing accounts and earlier conversations
+are preserved. Vercel builds do not run these migrations automatically.
 
-The new history tables reference memberships, so deleting a client or its
-membership cascades to the associated ChatKit history. There is no automatic
-age-based retention policy yet.
+Create a staff account only if you do not already have one:
 
-## 5. Start locally
+```powershell
+npm run admin:create -- aocadmin "AOC Administrator"
+```
+
+The terminal prompts privately for its password. Clients can be created in
+`/admin`. Existing users keep their login and client memberships.
+
+## 4. Run and configure the assistant
 
 ```powershell
 npm run dev
 ```
 
-This starts Next.js on **127.0.0.1:3000** and Python on **127.0.0.1:8000**.
-Open http://127.0.0.1:3000 and sign in with a **client** account. An administrator
-login still opens the existing admin interface.
+Open <http://127.0.0.1:3000>. Next.js uses port 3000; Python uses port 8000.
+Ctrl+C stops both. Restart this command after Python or environment changes.
 
-Keep this terminal open. **Ctrl+C** stops both processes. Next.js updates web
-code automatically; restart the command after Python or environment changes.
-`npm run dev:web` starts only Next.js and is useful with an already-running backend.
+Sign in as staff, open **Assistant settings** from `/admin`, and select a client:
 
-## 6. Verify before deploying
+1. Paste approved AOC-GPT behavior into **Instructions**.
+2. Add approved reference text in **Knowledge**, or connect that client's
+   existing API vector store using its `vs_...` ID.
+3. Enable **Word documents** and/or **Images** in **Tools** and set attempt limits.
+4. Set the greeting, accent color, and starter prompts in **Appearance**.
+5. **Save draft**, test replies, then **Publish for [client]**.
+6. Sign in as that client. Test text, generated-file cards, downloads, history,
+   and the monthly allowance. Refresh to load changed appearance settings.
+
+The settings editor is private to active administrators. Its test conversation
+uses the same agent factory/tools as ChatKit, with saved drafts instead of live
+settings. Tests incur API usage but do not enter client conversation history.
+The original staff assistant remains available in the administrator dashboard.
+
+See [AOC-GPT transfer steps](AOC_GPT_SETUP.md) and [settings/tool details](BUILDER_SETUP.md).
+The existing custom GPT does not synchronize automatically.
+
+## 5. Deploy on your existing Vercel URL
+
+The existing Next.js project keeps **https://quantum-project-xi.vercel.app/**.
+The Python backend is a second Vercel project using the same GitHub repository.
+Vercel supports FastAPI, Python 3.13, and streaming responses.
+[Vercel Python documentation](https://vercel.com/docs/functions/runtimes/python).
+
+Because your GitHub production branch deploys automatically, prepare this release
+on a preview branch first. Replace placeholders below with your actual project
+and branch names; do not push an incomplete setup straight to production.
+
+1. Run the checks in section 6. Commit the reviewed files to a preview branch
+   and push that branch. Keep credentials and `answer.txt` out of Git.
+2. In Vercel, **Add New Project**, import the same repository, and use Root
+   Directory **chatkit_backend** with the **FastAPI** preset. Use the branch
+   containing these changes for the initial backend deployment. The folder
+   contains `app.py`, pinned requirements, `.python-version`, and `vercel.json`.
+3. Set the Python environment variables from the table below. Use the same Neon
+   database as the target frontend. Apply the two new migrations to that database
+   before connecting the frontend.
+4. Deploy Python. Its `/health` endpoint should return
+   `{"status":"ok","service":"aoc-chatkit"}`. A health response proves startup;
+   a real client reply still needs testing.
+5. Copy the Python project's stable HTTPS origin into the existing Next.js
+   project's `CHATKIT_BACKEND_URL`, with no `/chatkit` suffix.
+6. Configure the remaining Next.js variables. Set Node.js to **22.x**. Register
+   the frontend's production and any stable preview domain with ChatKit.
+7. Deploy/test the frontend preview with matching preview environment values.
+   For an authenticated preview, `BETTER_AUTH_URL` must match that preview's
+   exact stable URL; unrelated automatic preview URLs will not share login.
+8. Once the backend, migrations, and production environment variables are ready,
+   merge/push the reviewed frontend change to the connected production branch.
+   Redeploy the backend from that same release if necessary.
+9. Confirm both deployments are **Ready**, then test the existing live URL.
+   Keep the previous Vercel deployment available for rollback.
+
+| Environment variable | Existing Next.js project | Python project |
+| --- | --- | --- |
+| `DATABASE_URL` | Existing Neon DB | Same DB |
+| `BETTER_AUTH_URL` | `https://quantum-project-xi.vercel.app` | Not needed |
+| `BETTER_AUTH_SECRET` | Keep existing production auth secret | Not needed |
+| `OPENAI_API_KEY` | Required by the existing admin assistant | Required for client replies and draft tests |
+| `OPENAI_MODEL` | Existing admin model | Client text model, default `gpt-5.4-mini` |
+| `OPENAI_IMAGE_MODEL` | Not needed for client generation | `gpt-image-2` |
+| `NEXT_PUBLIC_CHATKIT_DOMAIN_KEY` | Key registered for this frontend | Not needed |
+| `CHATKIT_BACKEND_URL` | Python HTTPS origin | Not needed |
+| `CHATKIT_BACKEND_SECRET` | New production shared secret | Identical secret |
+| `CHATKIT_VERCEL_PROTECTION_BYPASS` | If backend deployment protection requires it | Not needed |
+| `HUBSTAFF_ACCESS_TOKEN` | Keep existing optional token | Not needed |
+| `HUBSTAFF_MONTHLY_HOURS_DEFAULT` | Keep existing optional setting | Not needed |
+
+Keep environment scopes consistent: Production values for production, Preview
+values for a preview. Environment changes require a new deployment.
+
+If Vercel Deployment Protection blocks server-to-server access, use its automation
+bypass token in the **Next.js server-only** variable above. Application HMAC
+authentication remains required. Never expose that token in the browser.
+
+Both chat routes allow 120 seconds; Python bounds the reply to 95 seconds and the
+Next.js proxy waits up to 110 seconds. Configure a Vercel function duration of at
+least 120 seconds with a compatible plan/Fluid compute setting. Large or slow
+generation can still time out; long-running jobs need a separate durable queue.
+
+## 6. Verify before release
 
 ```powershell
+npm run setup:check
 npm run lint
-npm run test:chatkit
-.\.venv\Scripts\python.exe -m unittest discover -s chatkit_backend/tests -v
+npm test
+.venv\Scripts\python.exe -m unittest discover -s chatkit_backend/tests -v
+node --env-file=.env.local scripts/check-builder-database.mjs
+.venv\Scripts\python.exe scripts/check-chatkit-database.py
 npm run build
 ```
 
-Then check the actual client UI:
+While `npm run dev` is running, run `npm run test:http` in another terminal.
+The database test scripts use temporary tables in rolled-back transactions.
+They do not modify client records and do not call a paid model.
 
-1. Send a message and check streaming. Refresh and reopen it from ChatKit history.
-2. Rename a thread, start another, and delete a disposable test conversation.
-3. Read an earlier conversation in **Earlier chats**.
-4. Switch to another test client and verify its history is separate.
-5. Use the existing admin controls to pause AI, then confirm the client panel
-   locks after its next access refresh (within about 15 seconds).
-6. Test a low monthly allowance on a test client. New messages/retries consume
-   the allowance; viewing, renaming, and deleting history do not.
-7. Check narrow/mobile layouts and browser console errors, especially domain
-   registration and blocked CDN requests.
+Check secrets before committing:
 
-Requests admitted for generation count as attempts, including failed/cancelled
-responses, matching the existing reservation approach. Token totals are added
-when the upstream SDK supplies usage; an interrupted run can lack final usage.
-Requests stop after approximately 95 seconds of streaming. A per-account/user
-lease prevents simultaneous mutations and expires automatically after 3 minutes
-if a process stops unexpectedly.
+```powershell
+git status --short
+git ls-files .env .env.local .env.production answer.txt
+```
 
-## 7. Deploy Python to Vercel
+The second command should print nothing. Review the diff before committing.
 
-1. Push the reviewed changes to a development GitHub branch when ready. This
-   work does not push, merge, or deploy your production site automatically.
-2. In Vercel choose **Add New → Project**, import the **same repository**, and
-   create a second project, for example `quantum-chatkit-backend`.
-3. Set **Root Directory** to `chatkit_backend` and the framework to **FastAPI**.
-   Keep the framework's default install/build settings; do not use `npm run build`
-   for this Python project. `.python-version` selects Python 3.13.
-4. Add the following server environment variables to that project:
+For production configuration checking, supply production variables explicitly:
 
-   ```dotenv
-   OPENAI_API_KEY=<your-existing-OpenAI-project-key>
-   OPENAI_MODEL=<the-model-your-project-uses>
-   DATABASE_URL=<the-same-Neon-database-used-by-the-frontend>
-   CHATKIT_BACKEND_SECRET=<your-generated-production-shared-secret>
-   ```
+```powershell
+node --env-file=.env.production.local scripts/check-setup.mjs --production
+```
 
-5. Deploy and copy its HTTPS origin. `/health` should return `status: ok` when
-   deployment protection permits access. Health confirms the service started;
-   it does not verify database migrations or model access.
-6. If Vercel Deployment Protection blocks server requests, create its automation
-   bypass token and put it in the **Next.js** project's
-   `CHATKIT_VERCEL_PROTECTION_BYPASS`. Keep the backend's signature checks enabled.
+This optional file is Git-ignored; populate it securely yourself. The checker
+verifies configuration and table presence, not billing, matching remote secrets,
+domain registration, or deployment health. Those need a real client test.
 
-The backend config requests a 120-second function duration. Verify your project's
-plan and duration settings in Vercel. The deployment itself has not been tested
-against your Vercel account. [FastAPI on Vercel](https://vercel.com/docs/frameworks/backend/fastapi).
+## Troubleshooting
 
-## 8. Configure the existing Next.js Vercel project
-
-1. Keep the existing project's root directory and **Next.js** framework preset.
-2. Keep its existing secrets. Set Node.js to **22.x or newer** in project settings.
-3. Add/update:
-
-   ```dotenv
-   CLIENT_ASSISTANT_UI=chatkit
-   NEXT_PUBLIC_CHATKIT_DOMAIN_KEY=<registered-frontend-public-domain-key>
-   CHATKIT_BACKEND_URL=https://YOUR-CHATKIT-BACKEND.vercel.app
-   CHATKIT_BACKEND_SECRET=<the-same-production-shared-secret>
-   BETTER_AUTH_URL=https://quantum-project-xi.vercel.app
-   ```
-
-4. Add the optional bypass token from step 7 if needed.
-5. Apply the ChatKit migration to the production Neon database before enabling
-   the new frontend there. Local migration only prepares the database selected
-   in your local `.env.local`.
-6. Redeploy the Next.js project. `NEXT_PUBLIC_*` variables are included at build
-   time, so changing the public domain key requires a new build.
-7. Repeat the client checks on a preview deployment before promoting production.
-   Preview needs its own matching `BETTER_AUTH_URL`, registered frontend domain,
-   and consistent backend/database environment.
-
-## How to teach the assistant and customize it
-
-ChatKit is the conversation UI. The model, instructions, approved knowledge,
-and connected tools determine its answers; changing the UI alone does not train it.
-
-- Edit **`config/assistant.js` → `ASSISTANT_INSTRUCTIONS`** for the global AOC
-  role, tone, and rules; restart/redeploy the frontend after changes.
-- Existing per-client approved instructions and vector-store settings continue
-  to work. The backend selects them from the authenticated client's database row.
-- Set **`OPENAI_MODEL` on Python** to control the ChatKit model. A different
-  model must be available to your OpenAI project and compatible with Responses.
-- Edit **`chatkit_backend/assistant.py`** to add server-side tools later.
-- Customize greeting, starter prompts, and appearance in
-  **`components/ai-assistant/chatkit-assistant.js`**.
-- OpenAI's advanced integration guide links an interactive Widget Builder for
-  designing cards/forms/buttons. Those widgets still need code and authorized
-  server actions to perform work; the builder does not itself teach the model.
-  [Advanced ChatKit integration guide](https://developers.openai.com/api/docs/guides/custom-chatkit).
-
-## Feature differences and decisions for later
-
-| Feature | This integration |
-| --- | --- |
-| Text replies and saved history | Included; persisted in Neon by client and user |
-| Existing instructions / configured file search | Included |
-| Monthly limits / AI pause / usage dashboard | Existing tables and controls reused |
-| Old conversations | Read-only archive; old image metadata is retained but image previews are not rebuilt |
-| Model picker | Server-selected model for ChatKit; old interface keeps its picker |
-| Folders / branches / automatic old-history import | Not ported to ChatKit |
-| Image generation / uploads / voice / web search | Not enabled in this first ChatKit integration |
-| Live Hubstaff queries inside chat | Not connected; the existing portal cards continue to work |
-| Custom cards/actions or changing external records | Not enabled |
-| Admin UI redesign / browser workflow editor | Deferred as requested |
-
-The reply context is bounded to recent history (up to 40 stored items and about
-60,000 serialized characters); earlier messages are still visible in the UI.
-SDK tracing is disabled for this implementation. Standard OpenAI API data handling
-still applies to model requests.
-
-Fill out **`answer.txt`** and say “read answer.txt” to provide the remaining
-preferences. Useful next improvements are approved client FAQs, a read-only
-Hubstaff lookup tool, private document uploads, and a clear human handoff path.
-Choose which external actions clients should be able to authorize before adding
-write-capable tools.
-
-## Troubleshooting and rollback
-
-- **“Assistant is being set up”**: fill in the public domain key, verify backend
-  configuration, and restart/rebuild. Backend configuration errors are logged by
-  variable name without printing secrets.
-- **“Could not connect”**: check both terminal logs, Python `/health`, the shared
-  secret on both projects, database migrations, and deployment-protection settings.
-- **Chat frame does not load**: check the registered domain and CDN access. The
-  client page's CSP explicitly permits ChatKit frames from
-  `https://cdn.platform.openai.com` and supplies the nonce to its script.
-- **Port already in use**: stop your earlier `npm run dev` terminal before starting
-  the new one. Do not stop unrelated Node/Python processes.
-- **Windows Python errors**: use the project `.venv` with Python 3.13. The dev
-  launcher selects the event loop required by the PostgreSQL driver.
-- **Rollback**: set `CLIENT_ASSISTANT_UI=legacy` and restart/redeploy the frontend.
-  No database rollback is needed. ChatKit history stays stored separately and
-  reappears when ChatKit is enabled again. The old interface retains its own history.
+- **Chat is being set up:** check the domain key, restart/redeploy Next.js, and
+  confirm the domain is registered. A nonempty key alone does not prove validity.
+- **Assistant cannot connect:** verify Python `/health`, its logs, matching
+  backend secrets, the HTTPS origin, and any deployment protection token.
+- **Login fails:** preserve the existing auth secret, use the exact frontend
+  origin, and confirm both projects target the intended database.
+- **Word/image tool is unavailable:** save and publish that client's enabled
+  tool. Instructions alone do not enable it.
+- **Reply/image fails:** check API billing and access to the configured models.
+  Image generation is separately billed and can exceed the bounded request time.
+- **`429 credit_balance_exhausted`:** add API credits in your API Platform billing
+  settings, then retry. Your ChatGPT Business subscription does not fund API
+  requests. Increasing a client's portal allowance does not resolve this error.
+- **Allowance reached:** review monthly chat limits in `/admin` and file-attempt
+  limits in Assistant settings. Raising these does not add API billing credit.
+- **Port is busy:** stop the existing dev command. Do not kill unrelated processes.
+- **Rollback:** roll back the frontend deployment in Vercel. Keep the additive
+  tables and existing data. The removed legacy UI has no environment toggle.

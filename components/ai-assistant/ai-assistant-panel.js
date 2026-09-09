@@ -1,13 +1,12 @@
 import Image from "next/image";
 import { headers } from "next/headers";
 
-import Workspace from "@/components/workspace";
 import ChatKitAssistant from "./chatkit-assistant";
 import aocIcon from "@/aoc-icon.png";
 import styles from "./ai-assistant-panel.module.css";
+import { clientAppearance } from "@/lib/builder-data";
 
 export default async function AiAssistantPanel({
-  config,
   clientId,
   clientName,
   userId,
@@ -15,6 +14,7 @@ export default async function AiAssistantPanel({
   minHeight = "540px",
 }) {
   const nonce = (await headers()).get("x-nonce") || "";
+  const appearance = await clientAppearance(clientId);
   return (
     <section
       className={styles.panel}
@@ -30,23 +30,20 @@ export default async function AiAssistantPanel({
           <Image src={aocIcon} alt="" />
         </span>
         <div>
-          <h2 id="ai-assistant-title">AI Assistant</h2>
+          <h2 id="ai-assistant-title">AOC-GPT</h2>
           <p>Ask questions and continue saved conversations</p>
         </div>
         <span className={styles.badge}>Private</span>
       </header>
       <div className={styles.body}>
-        {process.env.CLIENT_ASSISTANT_UI === "legacy" ? (
-          <Workspace config={config} embedded />
-        ) : (
-          <ChatKitAssistant
-            key={`${clientId}:${userId}`}
-            clientId={clientId}
-            clientName={clientName}
-            domainKey={process.env.NEXT_PUBLIC_CHATKIT_DOMAIN_KEY || ""}
-            nonce={nonce}
-          />
-        )}
+        <ChatKitAssistant
+          key={`${clientId}:${userId}`}
+          clientId={clientId}
+          clientName={clientName}
+          domainKey={process.env.NEXT_PUBLIC_CHATKIT_DOMAIN_KEY || ""}
+          nonce={nonce}
+          appearance={appearance}
+        />
       </div>
     </section>
   );

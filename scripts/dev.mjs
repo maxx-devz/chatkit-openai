@@ -44,7 +44,7 @@ function run(command, args, cwd = root) {
   child.on("exit", (code) => { if (!stopping) stop(code || 0); });
 }
 
-if (env.CLIENT_ASSISTANT_UI !== "legacy") {
+{
   const backendUrl = env.CHATKIT_BACKEND_URL || "http://127.0.0.1:8000";
   env.CHATKIT_BACKEND_URL = backendUrl;
   const localBackend = new URL(backendUrl);

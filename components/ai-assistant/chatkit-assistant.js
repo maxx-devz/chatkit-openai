@@ -55,7 +55,7 @@ function EarlierChats() {
   );
 }
 
-function ChatSurface({ clientId, clientName, domainKey, nonce, refreshAccess }) {
+function ChatSurface({ clientId, clientName, domainKey, nonce, refreshAccess, appearance }) {
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const fetchChatKit = useCallback(async (input, init) => {
@@ -76,15 +76,15 @@ function ChatSurface({ clientId, clientName, domainKey, nonce, refreshAccess }) 
     api: { url: "/api/chatkit", domainKey, fetch: fetchChatKit },
     theme: {
       colorScheme: "light", radius: "soft", density: "normal",
-      color: { accent: { primary: "#1765ca", level: 2 } },
+      color: { accent: { primary: appearance?.accent || "#1765ca", level: 2 } },
       typography: { baseSize: 14 },
     },
     frameTitle: `${clientName} AI assistant`,
     header: { title: { text: clientName } },
     history: { enabled: true, showDelete: true, showRename: true },
     startScreen: {
-      greeting: "What can we work on today?",
-      prompts: [
+      greeting: appearance?.greeting || "What can we work on today?",
+      prompts: appearance?.starters ? appearance.starters.map((prompt) => ({ label: prompt, prompt, icon: "sparkle" })) : [
         { label: "Plan my next steps", prompt: "Help me plan the next steps for my ecommerce project. Ask me what you need to know.", icon: "lightbulb" },
         { label: "Improve my store", prompt: "Help me identify ways to improve my online store. Start by asking about my goals.", icon: "sparkle" },
         { label: "Draft a message", prompt: "Help me write a clear message to the AOC team about my project.", icon: "write" },
@@ -92,6 +92,11 @@ function ChatSurface({ clientId, clientName, domainKey, nonce, refreshAccess }) 
     },
     composer: { placeholder: "Ask a question or share an idea…", attachments: { enabled: false } },
     threadItemActions: { feedback: false, retry: true },
+    widgets: { onAction: async (action) => {
+      if (action.type === "download_file" && /^[0-9a-f-]{36}$/i.test(action.payload?.id || "")) {
+        window.open(`/api/assistant-files/${action.payload.id}`, "_blank", "noopener,noreferrer");
+      }
+    } },
     onReady: () => { setReady(true); },
     onResponseEnd: () => { void refreshAccess(); },
     onError: () => { setError((previous) => previous || "Chat could not load or finish the request. Please try again."); },
@@ -116,7 +121,7 @@ function ChatSurface({ clientId, clientName, domainKey, nonce, refreshAccess }) 
   );
 }
 
-export default function ChatKitAssistant({ clientId, clientName, domainKey, nonce }) {
+export default function ChatKitAssistant({ clientId, clientName, domainKey, nonce, appearance }) {
   const [tab, setTab] = useState("chat");
   const [access, setAccess] = useState(null);
   const [accessError, setAccessError] = useState("");
@@ -169,7 +174,7 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
       </div>
       <div id="assistant-chat" role="tabpanel" aria-labelledby="chat-tab" className={styles.content} hidden={tab !== "chat"}>
         {blocked ? <div className={styles.state} role="status">{blocked}</div> : (
-          <ChatSurface key={attempt} clientId={clientId} clientName={clientName} domainKey={domainKey} nonce={nonce} refreshAccess={refreshAccess} />
+          <ChatSurface key={attempt} clientId={clientId} clientName={clientName} domainKey={domainKey} nonce={nonce} refreshAccess={refreshAccess} appearance={appearance} />
         )}
       </div>
       {tab === "archive" && <div id="assistant-archive" role="tabpanel" aria-labelledby="archive-tab" className={styles.content}><EarlierChats /></div>}

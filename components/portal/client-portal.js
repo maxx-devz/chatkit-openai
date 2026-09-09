@@ -9,7 +9,6 @@ import HubstaffProvider, {
 import aocIcon from "@/aoc-icon.png";
 import aocLogo from "@/aoc-logo.png";
 import { PORTAL_CONFIG } from "@/config/portal";
-import { SITE_CONFIG } from "@/config/site";
 import styles from "./client-portal.module.css";
 
 const NAV_ITEMS = [
@@ -202,7 +201,6 @@ export default function ClientPortal({ portalContext }) {
               </div>
               <div className={styles.rightColumn}>
                 <AiAssistantPanel
-                  config={SITE_CONFIG}
                   clientId={portalContext.client.id}
                   clientName={portalContext.client.name}
                   userId={portalContext.user.id}

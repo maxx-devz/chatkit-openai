@@ -1,8 +1,10 @@
 import "./globals.css";
+import aocIcon from "@/aoc-icon.png";
 
 export const metadata = {
   title: "AOC Client Portal",
-  description: "Always Open Commerce client portal and AI assistant prototype",
+  description: "Always Open Commerce client portal and AOC-GPT assistant",
+  icons: { icon: aocIcon.src, apple: aocIcon.src },
 };
 
 export const viewport = {

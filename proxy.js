@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 export function proxy(request) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDevelopment = process.env.NODE_ENV === "development";
-  const chatkitFrame = request.nextUrl.pathname === "/" && process.env.CLIENT_ASSISTANT_UI !== "legacy"
+  const chatkitFrame = request.nextUrl.pathname === "/"
     ? " https://cdn.platform.openai.com" : "";
   const policy = `
     default-src 'self';

@@ -12,6 +12,7 @@ import {
   resolveRequestedModel,
 } from "@/lib/openai-models";
 import {
+  assertTrustedOrigin,
   readJsonRequest,
   requestSecurityErrorResponse,
 } from "@/lib/request-security";
@@ -124,6 +125,7 @@ export async function POST(request) {
   let messages;
 
   try {
+    assertTrustedOrigin(request.headers);
     body = await readJsonRequest(request, 80_000);
     messages = normalizeMessages(body?.messages);
   } catch (error) {

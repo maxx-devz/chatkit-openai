@@ -1,5 +1,5 @@
 """Neon-backed ChatKit Store. All queries include the server-established scope."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from uuid import uuid4
 
 from chatkit.store import NotFoundError, Store
@@ -20,6 +20,12 @@ class Context:
     instructions: str
     client: dict
     period_start: object = None
+    config: dict = field(default_factory=dict)
+    preview: bool = False
+    portal_origin: str = ""
+    thread_id: str | None = None
+    artifacts: list = field(default_factory=list)
+    tool_calls: int = 0
 
     @property
     def scope(self):

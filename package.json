@@ -13,11 +13,16 @@
     "portal:migrate": "node --env-file=.env.local scripts/migrate-portal.mjs",
     "admin:migrate": "node --env-file=.env.local scripts/migrate-admin.mjs",
     "chatkit:migrate": "node --env-file=.env.local scripts/migrate-chatkit.mjs",
+    "builder:migrate": "node --env-file=.env.local scripts/migrate-builder.mjs",
+    "test:builder": "node --test tests/builder-config.test.mjs",
     "test:chatkit": "node --test tests/chatkit-security.test.mjs",
     "client:create": "node --env-file=.env.local scripts/create-client.mjs",
     "client:delete": "node --env-file=.env.local scripts/delete-client.mjs",
     "list:client": "node --env-file=.env.local scripts/list-clients.mjs",
-    "admin:create": "node --env-file=.env.local scripts/create-admin.mjs"
+    "admin:create": "node --env-file=.env.local scripts/create-admin.mjs",
+    "setup:check": "node scripts/check-setup.mjs",
+    "test": "node --test tests",
+    "test:http": "node scripts/check-builder-http.mjs"
   },
   "engines": {
     "node": ">=22"

@@ -2,4 +2,8 @@
 node_modules
 .next
 *.log
-
+.venv
+.builder-review
+answer.txt
+__pycache__
+*.pyc

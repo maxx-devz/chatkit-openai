@@ -1,0 +1,6 @@
+{
+  "version": "1.0",
+  "name": "Generated file",
+  "template": "{\"type\":\"Card\",\"children\":[{\"type\":\"Text\",\"value\":{{ title | tojson }},\"weight\":\"semibold\"},{\"type\":\"Text\",\"value\":{{ filename | tojson }}},{\"type\":\"Button\",\"label\":\"Download\",\"onClickAction\":{\"type\":\"download_file\",\"handler\":\"client\",\"payload\":{\"id\":{{ id | tojson }}}}}]}",
+  "jsonSchema": {"type":"object","properties":{"title":{"type":"string"},"filename":{"type":"string"},"id":{"type":"string"}},"required":["title","filename","id"]}
+}

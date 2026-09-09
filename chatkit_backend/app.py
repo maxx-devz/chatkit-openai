@@ -18,8 +18,11 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 from assistant import PortalChatKitServer
 from security import verify_signature
 from store import Context, PostgresStore
+from builder_config import load_config
+from preview import router as preview_router
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+app.include_router(preview_router)
 store = PostgresStore()
 server = PortalChatKitServer(store)
 logger = logging.getLogger(__name__)
@@ -34,6 +37,7 @@ class Envelope(BaseModel):
     client_id: str = Field(pattern=r"^[1-9][0-9]{0,18}$")
     user_id: str = Field(pattern=r"^[1-9][0-9]{0,18}$")
     instructions: str = Field(max_length=20_000)
+    portal_origin: str = Field(default="", max_length=300)
     payload: dict
 
 
@@ -141,7 +145,7 @@ async def chatkit(request: Request):
         parsed = validate_payload(envelope.payload)
     except (ValidationError, ValueError):
         return JSONResponse({"error": "Invalid chat request"}, status_code=400, headers=NO_STORE)
-    if not os.getenv("DATABASE_URL") or (parsed.type in GENERATE and not os.getenv("OPENAI_API_KEY")):
+    if not os.getenv("DATABASE_URL"):
         return JSONResponse({"error": "Backend is not configured"}, status_code=503, headers=NO_STORE)
 
     db = None
@@ -155,6 +159,8 @@ async def chatkit(request: Request):
         )
         client = await load_client(db, envelope)
         context = Context(db, envelope.client_id, envelope.user_id, envelope.instructions, client)
+        context.config = await load_config(db, client)
+        context.portal_origin = envelope.portal_origin.rstrip("/")
         if parsed.type in MUTATE:
             token = uuid4().hex
             await acquire_lease(context, token)
@@ -166,6 +172,8 @@ async def chatkit(request: Request):
             if not isinstance(item, UserMessageItem):
                 raise HTTPException(400, "Retry requires a user message")
         if parsed.type in GENERATE:
+            if not os.getenv("OPENAI_API_KEY"):
+                raise HTTPException(503, "Backend is not configured")
             await reserve_request(context)
         # Strip unused browser metadata before handing the request to the SDK.
         data = parsed.model_dump(mode="json")

@@ -29,6 +29,7 @@ export async function POST(request) {
       client_id: context.clientId,
       user_id: context.userId,
       instructions: ASSISTANT_INSTRUCTIONS,
+      portal_origin: new URL(process.env.BETTER_AUTH_URL).origin,
       payload,
     });
     try {
