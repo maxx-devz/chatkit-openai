@@ -2,6 +2,7 @@ import { ASSISTANT_INSTRUCTIONS } from "@/config/assistant";
 import { chatKitBackendUrl, signChatKitRequest } from "@/lib/chatkit-security";
 import { getPortalAiContext, portalErrorResponse } from "@/lib/portal-data";
 import { uploadErrorMessage } from "@/lib/chatkit-uploads";
+import { hubstaffContextQuery } from "@/lib/chatkit-hubstaff";
 import { loadHubstaffAssistantSnapshot } from "@/lib/hubstaff";
 import {
   assertTrustedOrigin, readJsonRequest, requestSecurityErrorResponse,
@@ -12,12 +13,6 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 const noStore = { "Cache-Control": "private, no-store", "X-Accel-Buffering": "no" };
-const responseOperations = new Set([
-  "threads.create",
-  "threads.add_user_message",
-  "threads.retry_after_item",
-]);
-
 export async function POST(request) {
   try {
     assertTrustedOrigin(request.headers);
@@ -30,9 +25,11 @@ export async function POST(request) {
       return Response.json({ error: "The AI assistant is paused for this account." }, { status: 403, headers: noStore });
     }
     const payload = await readJsonRequest(request, 100_000);
-    const hubstaff = responseOperations.has(payload?.type)
-      ? await loadHubstaffAssistantSnapshot(context.client.hubstaffProjectUrl, {
-          monthlyHoursLimit: context.client.hubstaffMonthlyHoursLimit,
+    const hubstaffQuery = hubstaffContextQuery(payload);
+    const hubstaff = hubstaffQuery !== null
+      ? await loadHubstaffAssistantSnapshot(context.hubstaffProjectUrl, {
+          monthlyHoursLimit: context.hubstaffMonthlyHoursLimit,
+          query: hubstaffQuery,
         })
       : null;
     let url;

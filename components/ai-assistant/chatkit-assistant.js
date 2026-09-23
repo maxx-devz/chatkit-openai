@@ -2,7 +2,7 @@
 
 import { ChatKit, useChatKit } from "@openai/chatkit-react";
 import Script from "next/script";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_COUNT, UPLOAD_ACCEPT } from "@/lib/chatkit-uploads";
 import styles from "./chatkit-assistant.module.css";
 
@@ -129,18 +129,26 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
   const [access, setAccess] = useState(null);
   const [accessError, setAccessError] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const accessRequest = useRef(null);
   const refreshAccess = useCallback(async (signal) => {
-    try {
-      const response = await fetch("/api/ai-access", { cache: "no-store", signal });
-      if (!response.ok) throw new Error("Your assistant access could not be verified. Please refresh or sign in again.");
-      const data = await response.json();
-      if (!signal?.aborted) {
-        setAccess(data.ai);
-        setAccessError("");
+    if (accessRequest.current) return accessRequest.current;
+    const request = (async () => {
+      try {
+        const response = await fetch("/api/ai-access", { cache: "no-store", signal });
+        if (!response.ok) throw new Error("Your assistant access could not be verified. Please refresh or sign in again.");
+        const data = await response.json();
+        if (!signal?.aborted) {
+          setAccess(data.ai);
+          setAccessError("");
+        }
+      } catch (error) {
+        if (!signal?.aborted) setAccessError(error.message);
+      } finally {
+        if (accessRequest.current === request) accessRequest.current = null;
       }
-    } catch (error) {
-      if (!signal?.aborted) setAccessError(error.message);
-    }
+    })();
+    accessRequest.current = request;
+    return request;
   }, []);
   useEffect(() => {
     const controller = new AbortController();

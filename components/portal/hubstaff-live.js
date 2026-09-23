@@ -159,7 +159,7 @@ export default function HubstaffProvider({ clientName, projectConfigured, childr
     let controller = null;
     let requestInFlight = false;
 
-    if (!data?.configured || !data?.project?.id) return undefined;
+    if (!projectConfigured) return undefined;
 
     async function loadWorkflow() {
       if (!active || requestInFlight || document.visibilityState === "hidden") return;
@@ -194,7 +194,7 @@ export default function HubstaffProvider({ clientName, projectConfigured, childr
       window.clearInterval(intervalId);
       controller?.abort();
     };
-  }, [data?.configured, data?.project?.id]);
+  }, [projectConfigured]);
 
   const value = useMemo(
     () => ({

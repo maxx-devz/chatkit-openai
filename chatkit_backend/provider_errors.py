@@ -15,12 +15,14 @@ CONTACT = "Please contact Always Open Commerce."
 ISSUES = {
     "credit_balance_exhausted": ProviderIssue(
         "credit_balance_exhausted",
-        "AI replies are unavailable because the service's OpenAI API credits are exhausted. " + CONTACT,
+        "AI replies are unavailable because the service's OpenAI API credits are exhausted. "
+        "OpenAI code: credit_balance_exhausted. " + CONTACT,
         False,
     ),
     "insufficient_quota": ProviderIssue(
         "insufficient_quota",
-        "AI replies are unavailable because the service has reached an OpenAI API quota or billing limit. " + CONTACT,
+        "AI replies are unavailable because the service has reached an OpenAI API quota or billing limit. "
+        "OpenAI code: insufficient_quota. " + CONTACT,
         False,
     ),
     "rate_limit_exceeded": ProviderIssue(

@@ -11,6 +11,7 @@ import {
   normalizeHubstaffTask,
   normalizeHubstaffWorkflowList,
   normalizeHubstaffWorkflowTask,
+  sanitizeHubstaffTaskDescription,
   resolveMonthlyHoursLimit,
   taskSummary,
 } from "../lib/hubstaff-data.js";
@@ -181,6 +182,19 @@ test("creates tenant-scoped Hubstaff task links from normalized workflow tasks",
     dueAt: "2026-09-30",
     updatedAt: "2026-09-20T10:00:00Z",
   });
+});
+
+test("redacts sensitive task-description values and external contact links", () => {
+  const value = sanitizeHubstaffTaskDescription(
+    "See [brief](https://docs.example.com/private) or https://example.com/x\n"
+      + "Email owner@example.com\npassword: do-not-share\nAPI_KEY = secret-value",
+  );
+  assert.equal(value.includes("https://"), false);
+  assert.equal(value.includes("owner@example.com"), false);
+  assert.equal(value.includes("do-not-share"), false);
+  assert.equal(value.includes("secret-value"), false);
+  assert.match(value, /external link omitted/);
+  assert.match(value, /sensitive value omitted/);
 });
 
 test("assistant snapshot is read-only, bounded, and includes freshness metadata", () => {
