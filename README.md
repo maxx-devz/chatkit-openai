@@ -9,6 +9,7 @@ requests. Neon stores client settings, conversations, usage, and generated files
 **Configure replies: [Assistant settings](docs/BUILDER_SETUP.md).**
 **Transfer your custom GPT: [AOC-GPT configuration](docs/AOC_GPT_SETUP.md).**
 **Monitor usage: [Portal usage and allowances](docs/PORTAL_USAGE.md).**
+**Connect client work: [Hubstaff dashboard and assistant](docs/HUBSTAFF_SETUP.md).**
 
 The portal's AOC-GPT is an API assistant. Your team's existing custom GPT inside
 ChatGPT Business does not automatically connect or synchronize with it. Transfer
@@ -45,7 +46,8 @@ command. The setup guide covers credentials and migrations for a fresh checkout.
   greeting, colors, and starter prompts.
 - Existing administrator dashboard and staff assistant at `/admin`.
 - Staff usage panel with client allowances and recorded client/admin/draft tokens.
-- Optional Hubstaff project, task, and time reads for the client dashboard.
+- Per-client Hubstaff project, task, and monthly time reads for the dashboard
+  and read-only AOC-GPT answers.
 
 ChatKit is the client assistant interface. The old client chat UI, its model/chat
 endpoints, obsolete CSS, and unfinished workflow integration have been removed.
@@ -65,13 +67,14 @@ Existing accounts, client records, conversations, and administrator tools are re
 | `npm start` | Serve a production build; configure a running HTTPS Python backend separately |
 | `npm run auth:migrate` | Better Auth schema |
 | `npm run portal:migrate` | Client, membership, and earlier-history schema |
-| `npm run admin:migrate` | Staff access and monthly usage schema |
+| `npm run admin:migrate` | Staff access, monthly usage, Hubstaff limits, and encrypted PAT storage |
 | `npm run chatkit:migrate` | ChatKit conversations and request leases |
 | `npm run builder:migrate` | Assistant configuration, tools, and generated files |
 | `npm run usage:migrate` | Anonymous AI activity totals, independent of allowance resets |
 | `npm run admin:create -- USERNAME "DISPLAY NAME"` | Create a staff login; password is prompted privately |
 | `npm run client:create -- USERNAME "DISPLAY NAME"` | Create a client login |
 | `npm run list:client` | List current client accounts |
+| `npm run hubstaff:check -- PROJECT_URL` | Safely verify Hubstaff project access and summary data |
 | `npm run client:delete -- USERNAME --confirm-delete` | Permanently remove the specified client |
 
 Create clients through **Add client** in `/admin` or the command above. Existing
@@ -105,7 +108,7 @@ your production branch. Do not commit `.env.local`, credentials, or `answer.txt`
 | `app/api/assistant-files/[id]/route.js` | Authorized file downloads |
 | `config/assistant.js` | Company-wide server instructions |
 | `lib/portal-data.js` | Client access, earlier history, and allowance display |
-| `config/portal.js` | Dashboard content and assistant panel sizing |
+| `config/portal.js` | Portal layout and assistant panel sizing |
 
 ## Current boundaries
 
@@ -121,6 +124,6 @@ The private settings page is this application's editor. OpenAI's Widget Builder
 can design cards; it is not a workflow automation engine. Instructions alone
 cannot add new tools or connect external applications.
 
-The dashboard still contains sample content where Hubstaff is not configured.
-Password recovery and automatic knowledge synchronization are not implemented.
+Accounts without a Hubstaff project show an unconfigured state instead of sample
+hours or tasks. Password recovery and automatic knowledge synchronization are not implemented.
 OpenAI API billing is separate from ChatGPT Business.

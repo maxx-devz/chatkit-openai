@@ -33,6 +33,7 @@ class PreviewRequest(BaseModel):
     revision: int = Field(ge=1)
     instructions: str = Field(max_length=20000)
     portal_origin: str = Field(max_length=300)
+    hubstaff: dict | None = None
     messages: list[PreviewMessage] = Field(min_length=1, max_length=12)
 
 
@@ -73,7 +74,7 @@ async def preview(request: Request):
                 await db.execute("DELETE FROM portal_assistant_files WHERE user_id=%s AND preview=TRUE AND created_at < NOW()-INTERVAL '24 hours'", (data.user_id,))
                 context = Context(db, data.client_id, data.user_id, data.instructions, client,
                     config=AssistantConfig.model_validate(client["draft"]).model_dump(), preview=True,
-                    portal_origin=data.portal_origin.rstrip("/"))
+                    portal_origin=data.portal_origin.rstrip("/"), hubstaff=data.hubstaff)
                 started_at = datetime.now(timezone.utc)
                 result = Runner.run_streamed(make_agent(context), [item.model_dump() for item in data.messages],
                     context=context, max_turns=5, run_config=RunConfig(tracing_disabled=True, trace_include_sensitive_data=False))

@@ -57,8 +57,9 @@ For a fresh checkout, copy `.env.example` to `.env.local` and fill the values.
 | `CHATKIT_BACKEND_URL` | `http://127.0.0.1:8000` |
 | `CHATKIT_BACKEND_SECRET` | Random 32+ character secret shared by both services |
 | `CHATKIT_VERCEL_PROTECTION_BYPASS` | Leave blank locally |
-| `HUBSTAFF_ACCESS_TOKEN` | Optional existing server-only Hubstaff organization token |
-| `HUBSTAFF_MONTHLY_HOURS_DEFAULT` | Optional existing hours fallback |
+| `HUBSTAFF_PAT_REFRESH_TOKEN` | Initial member PAT value; server-only |
+| `HUBSTAFF_TOKEN_ENCRYPTION_KEY` | Stable random 32+ character key for PAT rotation storage |
+| `HUBSTAFF_ACCESS_TOKEN` | Optional alternative `hsoat_` organization token |
 
 Create/manage your API key in the [API Platform](https://platform.openai.com/api-keys).
 ChatGPT Business and API usage have separate billing. An existing custom GPT's
@@ -197,8 +198,10 @@ and branch names; do not push an incomplete setup straight to production.
 | `CHATKIT_BACKEND_URL` | Python HTTPS origin | Not needed |
 | `CHATKIT_BACKEND_SECRET` | New production shared secret | Identical secret |
 | `CHATKIT_VERCEL_PROTECTION_BYPASS` | If backend deployment protection requires it | Not needed |
-| `HUBSTAFF_ACCESS_TOKEN` | Keep existing optional token | Not needed |
-| `HUBSTAFF_MONTHLY_HOURS_DEFAULT` | Keep existing optional setting | Not needed |
+| `HUBSTAFF_PAT_REFRESH_TOKEN` | Initial member PAT value, or blank when using `hsoat_` | Not needed |
+| `HUBSTAFF_TOKEN_ENCRYPTION_KEY` | Stable random 32+ character key for PAT storage | Not needed |
+| `HUBSTAFF_ACCESS_TOKEN` | Optional alternative `hsoat_` organization token | Not needed |
+| `HUBSTAFF_REPORT_TIME_ZONE` | Organization timezone, such as `Asia/Manila` | Not needed |
 
 Keep environment scopes consistent: Production values for production, Preview
 values for a preview. Environment changes require a new deployment.

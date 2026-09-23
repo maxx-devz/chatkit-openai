@@ -24,6 +24,7 @@ class Context:
     config: dict = field(default_factory=dict)
     preview: bool = False
     portal_origin: str = ""
+    hubstaff: dict | None = None
     thread_id: str | None = None
     artifacts: list = field(default_factory=list)
     tool_calls: int = 0

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import nextEnv from "@next/env";
 import pg from "pg";
 import { chatKitBackendUrl } from "../lib/chatkit-security.js";
+import { normalizeReportTimeZone } from "../lib/hubstaff-data.js";
 
 const production = process.argv.includes("--production");
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -46,6 +47,15 @@ if (!production && localBackend) {
 const retiredImages = new Set(["gpt-image-1", "gpt-image-1-mini", "gpt-image-1.5", "chatgpt-image-latest", "dall-e-2", "dall-e-3"]);
 check(!retiredImages.has(process.env.OPENAI_IMAGE_MODEL?.trim()), "Image model configuration",
   "The configured image model has a retirement notice. Use OPENAI_IMAGE_MODEL=gpt-image-2 before enabling images.");
+const hubstaffTimeZone = process.env.HUBSTAFF_REPORT_TIME_ZONE?.trim();
+check(!hubstaffTimeZone || normalizeReportTimeZone(hubstaffTimeZone) === hubstaffTimeZone,
+  "Hubstaff reporting timezone", "Use a valid IANA timezone such as Asia/Manila.");
+const hubstaffPatConfigured = Boolean(configured("HUBSTAFF_PAT_REFRESH_TOKEN"));
+if (hubstaffPatConfigured) {
+  check((process.env.HUBSTAFF_TOKEN_ENCRYPTION_KEY?.trim().length || 0) >= 32,
+    "Hubstaff PAT encryption key",
+    "Set HUBSTAFF_TOKEN_ENCRYPTION_KEY to a stable random value containing at least 32 characters.");
+}
 
 if (configured("DATABASE_URL")) {
   const db = new pg.Client({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 8000, query_timeout: 10000 });
@@ -54,7 +64,7 @@ if (configured("DATABASE_URL")) {
     const groups = {
       "auth:migrate": ["user", "session", "account", "verification", "rateLimit"],
       "portal:migrate": ["portal_clients", "portal_memberships", "portal_workspace_snapshots"],
-      "admin:migrate": ["portal_admins", "portal_ai_usage_monthly"],
+      "admin:migrate": ["portal_admins", "portal_ai_usage_monthly", "portal_hubstaff_tokens"],
       "chatkit:migrate": ["portal_chatkit_threads", "portal_chatkit_items", "portal_chatkit_leases"],
       ...((process.env.CHATKIT_UPLOADS_ENABLED || "true").toLowerCase() === "true" ? {
         "uploads:migrate": ["portal_chatkit_uploads", "portal_chatkit_upload_attempts"],
@@ -66,6 +76,10 @@ if (configured("DATABASE_URL")) {
       const result = await db.query("SELECT name, to_regclass('public.' || quote_ident(name)) IS NOT NULL AS present FROM unnest($1::text[]) AS name", [tables]);
       check(result.rows.every(row => row.present), migration + " tables", `Run npm run ${migration} against this deployment's database.`);
     }
+    const hubstaffColumn = await db.query(
+      "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='portal_clients' AND column_name='hubstaff_monthly_hours_limit') AS present",
+    );
+    check(Boolean(hubstaffColumn.rows[0]?.present), "Hubstaff client-limit column", "Run npm run admin:migrate against this deployment's database.");
   } catch { check(false, "Database connection", "Check DATABASE_URL, network access, and the Neon database status."); }
   finally { await db.end().catch(() => {}); }
 }

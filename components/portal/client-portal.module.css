@@ -348,8 +348,7 @@
 }
 
 .metricIcon svg,
-.cardHeader svg,
-.projectIcon svg {
+.cardHeader svg {
   width: 21px;
   height: 21px;
   fill: none;
@@ -386,10 +385,17 @@
   color: #132239;
 }
 
-.metricValue strong {
+.metricValue strong,
+.metricValue a {
+  overflow: hidden;
+  color: inherit;
   font-size: clamp(17px, 1.6vw, 22px);
   letter-spacing: -0.035em;
+  text-decoration: none;
+  text-overflow: ellipsis;
 }
+
+.metricValue a:hover { text-decoration: underline; }
 
 .purple .metricValue,
 .green .metricValue {
@@ -397,6 +403,7 @@
 }
 
 .purple .metricValue strong,
+.purple .metricValue a,
 .green .metricValue strong {
   font-size: 16px;
 }
@@ -517,6 +524,11 @@
   font-size: 10px;
 }
 
+.liveProjectTitle {
+  color: #25344a !important;
+  font-size: 10px !important;
+}
+
 .liveProjectMeta span {
   margin-top: 3px;
   color: #8490a1;
@@ -534,21 +546,20 @@
 .liveProjectMeta a:hover { text-decoration: underline; }
 
 .taskBoard {
-  display: flex;
-  gap: 9px;
-  padding: 5px 16px 14px;
-  overflow-x: auto;
+  display: grid;
+  gap: 12px;
+  padding: 8px 16px 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .taskColumn {
   display: grid;
-  min-width: 145px;
-  flex: 1 0 145px;
+  min-width: 0;
   align-content: start;
   overflow: hidden;
   border: 1px solid #e2eaf2;
-  border-radius: 9px;
-  background: #f7fafd;
+  border-radius: 12px;
+  background: #f8fbfe;
 }
 
 .taskColumn > header {
@@ -556,57 +567,447 @@
   align-items: center;
   justify-content: space-between;
   gap: 5px;
-  padding: 8px 9px;
+  padding: 11px 12px;
   background: #edf5fb;
 }
 
-.taskColumn > header strong {
+.taskStageLabel {
+  display: flex !important;
+  min-width: 0;
+  height: auto !important;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.taskStageLabel svg,
+.taskCardIcon svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.taskStageLabel strong {
   overflow: hidden;
   color: #48617a;
-  font-size: 8px;
+  font-size: 10px;
+  letter-spacing: .025em;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
-.taskColumn > header span {
+.taskCount {
   display: grid;
-  min-width: 17px;
-  height: 17px;
+  min-width: 22px;
+  height: 22px;
   place-items: center;
   border-radius: 999px;
   background: #dcebf7;
   color: #4c7694;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 800;
 }
 
 .taskColumn > div {
   display: grid;
-  gap: 6px;
-  padding: 7px;
+  gap: 8px;
+  padding: 9px;
 }
 
 .taskCard {
-  display: grid;
-  gap: 5px;
-  padding: 8px;
+  display: flex;
+  gap: 8px;
+  padding: 10px;
   border: 1px solid #e2e9f1;
-  border-radius: 7px;
+  border-radius: 9px;
   background: #fff;
   box-shadow: 0 3px 9px rgba(32, 68, 106, .045);
 }
 
+.taskCard > div {
+  min-width: 0;
+}
+
+.taskCard strong,
+.taskCard small {
+  display: block;
+}
+
 .taskCard strong {
   color: #2d425b;
-  font-size: 9px;
-  line-height: 1.35;
+  font-size: 10.5px;
+  line-height: 1.4;
 }
 
 .taskCard small {
+  margin-top: 3px;
   color: #7e8ea1;
-  font-size: 8px;
+  font-size: 9px;
   text-transform: capitalize;
+}
+
+.taskCardIcon {
+  flex: 0 0 auto;
+  color: #58738e;
+}
+
+.taskColumn_in_progress .taskStageLabel,
+.taskColumn_in_progress .taskCardIcon { color: #176be7; }
+
+.taskColumn_done .taskStageLabel,
+.taskColumn_done .taskCardIcon { color: #208c4d; }
+
+.taskColumnEmpty {
+  margin: 16px 5px;
+  color: #8a98a9;
+  font-size: 10px;
+  text-align: center;
+}
+
+.taskShowMore {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d8e6f3;
+  border-radius: 8px;
+  background: #fff;
+  color: #176be7;
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.taskShowMore:hover {
+  border-color: #9fc5ee;
+  background: #f2f8ff;
+}
+
+.taskAssistantPrompt {
+  display: grid;
+  align-items: center;
+  gap: 10px;
+  margin: 0 16px 16px;
+  padding: 11px 12px;
+  border: 1px solid #dce9f7;
+  border-radius: 11px;
+  background: linear-gradient(105deg, #f4f9ff, #f8fbff);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.taskAssistantPrompt > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 9px;
+  background: #e5f1ff;
+  color: #176be7;
+}
+
+.taskAssistantPrompt svg {
+  width: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
+.taskAssistantPrompt strong,
+.taskAssistantPrompt small {
+  display: block;
+}
+
+.taskAssistantPrompt strong {
+  color: #273b54;
+  font-size: 10px;
+}
+
+.taskAssistantPrompt small {
+  margin-top: 2px;
+  color: #74869a;
+  font-size: 9px;
+}
+
+.taskAssistantPrompt a {
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #176be7;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 750;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.taskAssistantPrompt a:hover { background: #0e5dce; }
+
+.workflowSkeleton,
+.workflowAccordion {
+  display: grid;
+  gap: 9px;
+  padding: 8px 16px 16px;
+}
+
+.workflowSkeleton i {
+  height: 66px;
+  overflow: hidden;
+  border: 1px solid #e1e9f1;
+  border-radius: 12px;
+  background: linear-gradient(90deg, #f5f8fb 25%, #eaf1f7 50%, #f5f8fb 75%);
+  background-size: 220% 100%;
+  animation: workflowShimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes workflowShimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+.workflowGroup {
+  --workflow-color: #60748b;
+  --workflow-soft: #eef3f7;
+  overflow: hidden;
+  border: 1px solid #dfe8f1;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgba(30, 66, 102, .035);
+}
+
+.workflow_todo {
+  --workflow-color: #53708c;
+  --workflow-soft: #eaf1f7;
+}
+
+.workflow_in_progress {
+  --workflow-color: #176be7;
+  --workflow-soft: #e8f2ff;
+}
+
+.workflow_review {
+  --workflow-color: #7b55d9;
+  --workflow-soft: #f0ebff;
+}
+
+.workflow_done {
+  --workflow-color: #20945a;
+  --workflow-soft: #e8f7ef;
+}
+
+.workflow_other {
+  --workflow-color: #b06a17;
+  --workflow-soft: #fff3e5;
+}
+
+.workflowRow {
+  display: grid;
+  width: 100%;
+  min-height: 66px;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  text-align: left;
+}
+
+.workflowRow:hover,
+.workflowRow[aria-expanded="true"] {
+  background: #fbfdff;
+}
+
+.workflowIcon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--workflow-soft);
+  color: var(--workflow-color);
+}
+
+.workflowIcon svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.workflowCopy {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 12px;
+}
+
+.workflowCopy strong {
+  overflow: hidden;
+  color: #263b53;
+  font-size: 11px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workflowCopy small {
+  color: #77899c;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.workflowCopy > i {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf2f6;
+  grid-column: 1 / -1;
+}
+
+.workflowCopy > i > b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--workflow-color);
+  transition: width .28s ease;
+}
+
+.workflowChevron {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--workflow-soft);
+  color: var(--workflow-color);
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.workflowPanel {
+  border-top: 1px solid #e7edf4;
+  background: #f8fbfe;
+}
+
+.taskLoading {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+}
+
+.taskLoading i {
+  height: 45px;
+  border-radius: 9px;
+  background: linear-gradient(90deg, #edf3f8 25%, #e2ebf3 50%, #edf3f8 75%);
+  background-size: 220% 100%;
+  animation: workflowShimmer 1.2s ease-in-out infinite;
+}
+
+.taskLoading span {
+  color: #70849a;
+  font-size: 9px;
+  text-align: center;
+}
+
+.workflowTasks {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+}
+
+.workflowTasks > a {
+  display: grid;
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid #e0e9f1;
+  border-radius: 9px;
+  background: #fff;
+  color: inherit;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  text-decoration: none;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+.workflowTasks > a:hover {
+  border-color: #a9caed;
+  box-shadow: 0 5px 14px rgba(32, 83, 137, .09);
+  transform: translateY(-1px);
+}
+
+.workflowTasks > a > span:nth-child(2) {
+  min-width: 0;
+}
+
+.workflowTasks strong,
+.workflowTasks small {
+  display: block;
+}
+
+.workflowTasks strong {
+  color: #273d55;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.workflowTasks small {
+  margin-top: 2px;
+  color: #8492a3;
+  font-size: 8.5px;
+}
+
+.workflowTasks > a > b {
+  color: #176be7;
+  font-size: 9px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.workflowEmpty,
+.workflowNotice {
+  margin: 0;
+  padding: 18px 14px;
+  color: #7d8fa2;
+  font-size: 10px;
+  text-align: center;
+}
+
+.workflowNotice {
+  padding: 5px;
+  color: #956e29;
+  font-size: 9px;
+}
+
+.workflowTaskError {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  color: #9b4b44;
+  font-size: 9px;
+}
+
+.workflowTaskError button {
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  border: 1px solid #e7b7b1;
+  border-radius: 7px;
+  background: #fff;
+  color: #9b4b44;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
 }
 
 .liveEmpty,
@@ -663,174 +1064,6 @@
   margin-top: 5px;
   color: #778499;
   font-size: 8px;
-}
-
-.chartHeading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 13px 18px 0;
-  border-top: 1px solid #edf1f5;
-}
-
-.chartHeading strong {
-  color: #26364e;
-  font-size: 10px;
-}
-
-.chartHeading span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: #7a8799;
-  font-size: 8px;
-}
-
-.chartHeading i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #176be7;
-}
-
-.chartHeading i:last-of-type {
-  margin-left: 7px;
-  background: #b9c5d4;
-}
-
-.chartWrap {
-  padding: 4px 16px 15px;
-}
-
-.chartWrap svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: 260px;
-  overflow: visible;
-}
-
-.chartWrap text {
-  fill: #7d8999;
-  font-size: 10px;
-}
-
-.gridLine {
-  stroke: #e7edf4;
-  stroke-dasharray: 4 5;
-  stroke-width: 1;
-}
-
-.axisLine {
-  stroke: #cfd9e5;
-  stroke-width: 1;
-}
-
-.usedLine,
-.remainingLine {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 3;
-}
-
-.usedLine { stroke: #176be7; }
-.remainingLine { stroke: #b9c5d4; }
-
-.projectList {
-  padding: 4px 16px 10px;
-}
-
-.projectList article {
-  display: grid;
-  min-width: 0;
-  min-height: 58px;
-  align-items: center;
-  padding: 9px 0;
-  border-bottom: 1px solid #edf1f5;
-  grid-template-columns: auto minmax(150px, 1fr) auto minmax(90px, 0.55fr) 34px;
-  gap: 10px;
-}
-
-.projectList article:last-child {
-  border: 0;
-}
-
-.projectIcon {
-  display: grid;
-  width: 29px;
-  height: 29px;
-  place-items: center;
-  border-radius: 8px;
-  background: #176be7;
-}
-
-.projectIcon svg {
-  width: 16px;
-  height: 16px;
-}
-
-.projectName {
-  min-width: 0;
-}
-
-.projectName strong,
-.projectName small {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.projectName strong {
-  color: #25344a;
-  font-size: 9px;
-}
-
-.projectName small {
-  margin-top: 4px;
-  color: #8490a1;
-  font-size: 8px;
-}
-
-.inProgress,
-.completed {
-  padding: 5px 7px;
-  border-radius: 6px;
-  background: #eaf2ff;
-  color: #1c63c6;
-  font-size: 8px;
-  font-weight: 720;
-  white-space: nowrap;
-}
-
-.completed {
-  background: #eaf8ef;
-  color: #198a3e;
-}
-
-.projectProgress {
-  height: 5px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #e9eef4;
-}
-
-.projectProgress i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: #176be7;
-}
-
-.projectList article:nth-child(2) .projectProgress i {
-  background: #20a34a;
-}
-
-.projectList article > b {
-  color: #67758a;
-  font-size: 8px;
-  text-align: right;
 }
 
 .quickQuestions header {
@@ -1019,17 +1252,17 @@
     border: 0;
   }
 
-  .projectList article {
-    grid-template-columns: auto minmax(0, 1fr) 35px;
+  .taskBoard {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .projectList article > span:nth-of-type(2),
-  .projectProgress {
-    display: none;
+  .taskAssistantPrompt {
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .chartHeading span {
-    display: none;
+  .taskAssistantPrompt a {
+    grid-column: 1 / -1;
+    text-align: center;
   }
 
   .footer {

@@ -18,6 +18,8 @@ async function main() {
       client.slug,
       client.portal_enabled,
       client.ai_enabled,
+      client.hubstaff_project_url,
+      client.hubstaff_monthly_hours_limit,
       COALESCE(
         STRING_AGG(DISTINCT auth_user.username, ', ' ORDER BY auth_user.username),
         ''
@@ -34,7 +36,9 @@ async function main() {
       client.display_name,
       client.slug,
       client.portal_enabled,
-      client.ai_enabled
+      client.ai_enabled,
+      client.hubstaff_project_url,
+      client.hubstaff_monthly_hours_limit
     ORDER BY client.display_name ASC;
   `;
 
@@ -48,6 +52,8 @@ async function main() {
     Username: row.usernames || row.slug,
     "Portal": row.portal_enabled ? "Enabled" : "Disabled",
     "AI assistant": row.ai_enabled ? "Enabled" : "Disabled",
+    "Hubstaff project": row.hubstaff_project_url?.match(/\/projects\/(\d+)/)?.[1] || "Not connected",
+    "Monthly hours": row.hubstaff_monthly_hours_limit ?? "Hubstaff/default",
   })));
 }
 

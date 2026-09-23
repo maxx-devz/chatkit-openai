@@ -4,6 +4,7 @@ import AiAssistantPanel from "@/components/ai-assistant/ai-assistant-panel";
 import AccountControls from "@/components/portal/account-controls";
 import HubstaffProvider, {
   HubstaffMetrics,
+  HubstaffMonthGlance,
   HubstaffProjectProgress,
 } from "@/components/portal/hubstaff-live";
 import aocIcon from "@/aoc-icon.png";
@@ -109,42 +110,6 @@ function PortalHeader({ portal }) {
   );
 }
 
-function TimeOverview() {
-  return (
-    <section className={styles.card} aria-labelledby="time-overview-title">
-      <header className={styles.cardHeader}>
-        <span><PortalIcon name="chart" /></span>
-        <h2 id="time-overview-title">This Month at a Glance</h2>
-      </header>
-      <div className={styles.glanceStats}>
-        <div><strong>7.25</strong><span>Hours Used</span></div>
-        <div><strong>7.75</strong><span>Hours Remaining</span></div>
-        <div><strong>48%</strong><span>Time Used</span></div>
-        <div><strong>5</strong><span>Tasks Completed</span></div>
-      </div>
-      <div className={styles.chartHeading}>
-        <strong>Time Usage Trend</strong>
-        <span><i /> Hours Used <i /> Hours Remaining</span>
-      </div>
-      <div className={styles.chartWrap} aria-label="Prototype time usage chart">
-        <svg viewBox="0 0 700 250" role="img" aria-labelledby="chart-title">
-          <title id="chart-title">Hours used increase while hours remaining decrease through May</title>
-          {[40, 90, 140, 190].map((y) => (
-            <line className={styles.gridLine} x1="48" x2="678" y1={y} y2={y} key={y} />
-          ))}
-          <line className={styles.axisLine} x1="48" x2="48" y1="24" y2="205" />
-          <line className={styles.axisLine} x1="48" x2="678" y1="205" y2="205" />
-          <polyline className={styles.remainingLine} points="48,44 140,70 232,92 324,121 416,145 508,163 598,178 678,166" />
-          <polyline className={styles.usedLine} points="48,205 140,183 232,159 324,145 416,135 508,125 598,115 678,98" />
-          {["May 1", "May 7", "May 14", "May 21", "May 28", "May 31"].map((label, index) => (
-            <text x={48 + index * 124} y="232" key={label}>{label}</text>
-          ))}
-        </svg>
-      </div>
-    </section>
-  );
-}
-
 function QuickQuestions({ questions }) {
   return (
     <section className={styles.quickQuestions} aria-labelledby="quick-questions-title">
@@ -182,22 +147,32 @@ export default function ClientPortal({ portalContext }) {
     memberships: portalContext.memberships,
     user: portalContext.user,
   };
+  const quickQuestions = [
+    `How many hours does ${portal.clientName} have left this month?`,
+    `What work was completed today for ${portal.clientName}?`,
+    `Which ${portal.clientName} tasks are in progress?`,
+    `What was completed this month for ${portal.clientName}?`,
+  ];
 
   return (
     <div className={styles.portalShell}>
       <PortalSidebar portal={portal} />
       <div className={styles.portalMain}>
         <PortalHeader portal={portal} />
-        <HubstaffProvider projectConfigured={Boolean(portal.client.hubstaffProjectUrl)}>
+        <HubstaffProvider
+          clientName={portal.clientName}
+          key={portal.client.slug}
+          projectConfigured={Boolean(portal.client.hubstaffProjectUrl)}
+        >
           <main className={styles.dashboard} id="dashboard">
             <section className={styles.metrics} aria-label="Account overview">
-              <HubstaffMetrics fallbackMetrics={portal.metrics} />
+              <HubstaffMetrics />
             </section>
 
             <div className={styles.dashboardGrid}>
               <div className={styles.leftColumn}>
-                <TimeOverview />
-                <HubstaffProjectProgress fallbackProjects={portal.projects} />
+                <HubstaffMonthGlance />
+                <HubstaffProjectProgress />
               </div>
               <div className={styles.rightColumn}>
                 <AiAssistantPanel
@@ -208,7 +183,7 @@ export default function ClientPortal({ portalContext }) {
                   key={portal.client.slug}
                   minHeight={portal.assistantPanel.minHeight}
                 />
-                <QuickQuestions questions={portal.quickQuestions} />
+                <QuickQuestions questions={quickQuestions} />
               </div>
             </div>
           </main>

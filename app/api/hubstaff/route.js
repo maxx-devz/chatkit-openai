@@ -10,7 +10,10 @@ export const dynamic = "force-dynamic";
 export async function GET(request) {
   try {
     const context = await resolvePortalContext(request.headers);
-    const data = await loadHubstaffProject(context.client.hubstaffProjectUrl);
+    const data = await loadHubstaffProject(context.client.hubstaffProjectUrl, {
+      monthlyHoursLimit: context.client.hubstaffMonthlyHoursLimit,
+      includeTasks: false,
+    });
 
     return Response.json(data, {
       headers: {

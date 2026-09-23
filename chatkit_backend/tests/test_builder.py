@@ -11,7 +11,7 @@ from docx import Document
 from pydantic import ValidationError
 from builder_config import AssistantConfig
 from generation import DocumentSection, FILE_CARD, render_document, reserve_tool, save_artifact, DOCX_MIME
-from assistant import make_agent
+from assistant import hubstaff_tools, make_agent
 from preview import PreviewRequest
 
 
@@ -37,6 +37,15 @@ class BuilderTests(unittest.TestCase):
         self.assertEqual(len(agent.tools), 3)
         self.assertEqual(agent.tools[-1].vector_store_ids, ["vs_client"])
         self.assertEqual(agent.tools[0].params_json_schema["additionalProperties"], False)
+
+    def test_hubstaff_tool_is_scoped_to_the_signed_request_snapshot(self):
+        snapshot = {"configured": True, "available": True, "readOnly": True,
+                    "project": {"id": 7, "name": "Golf Brands"}}
+        context = SimpleNamespace(hubstaff=snapshot)
+        tools = hubstaff_tools(context)
+        self.assertEqual(len(tools), 1)
+        self.assertEqual(tools[0].name, "get_hubstaff_project_status")
+        self.assertEqual(hubstaff_tools(SimpleNamespace(hubstaff=None)), [])
 
     def test_widget_template_escapes_data_and_emits_client_download_action(self):
         widget = FILE_CARD.build({"title": 'A "quote"', "filename": "proposal.docx", "id": "test-id"}).model_dump()

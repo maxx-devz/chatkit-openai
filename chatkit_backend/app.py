@@ -40,6 +40,7 @@ class Envelope(BaseModel):
     user_id: str = Field(pattern=r"^[1-9][0-9]{0,18}$")
     instructions: str = Field(max_length=20_000)
     portal_origin: str = Field(default="", max_length=300)
+    hubstaff: dict | None = None
     payload: dict
 
 
@@ -168,6 +169,7 @@ async def chatkit(request: Request):
         context = Context(db, envelope.client_id, envelope.user_id, envelope.instructions, client)
         context.config = await load_config(db, client)
         context.portal_origin = envelope.portal_origin.rstrip("/")
+        context.hubstaff = envelope.hubstaff
         if parsed.type in MUTATE:
             token = uuid4().hex
             await acquire_lease(context, token)

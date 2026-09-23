@@ -64,6 +64,7 @@ function settingsFromClient(client) {
         assistantInstructions: client.assistantInstructions,
         vectorStoreId: client.vectorStoreId,
         hubstaffProjectUrl: client.hubstaffProjectUrl || "",
+        hubstaffMonthlyHoursLimit: client.hubstaffMonthlyHoursLimit ?? "",
       }
     : null;
 }
@@ -204,6 +205,7 @@ export default function AdminDashboard({ initialData }) {
           password: form.get("password"),
           monthlyPromptLimit: Number(form.get("monthlyPromptLimit")),
           hubstaffProjectUrl: form.get("hubstaffProjectUrl"),
+          hubstaffMonthlyHoursLimit: form.get("hubstaffMonthlyHoursLimit"),
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -514,6 +516,19 @@ export default function AdminDashboard({ initialData }) {
                         />
                         <small>Optional. Only this client&apos;s project is queried for monthly hours and task progress.</small>
                       </label>
+                      <label className={styles.vectorField}>
+                        <span>Monthly Hubstaff hours limit</span>
+                        <input
+                          type="number"
+                          min="0.01"
+                          max="100000"
+                          step="0.01"
+                          placeholder="Use the Hubstaff project budget"
+                          value={draft.hubstaffMonthlyHoursLimit}
+                          onChange={(event) => updateDraft("hubstaffMonthlyHoursLimit", event.target.value)}
+                        />
+                        <small>Optional per-client fallback. A monthly hours budget configured in Hubstaff takes priority.</small>
+                      </label>
                     </section>
 
                     <section className={`${styles.settingsCard} ${styles.wideCard}`}>
@@ -577,6 +592,17 @@ export default function AdminDashboard({ initialData }) {
                 name="hubstaffProjectUrl"
                 type="url"
                 placeholder="https://tasks.hubstaff.com/app/organizations/14952/projects/803599"
+              />
+            </label>
+            <label className={styles.dialogWide}>
+              <span>Monthly Hubstaff hours limit</span>
+              <input
+                name="hubstaffMonthlyHoursLimit"
+                type="number"
+                min="0.01"
+                max="100000"
+                step="0.01"
+                placeholder="Optional when Hubstaff has no monthly budget"
               />
             </label>
           </div>

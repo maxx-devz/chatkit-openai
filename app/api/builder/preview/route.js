@@ -1,9 +1,10 @@
 import { ASSISTANT_INSTRUCTIONS } from "@/config/assistant";
 import { resolveAdminContext } from "@/lib/admin-data";
-import { builderHeaders, builderResponseError } from "@/lib/builder-data";
+import { builderHeaders, builderPool, builderResponseError } from "@/lib/builder-data";
 import { builderError } from "@/lib/builder-config";
 import { assertTrustedOrigin, readJsonRequest } from "@/lib/request-security";
 import { chatKitBackendUrl, signChatKitRequest } from "@/lib/chatkit-security";
+import { loadHubstaffAssistantSnapshot } from "@/lib/hubstaff";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -16,8 +17,19 @@ export async function POST(request) {
       || !Array.isArray(input.messages) || input.messages.length < 1 || input.messages.length > 12
       || input.messages.some((m) => !m || !["user", "assistant"].includes(m.role) || typeof m.content !== "string" || !m.content.trim() || m.content.length > 12000)
       || input.messages.at(-1).role !== "user" || input.messages.reduce((total, m) => total + m.content.length, 0) > 30000) throw builderError("Use a saved draft and a shorter test conversation.");
+    const hubstaffRows = await builderPool.query(
+      "SELECT hubstaff_project_url,hubstaff_monthly_hours_limit FROM portal_clients WHERE id=$1",
+      [input.clientId],
+    );
+    const selectedClient = hubstaffRows.rows[0];
+    const hubstaff = selectedClient
+      ? await loadHubstaffAssistantSnapshot(selectedClient.hubstaff_project_url, {
+          monthlyHoursLimit: selectedClient.hubstaff_monthly_hours_limit,
+        })
+      : null;
     const body = JSON.stringify({ client_id: input.clientId, user_id: admin.id, revision: input.revision,
       instructions: ASSISTANT_INSTRUCTIONS, portal_origin: new URL(process.env.BETTER_AUTH_URL).origin,
+      hubstaff,
       messages: input.messages.map(({ role, content }) => ({ role, content })) });
     const url = new URL("/builder-preview", chatKitBackendUrl(process.env.CHATKIT_BACKEND_URL || "http://127.0.0.1:8000"));
     const upstream = await fetch(url, { method: "POST", cache: "no-store", redirect: "error",

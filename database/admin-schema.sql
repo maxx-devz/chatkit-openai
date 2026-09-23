@@ -23,7 +23,8 @@ ALTER TABLE portal_clients
   ADD COLUMN IF NOT EXISTS portal_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   ADD COLUMN IF NOT EXISTS monthly_prompt_limit INTEGER NOT NULL DEFAULT 150,
-  ADD COLUMN IF NOT EXISTS hubstaff_project_url TEXT;
+  ADD COLUMN IF NOT EXISTS hubstaff_project_url TEXT,
+  ADD COLUMN IF NOT EXISTS hubstaff_monthly_hours_limit NUMERIC(10,2);
 
 DO $$
 BEGIN
@@ -34,6 +35,25 @@ BEGIN
     ALTER TABLE portal_clients
       ADD CONSTRAINT portal_clients_monthly_prompt_limit
       CHECK (monthly_prompt_limit BETWEEN 1 AND 100000);
+  END IF;
+END
+$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'portal_clients_hubstaff_monthly_hours_limit'
+  ) THEN
+    ALTER TABLE portal_clients
+      ADD CONSTRAINT portal_clients_hubstaff_monthly_hours_limit
+      CHECK (
+        hubstaff_monthly_hours_limit IS NULL
+        OR (
+          hubstaff_monthly_hours_limit > 0
+          AND hubstaff_monthly_hours_limit <= 100000
+        )
+      );
   END IF;
 END
 $$;
@@ -56,6 +76,21 @@ CREATE TABLE IF NOT EXISTS portal_ai_usage_monthly (
 
 CREATE INDEX IF NOT EXISTS portal_ai_usage_period_idx
   ON portal_ai_usage_monthly (period_start DESC, client_id);
+
+-- Hubstaff personal access tokens rotate whenever they are refreshed. Keep the
+-- current pair encrypted at rest so Vercel instances share one valid rotation.
+CREATE TABLE IF NOT EXISTS portal_hubstaff_tokens (
+  id SMALLINT PRIMARY KEY,
+  encrypted_access_token TEXT NOT NULL,
+  encrypted_refresh_token TEXT NOT NULL,
+  access_expires_at TIMESTAMPTZ NOT NULL,
+  seed_fingerprint TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT portal_hubstaff_tokens_singleton CHECK (id = 1)
+);
+
+ALTER TABLE portal_hubstaff_tokens
+  ADD COLUMN IF NOT EXISTS seed_fingerprint TEXT;
 
 -- This table prepares the authorization data for a future /admin portal.
 -- Every admin route must verify the signed-in Better Auth user and an active
