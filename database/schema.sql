@@ -26,12 +26,19 @@ CREATE TABLE IF NOT EXISTS portal_memberships (
   client_id BIGINT NOT NULL REFERENCES portal_clients(id) ON DELETE CASCADE,
   user_id BIGINT NOT NULL REFERENCES portal_users(id) ON DELETE CASCADE,
   role TEXT NOT NULL DEFAULT 'member',
+  last_seen_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (client_id, user_id),
   CONSTRAINT portal_memberships_role
     CHECK (role IN ('member', 'client_admin', 'aoc_admin'))
 );
+
+ALTER TABLE portal_memberships
+  ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS portal_memberships_presence_idx
+  ON portal_memberships (client_id, last_seen_at DESC);
 
 -- The current UI already treats folders, branches, messages, assets, and usage
 -- as one workspace. A JSONB snapshot preserves that behavior for the prototype.

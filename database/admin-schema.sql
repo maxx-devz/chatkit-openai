@@ -23,8 +23,14 @@ ALTER TABLE portal_clients
   ADD COLUMN IF NOT EXISTS portal_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   ADD COLUMN IF NOT EXISTS monthly_prompt_limit INTEGER NOT NULL DEFAULT 150,
+  ADD COLUMN IF NOT EXISTS approved_website_url TEXT,
   ADD COLUMN IF NOT EXISTS hubstaff_project_url TEXT,
+  ADD COLUMN IF NOT EXISTS hubstaff_tracking_project_id BIGINT,
   ADD COLUMN IF NOT EXISTS hubstaff_monthly_hours_limit NUMERIC(10,2);
+
+CREATE INDEX IF NOT EXISTS portal_clients_hubstaff_tracking_project_idx
+  ON portal_clients (hubstaff_tracking_project_id)
+  WHERE hubstaff_tracking_project_id IS NOT NULL;
 
 DO $$
 BEGIN

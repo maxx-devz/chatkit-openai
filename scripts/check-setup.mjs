@@ -67,8 +67,9 @@ if (configured("DATABASE_URL")) {
       "admin:migrate": ["portal_admins", "portal_ai_usage_monthly", "portal_hubstaff_tokens"],
       "chatkit:migrate": ["portal_chatkit_threads", "portal_chatkit_items", "portal_chatkit_leases"],
       ...((process.env.CHATKIT_UPLOADS_ENABLED || "true").toLowerCase() === "true" ? {
-        "uploads:migrate": ["portal_chatkit_uploads", "portal_chatkit_upload_attempts"],
+      "uploads:migrate": ["portal_chatkit_uploads", "portal_chatkit_upload_attempts"],
       } : {}),
+      "library:migrate": ["portal_client_library"],
       "usage:migrate": ["portal_ai_activity_monthly", "portal_ai_provider_status"],
       "builder:migrate": ["portal_assistant_configs", "portal_assistant_versions", "portal_assistant_files", "portal_assistant_tool_usage", "portal_assistant_preview_usage"],
     };
@@ -76,11 +77,21 @@ if (configured("DATABASE_URL")) {
       const result = await db.query("SELECT name, to_regclass('public.' || quote_ident(name)) IS NOT NULL AS present FROM unnest($1::text[]) AS name", [tables]);
       check(result.rows.every(row => row.present), migration + " tables", `Run npm run ${migration} against this deployment's database.`);
     }
-    const hubstaffColumn = await db.query(
-      "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='portal_clients' AND column_name='hubstaff_monthly_hours_limit') AS present",
+    const integrationColumns = await db.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='portal_clients' AND column_name = ANY($1::text[])",
+      [["hubstaff_monthly_hours_limit", "hubstaff_tracking_project_id", "approved_website_url"]],
     );
-    check(Boolean(hubstaffColumn.rows[0]?.present), "Hubstaff client-limit column", "Run npm run admin:migrate against this deployment's database.");
-  } catch { check(false, "Database connection", "Check DATABASE_URL, network access, and the Neon database status."); }
+    check(integrationColumns.rows.length === 3, "Client integration columns", "Run npm run admin:migrate against this deployment's database.");
+  } catch (error) {
+    const detail = String(error?.message || error || "Unknown database error")
+      .replace(process.env.DATABASE_URL || "", "[database URL removed]")
+      .slice(0, 240);
+    check(
+      false,
+      "Database connection",
+      `${detail}. Check DATABASE_URL, network access, and the Neon database status.`,
+    );
+  }
   finally { await db.end().catch(() => {}); }
 }
 console.log("This checks configuration and schema only. Verify domain registration, matching backend settings, API billing, and a real client reply before release. See docs/CHATKIT_SETUP.md.");

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import aocIcon from "@/aoc-icon.png";
 import aocLogo from "@/aoc-logo.png";
@@ -43,6 +43,19 @@ function dateLabel(value) {
   }).format(new Date(value));
 }
 
+function presenceTitle(client) {
+  if (client.isOnline) return "A client user is active in the portal now";
+  if (!client.lastSeenAt) return "No recent portal activity";
+  const date = new Date(client.lastSeenAt);
+  if (Number.isNaN(date.getTime())) return "No recent portal activity";
+  return `Last seen ${new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date)}`;
+}
+
 function initials(value) {
   return String(value || "AOC")
     .split(/\s+/)
@@ -61,8 +74,8 @@ function settingsFromClient(client) {
         portalEnabled: client.portalEnabled,
         aiEnabled: client.aiEnabled,
         monthlyPromptLimit: client.monthlyPromptLimit,
-        assistantInstructions: client.assistantInstructions,
         vectorStoreId: client.vectorStoreId,
+        approvedWebsiteUrl: client.approvedWebsiteUrl || "",
         hubstaffProjectUrl: client.hubstaffProjectUrl || "",
         hubstaffMonthlyHoursLimit: client.hubstaffMonthlyHoursLimit ?? "",
       }
@@ -92,6 +105,42 @@ export default function AdminDashboard({ initialData }) {
   const [busy, setBusy] = useState("");
   const [createError, setCreateError] = useState("");
   const createDialogRef = useRef(null);
+
+  useEffect(() => {
+    let active = true;
+    let requestInFlight = false;
+
+    async function refreshPresence() {
+      if (!active || requestInFlight || document.visibilityState === "hidden") return;
+      requestInFlight = true;
+      try {
+        const response = await fetch("/api/admin/presence", { cache: "no-store" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !Array.isArray(payload?.clients) || !active) return;
+        const presenceBySlug = new Map(payload.clients.map((client) => [client.slug, client]));
+        setClients((current) => current.map((client) => {
+          const presence = presenceBySlug.get(client.slug);
+          return presence ? { ...client, ...presence } : client;
+        }));
+      } catch {
+        // Presence is informational; keep the last known state during a transient failure.
+      } finally {
+        requestInFlight = false;
+      }
+    }
+
+    const refresh = () => { void refreshPresence(); };
+    refresh();
+    const intervalId = window.setInterval(refresh, 15_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, []);
 
   const selectedClient = clients.find((client) => client.slug === selectedSlug)
     || clients[0]
@@ -204,6 +253,7 @@ export default function AdminDashboard({ initialData }) {
           name: form.get("name"),
           password: form.get("password"),
           monthlyPromptLimit: Number(form.get("monthlyPromptLimit")),
+          approvedWebsiteUrl: form.get("approvedWebsiteUrl"),
           hubstaffProjectUrl: form.get("hubstaffProjectUrl"),
           hubstaffMonthlyHoursLimit: form.get("hubstaffMonthlyHoursLimit"),
         }),
@@ -230,6 +280,7 @@ export default function AdminDashboard({ initialData }) {
   const usagePercent = selectedClient
     ? Math.min(100, (selectedClient.requestsUsed / selectedClient.monthlyPromptLimit) * 100)
     : 0;
+  const remainingPercent = selectedClient ? Math.max(0, 100 - usagePercent) : 0;
 
   return (
     <div className={styles.shell}>
@@ -342,10 +393,11 @@ export default function AdminDashboard({ initialData }) {
 
               <div className={styles.clientList}>
                 {filteredClients.map((client) => {
-                  const percent = Math.min(
+                  const usedPercent = Math.min(
                     100,
                     (client.requestsUsed / client.monthlyPromptLimit) * 100,
                   );
+                  const remainingPercent = Math.max(0, 100 - usedPercent);
                   return (
                     <button
                       className={client.slug === selectedClient?.slug ? styles.selectedClient : ""}
@@ -357,10 +409,19 @@ export default function AdminDashboard({ initialData }) {
                       <span className={styles.clientCopy}>
                         <strong>{client.name}</strong>
                         <small>@{client.slug}</small>
-                        <i><b style={{ width: `${percent}%` }} /></i>
+                        <i
+                          aria-label={`${client.name} monthly requests remaining`}
+                          aria-valuemax={client.monthlyPromptLimit}
+                          aria-valuemin="0"
+                          aria-valuenow={client.requestsRemaining}
+                          role="progressbar"
+                        ><b style={{ width: `${remainingPercent}%` }} /></i>
                       </span>
-                      <span className={client.aiEnabled ? styles.live : styles.paused}>
-                        {client.aiEnabled ? "Live" : "Paused"}
+                      <span
+                        className={client.isOnline ? styles.online : styles.offline}
+                        title={presenceTitle(client)}
+                      >
+                        {client.isOnline ? "Online" : "Offline"}
                       </span>
                     </button>
                   );
@@ -397,10 +458,10 @@ export default function AdminDashboard({ initialData }) {
                   {error ? <p className={styles.error} role="alert">{error}</p> : null}
 
                   <div className={styles.usageHero} id="ai-controls">
-                    <div className={styles.usageRing} style={{ "--usage": `${usagePercent * 3.6}deg` }}>
+                    <div className={styles.usageRing} style={{ "--usage": `${remainingPercent * 3.6}deg` }}>
                       <span>
-                        <strong>{Math.round(usagePercent)}%</strong>
-                        <small>used</small>
+                        <strong>{Math.round(remainingPercent)}%</strong>
+                        <small>left</small>
                       </span>
                     </div>
                     <div className={styles.usageOverview}>
@@ -410,13 +471,14 @@ export default function AdminDashboard({ initialData }) {
                         {number(selectedClient.requestsUsed)} of {number(selectedClient.monthlyPromptLimit)} used
                         · resets {dateLabel(selectedClient.resetsAt)}
                       </span>
-                      <div><i style={{ width: `${usagePercent}%` }} /></div>
+                      <div
+                        aria-label={`${selectedClient.name} monthly requests remaining`}
+                        aria-valuemax={selectedClient.monthlyPromptLimit}
+                        aria-valuemin="0"
+                        aria-valuenow={selectedClient.requestsRemaining}
+                        role="progressbar"
+                      ><i style={{ width: `${remainingPercent}%` }} /></div>
                     </div>
-                    <dl className={styles.tokenSummary}>
-                      <div><dt>Total tokens</dt><dd>{number(selectedClient.totalTokens)}</dd></div>
-                      <div><dt>Input</dt><dd>{number(selectedClient.inputTokens)}</dd></div>
-                      <div><dt>Output</dt><dd>{number(selectedClient.outputTokens)}</dd></div>
-                    </dl>
                   </div>
 
                   <div className={styles.settingsGrid}>
@@ -484,19 +546,8 @@ export default function AdminDashboard({ initialData }) {
                     <section className={`${styles.settingsCard} ${styles.wideCard}`}>
                       <header>
                         <span><Icon name="overview" /></span>
-                        <div><h3>Client knowledge & instructions</h3><p>Private configuration supplied only to this client&apos;s assistant.</p></div>
+                        <div><h3>Client integrations</h3><p>Connect approved knowledge, one website, and the client&apos;s Hubstaff project.</p></div>
                       </header>
-                      <label className={styles.instructionsField}>
-                        <span>Assistant instructions</span>
-                        <textarea
-                          maxLength="12000"
-                          rows="6"
-                          placeholder="Example: Answer using ChurchBanners terminology and approved project details..."
-                          value={draft.assistantInstructions}
-                          onChange={(event) => updateDraft("assistantInstructions", event.target.value)}
-                        />
-                        <small>{number(draft.assistantInstructions.length)} / 12,000 characters</small>
-                      </label>
                       <label className={styles.vectorField}>
                         <span>OpenAI vector store ID</span>
                         <input
@@ -505,6 +556,16 @@ export default function AdminDashboard({ initialData }) {
                           onChange={(event) => updateDraft("vectorStoreId", event.target.value)}
                         />
                         <small>Optional approved file-search knowledge base for this client only.</small>
+                      </label>
+                      <label className={styles.vectorField}>
+                        <span>Approved website URL</span>
+                        <input
+                          type="url"
+                          placeholder="https://www.example.com"
+                          value={draft.approvedWebsiteUrl}
+                          onChange={(event) => updateDraft("approvedWebsiteUrl", event.target.value)}
+                        />
+                        <small>Optional. AOC-GPT web search is restricted to this public domain and its subdomains for this client.</small>
                       </label>
                       <label className={styles.vectorField}>
                         <span>Hubstaff project URL</span>
@@ -586,6 +647,15 @@ export default function AdminDashboard({ initialData }) {
             <label><span>Username</span><input name="username" minLength="3" maxLength="50" required pattern="[a-z0-9][a-z0-9._-]{2,49}" placeholder="churchbanners" /></label>
             <label className={styles.dialogWide}><span>Temporary password</span><input name="password" type="password" minLength="12" maxLength="128" required autoComplete="new-password" placeholder="At least 12 characters" /></label>
             <label className={styles.dialogWide}><span>Monthly requests</span><input name="monthlyPromptLimit" type="number" min="1" max="100000" defaultValue="150" required /></label>
+            <label className={styles.dialogWide}>
+              <span>Approved website URL</span>
+              <input
+                name="approvedWebsiteUrl"
+                type="url"
+                placeholder="https://www.example.com"
+              />
+              <small>Optional. The assistant can search only this website domain for this client.</small>
+            </label>
             <label className={styles.dialogWide}>
               <span>Hubstaff project URL</span>
               <input

@@ -10,6 +10,8 @@ requests. Neon stores client settings, conversations, usage, and generated files
 **Transfer your custom GPT: [AOC-GPT configuration](docs/AOC_GPT_SETUP.md).**
 **Monitor usage: [Portal usage and allowances](docs/PORTAL_USAGE.md).**
 **Connect client work: [Hubstaff dashboard and assistant](docs/HUBSTAFF_SETUP.md).**
+**Restrict public web research: [Approved client websites](docs/WEBSITE_ACCESS_SETUP.md).**
+**Save cross-conversation files: [Persistent client library](docs/CLIENT_LIBRARY_SETUP.md).**
 
 The portal's AOC-GPT is an API assistant. Your team's existing custom GPT inside
 ChatGPT Business does not automatically connect or synchronize with it. Transfer
@@ -39,6 +41,7 @@ command. The setup guide covers credentials and migrations for a fresh checkout.
 - Earlier conversations preserved in a read-only **Earlier chats** archive.
 - AOC-GPT branding and approved per-client instructions and knowledge.
 - Optional client-specific OpenAI vector-store file search.
+- Persistent client files and reference links with a private **Library** tab.
 - Optional DOCX and image tools, enabled by staff per client.
 - Client/user ownership checks for all conversations and file downloads.
 - Monthly chat allowance, separate generation attempt limits, and usage tracking.
@@ -48,6 +51,8 @@ command. The setup guide covers credentials and migrations for a fresh checkout.
 - Staff usage panel with client allowances and recorded client/admin/draft tokens.
 - Per-client Hubstaff project, task, and monthly time reads for the dashboard
   and read-only AOC-GPT answers.
+- Optional per-client public website search, locked by the server to the domain
+  approved by an administrator.
 
 ChatKit is the client assistant interface. The old client chat UI, its model/chat
 endpoints, obsolete CSS, and unfinished workflow integration have been removed.
@@ -67,8 +72,10 @@ Existing accounts, client records, conversations, and administrator tools are re
 | `npm start` | Serve a production build; configure a running HTTPS Python backend separately |
 | `npm run auth:migrate` | Better Auth schema |
 | `npm run portal:migrate` | Client, membership, and earlier-history schema |
-| `npm run admin:migrate` | Staff access, monthly usage, Hubstaff limits, and encrypted PAT storage |
+| `npm run admin:migrate` | Staff access, monthly usage, client integrations, and encrypted PAT storage |
 | `npm run chatkit:migrate` | ChatKit conversations and request leases |
+| `npm run uploads:migrate` | Conversation attachment storage and limits |
+| `npm run library:migrate` | Persistent client files, links, reporting dates, and search status |
 | `npm run builder:migrate` | Assistant configuration, tools, and generated files |
 | `npm run usage:migrate` | Anonymous AI activity totals, independent of allowance resets |
 | `npm run admin:create -- USERNAME "DISPLAY NAME"` | Create a staff login; password is prompted privately |
@@ -101,6 +108,8 @@ your production branch. Do not commit `.env.local`, credentials, or `answer.txt`
 | `app/api/chatkit/route.js` | Authenticated, signed streaming proxy |
 | `chatkit_backend/app.py` | Identity checks, quotas, and ChatKit protocol |
 | `chatkit_backend/assistant.py` | Agent instructions, file search, and streaming |
+| `lib/client-website.js` | Validation and normalization for approved client websites |
+| `chatkit_backend/client_library.py` | Permanent client files, links, indexing, and retrieval tools |
 | `chatkit_backend/generation.py` | DOCX and image generation with private storage |
 | `chatkit_backend/generated-file.widget` | ChatKit download-card template |
 | `components/builder/assistant-builder.js` | Staff settings and draft tests |
@@ -114,8 +123,10 @@ your production branch. Do not commit `.env.local`, credentials, or `answer.txt`
 
 Tools create structured Word documents and square WebP images. Clients can attach
 supported documents, spreadsheets, text/data files, and images; see the
-[upload setup and usage guide](docs/UPLOADS_SETUP.md). Arbitrary
-file formats, Google Drive delivery, third-party actions, and per-output approval
+[upload setup and usage guide](docs/UPLOADS_SETUP.md). Clients can explicitly
+promote an attachment into the [persistent client library](docs/CLIENT_LIBRARY_SETUP.md)
+for later conversations. Arbitrary file formats, live Google Drive content access,
+login-only website access, third-party write actions, and per-output approval
 queues are not implemented. Staff approve instructions/tools before publishing;
 generated files can then be downloaded immediately by their requesting user.
 See [tool limits](docs/BUILDER_SETUP.md#generation-and-storage-limits).

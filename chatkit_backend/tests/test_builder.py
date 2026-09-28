@@ -11,7 +11,7 @@ from docx import Document
 from pydantic import ValidationError
 from builder_config import AssistantConfig
 from generation import DocumentSection, FILE_CARD, render_document, reserve_tool, save_artifact, DOCX_MIME
-from assistant import hubstaff_tools, make_agent
+from assistant import hubstaff_tools, make_agent, website_tools
 from preview import PreviewRequest
 
 
@@ -46,6 +46,13 @@ class BuilderTests(unittest.TestCase):
         self.assertEqual(len(tools), 1)
         self.assertEqual(tools[0].name, "get_hubstaff_project_status")
         self.assertEqual(hubstaff_tools(SimpleNamespace(hubstaff=None)), [])
+
+    def test_website_tool_is_restricted_to_the_approved_client_domain(self):
+        context = SimpleNamespace(client={"approved_website_url": "https://www.example.com/"})
+        tools = website_tools(context)
+        self.assertEqual(len(tools), 1)
+        self.assertEqual(tools[0].filters.allowed_domains, ["www.example.com"])
+        self.assertEqual(website_tools(SimpleNamespace(client={})), [])
 
     def test_widget_template_escapes_data_and_emits_client_download_action(self):
         widget = FILE_CARD.build({"title": 'A "quote"', "filename": "proposal.docx", "id": "test-id"}).model_dump()

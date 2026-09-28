@@ -2,7 +2,11 @@ import {
   hubstaffErrorResponse,
   loadHubstaffProject,
 } from "@/lib/hubstaff";
-import { resolvePortalContext, portalErrorResponse } from "@/lib/portal-data";
+import {
+  rememberHubstaffTrackingProjectId,
+  resolvePortalContext,
+  portalErrorResponse,
+} from "@/lib/portal-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +17,23 @@ export async function GET(request) {
     const data = await loadHubstaffProject(context.client.hubstaffProjectUrl, {
       monthlyHoursLimit: context.client.hubstaffMonthlyHoursLimit,
       includeTasks: false,
+      trackingProjectId: context.client.hubstaffTrackingProjectId,
     });
+
+    if (
+      data?.project?.trackingProjectId
+      && data.project.trackingProjectId !== context.client.hubstaffTrackingProjectId
+    ) {
+      await rememberHubstaffTrackingProjectId(
+        context.client.id,
+        context.client.hubstaffProjectUrl,
+        data.project.trackingProjectId,
+      ).catch((error) => {
+        console.warn("Hubstaff v2 project mapping could not be persisted", {
+          code: error?.code || error?.publicDetails?.code || "database_error",
+        });
+      });
+    }
 
     return Response.json(data, {
       headers: {

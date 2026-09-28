@@ -4,8 +4,26 @@ import { useEffect, useRef, useState } from "react";
 import styles from "./portal-usage.module.css";
 import { providerStatus, OPENAI_BILLING_URL } from "@/lib/openai-issues";
 
-const labels = { client: "Client ChatKit", admin: "Admin assistant", preview: "Draft tests" };
 const number = value => new Intl.NumberFormat().format(Number(value) || 0);
+
+function remainingPercent(remaining, allowance) {
+  const limit = Math.max(0, Number(allowance) || 0);
+  return limit ? Math.min(100, Math.max(0, (Number(remaining) / limit) * 100)) : 0;
+}
+
+function CapacityBar({ allowance, label, remaining }) {
+  const percent = remainingPercent(remaining, allowance);
+  return (
+    <div
+      className={styles.capacityBar}
+      aria-label={label}
+      aria-valuemax={allowance}
+      aria-valuemin="0"
+      aria-valuenow={remaining}
+      role="progressbar"
+    ><i style={{ width: `${percent}%` }} /></div>
+  );
+}
 
 export default function PortalUsage() {
   const [snapshot, setSnapshot] = useState({ data: null, error: "" });
@@ -52,13 +70,18 @@ export default function PortalUsage() {
 
   const { data, error } = snapshot;
   const apiStatus = providerStatus(data?.apiStatus?.code);
-  const totalTokens = data?.activity.reduce((sum, row) => sum + Number(row.total_tokens), 0) || 0;
-  const remaining = data?.clients.reduce((sum, row) => sum + (row.enabled ? row.remaining : 0), 0) || 0;
-  const trackedFrom = data?.activity.map(row => row.first_recorded_at).sort()[0];
+  const enabledClients = data?.clients.filter(client => client.enabled) || [];
+  const combinedAllowance = enabledClients.reduce((sum, client) => sum + client.allowance, 0);
+  const combinedRemaining = enabledClients.reduce((sum, client) => sum + client.remaining, 0);
+  const combinedUsed = Math.max(0, combinedAllowance - combinedRemaining);
+  const accountStatus = apiStatus.code === "ready"
+    ? "Available"
+    : apiStatus.code === "unknown" ? "Not checked" : "Attention needed";
+
   return (
     <section className={styles.panel} id="portal-usage" aria-labelledby="portal-usage-title">
       <div className={styles.heading}>
-        <div><h2 id="portal-usage-title">Portal AI usage</h2><p>Client chats, your admin assistant, and staff draft tests.</p></div>
+        <div><h2 id="portal-usage-title">AI request capacity</h2><p>Live portal allowances and the latest recorded OpenAI connection status.</p></div>
         <button type="button" onClick={() => refreshRef.current?.()}>Refresh usage</button>
       </div>
       {error && <p className={styles.error} role="alert">{error} {data ? "The figures below are from the last successful refresh." : ""}</p>}
@@ -70,32 +93,50 @@ export default function PortalUsage() {
           {apiStatus.billing && <a href={OPENAI_BILLING_URL} target="_blank" rel="noreferrer">Open OpenAI billing</a>}
           <small>{data.apiStatus?.observedAt
             ? `Admin assistant · ${data.apiStatus.model} · Last observed ${new Date(data.apiStatus.observedAt).toLocaleString()}.`
-            : "No recorded admin API result for the current key."} Refresh reads the recorded status; it does not make an API request. After fixing billing, retry your message to check access again.</small>
+            : "No recorded API result for the current key."} This status updates after an admin assistant request; refreshing does not make an OpenAI request.</small>
         </div>
+
         <div className={styles.metrics}>
-          <div><span>Recorded text-agent tokens</span><strong>{data.trackingReady ? number(totalTokens) : "Setup needed"}</strong><small>{data.period} · UTC month</small></div>
-          <div><span>Enabled-client requests left</span><strong>{number(remaining)}</strong><small>Separate allowances per client</small></div>
-          <div><span>OpenAI credit balance</span><strong>Amount unavailable</strong><small><a href={OPENAI_BILLING_URL} target="_blank" rel="noreferrer">View billing and credits</a></small></div>
+          <div className={styles.capacityMetric}>
+            <span>Combined client capacity</span>
+            <strong>{number(combinedRemaining)} left</strong>
+            <small>{number(combinedUsed)} of {number(combinedAllowance)} requests used this UTC month</small>
+            <CapacityBar allowance={combinedAllowance} label="Combined client requests remaining" remaining={combinedRemaining} />
+          </div>
+          <div>
+            <span>AI-enabled clients</span>
+            <strong>{number(enabledClients.length)}</strong>
+            <small>{number((data.clients || []).length - enabledClients.length)} paused or unavailable</small>
+          </div>
+          <div>
+            <span>OpenAI API status</span>
+            <strong>{accountStatus}</strong>
+            <small>Numeric credits are available only in the OpenAI billing portal</small>
+          </div>
         </div>
-        {(!data.trackingReady || data.statusTrackingReady === false) && <p className={styles.notice}>Usage tracking setup is incomplete. Run <code>npm run usage:migrate</code> against this deployment&apos;s database, then refresh.</p>}
-        {data.trackingReady && <>
-          <div className={styles.tableWrap}><table>
-            <caption>Recorded runs this month</caption>
-            <thead><tr><th scope="col">Source</th><th scope="col">Runs</th><th scope="col">Input tokens</th><th scope="col">Output tokens</th><th scope="col">Without token report</th></tr></thead>
-            <tbody>{Object.entries(labels).map(([source, label]) => {
-              const row = data.activity.find(item => item.source === source) || {};
-              return <tr key={source}><th scope="row">{label}</th><td>{number(row.runs)}</td><td>{number(row.input_tokens)}</td><td>{number(row.output_tokens)}</td><td>{number(Number(row.runs || 0) - Number(row.reported_runs || 0))}</td></tr>;
-            })}</tbody>
-          </table></div>
-          <p className={styles.note}>{trackedFrom ? `First recorded run this month: ${new Date(trackedFrom).toLocaleString()}.` : "Tracking starts with the next AI run."} Earlier admin and client calls are not backfilled. Runs include failed attempts; interrupted runs may have incomplete token reports. Image generation and other tool charges are excluded from text-agent token totals.</p>
-        </>}
-        <div className={styles.tableWrap}><table>
-          <caption>Current client allowances</caption>
-          <thead><tr><th scope="col">Client</th><th scope="col">Access</th><th scope="col">Requests used</th><th scope="col">Monthly limit</th><th scope="col">Requests left</th></tr></thead>
-          <tbody>{data.clients.map((client, index) => <tr key={index}><th scope="row">{client.name}</th><td>{client.enabled ? "Enabled" : "Paused"}</td><td>{number(client.used)}</td><td>{number(client.allowance)}</td><td>{number(client.remaining)}</td></tr>)}</tbody>
-        </table>{data.clients.length === 0 && <p>No client accounts yet.</p>}</div>
-        <p className={styles.note}>Client allowances are portal limits. Resetting one does not reset recorded AI usage or refund OpenAI credits. Admin chats have no monthly portal allowance; draft tests allow 20 replies per staff member per hour. A prompt can use different numbers of tokens, so these figures cannot predict how many prompts your OpenAI balance will buy.</p>
-        <p className={styles.updated}>Updated {new Date(data.fetchedAt).toLocaleTimeString()}. Refreshes every 15 seconds while visible; running replies appear after they finish. Totals cover this portal&apos;s database, not other apps using the same OpenAI account.</p>
+
+        {data.statusTrackingReady === false && <p className={styles.notice}>API status setup is incomplete. Run <code>npm run usage:migrate</code> against this deployment&apos;s database, then refresh.</p>}
+
+        <div className={styles.clientCapacity}>
+          <h3>Client monthly allowances</h3>
+          <p>Each bar shows remaining portal requests. It updates after a completed or failed request.</p>
+          <div className={styles.capacityList}>
+            {data.clients.map((client, index) => (
+              <article key={`${client.name}-${index}`} className={!client.enabled ? styles.paused : ""}>
+                <div>
+                  <strong>{client.name}</strong>
+                  <span>{client.enabled ? `${number(client.remaining)} requests left` : "AI access paused"}</span>
+                </div>
+                <CapacityBar allowance={client.allowance} label={`${client.name} monthly requests remaining`} remaining={client.enabled ? client.remaining : 0} />
+                <small>{number(client.used)} used · {number(client.allowance)} monthly limit</small>
+              </article>
+            ))}
+          </div>
+          {data.clients.length === 0 && <p>No client accounts yet.</p>}
+        </div>
+
+        <p className={styles.note}>These progress bars represent the request limits configured inside this portal. OpenAI does not provide a supported real-time remaining-credit balance through the normal project API key. A free-credit or paid account therefore cannot be converted into an accurate “prompts left” number because every request can use different models, tools, and amounts of work.</p>
+        <p className={styles.updated}>Updated {new Date(data.fetchedAt).toLocaleTimeString()}. Refreshes every 15 seconds while visible. Other applications using the same OpenAI account are not part of these portal allowances.</p>
       </>}
     </section>
   );

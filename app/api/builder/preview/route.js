@@ -18,13 +18,16 @@ export async function POST(request) {
       || input.messages.some((m) => !m || !["user", "assistant"].includes(m.role) || typeof m.content !== "string" || !m.content.trim() || m.content.length > 12000)
       || input.messages.at(-1).role !== "user" || input.messages.reduce((total, m) => total + m.content.length, 0) > 30000) throw builderError("Use a saved draft and a shorter test conversation.");
     const hubstaffRows = await builderPool.query(
-      "SELECT hubstaff_project_url,hubstaff_monthly_hours_limit FROM portal_clients WHERE id=$1",
+      "SELECT hubstaff_project_url,hubstaff_tracking_project_id,hubstaff_monthly_hours_limit FROM portal_clients WHERE id=$1",
       [input.clientId],
     );
     const selectedClient = hubstaffRows.rows[0];
+    const latestQuestion = input.messages.at(-1).content;
     const hubstaff = selectedClient
       ? await loadHubstaffAssistantSnapshot(selectedClient.hubstaff_project_url, {
           monthlyHoursLimit: selectedClient.hubstaff_monthly_hours_limit,
+          trackingProjectId: selectedClient.hubstaff_tracking_project_id,
+          query: latestQuestion,
         })
       : null;
     const body = JSON.stringify({ client_id: input.clientId, user_id: admin.id, revision: input.revision,

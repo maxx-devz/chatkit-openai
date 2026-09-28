@@ -240,7 +240,7 @@
   background: #edf8ff;
 }
 
-.historyList > div > button:first-child {
+.sessionSelect {
   display: grid;
   flex: 1;
   min-width: 0;
@@ -256,27 +256,81 @@
   text-align: left;
 }
 
-.historyList > div > button:first-child:hover { background: transparent; }
+.sessionSelect:hover { background: transparent; }
 
+.sessionActions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding-right: 4px;
+  opacity: 0;
+}
+
+.historyList > div:hover .sessionActions,
+.sessionActions:focus-within,
+.activeSession .sessionActions { opacity: 1; }
+
+.renameSession,
 .deleteSession {
-  width: 29px;
-  flex: 0 0 29px;
-  margin: 5px 5px 5px 0;
+  display: grid;
+  width: 24px;
+  height: 27px;
+  flex: 0 0 24px;
+  place-items: center;
   border: 0;
   border-radius: 7px;
   background: transparent;
   color: #8b9aab;
   cursor: pointer;
   font: inherit;
-  font-size: 17px;
+  font-size: 14px;
   line-height: 1;
-  opacity: 0;
 }
 
-.historyList > div:hover .deleteSession,
-.deleteSession:focus-visible { opacity: 1; }
+.renameSession:hover { background: #e7f3fb; color: #087fc6; }
+
+.deleteSession {
+  font-size: 17px;
+}
 
 .deleteSession:hover { background: #fff0f0; color: #ac5757; }
+
+.renameSessionForm {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  padding: 6px;
+}
+
+.renameSessionForm input {
+  min-width: 0;
+  grid-column: 1 / -1;
+  padding: 7px;
+  border: 1px solid #a9cee5;
+  border-radius: 7px;
+  outline: 0;
+  background: #fff;
+  color: #334e68;
+  font: inherit;
+  font-size: 10px;
+}
+
+.renameSessionForm input:focus { border-color: #168bce; box-shadow: 0 0 0 2px rgba(22, 139, 206, .12); }
+
+.renameSessionForm button {
+  padding: 5px;
+  border: 1px solid #c9dce9;
+  border-radius: 6px;
+  background: #fff;
+  color: #087fc6;
+  cursor: pointer;
+  font: inherit;
+  font-size: 8px;
+  font-weight: 720;
+}
+
+.renameSessionForm button:disabled { cursor: not-allowed; opacity: .5; }
 
 .historyList strong {
   overflow: hidden;
@@ -515,7 +569,7 @@
   .history { padding: 16px 0 12px; border-right: 0; border-bottom: 1px solid #edf2f6; }
   .historyList { display: flex; max-height: none; overflow-x: auto; padding-bottom: 3px; }
   .historyList > div { min-width: 180px; }
-  .historyList > div .deleteSession { opacity: 1; }
+  .sessionActions { opacity: 1; }
   .contextControls { display: grid; }
   .composer { display: grid; }
   .composer button { min-height: 40px; }

@@ -1,6 +1,6 @@
 import {
   hubstaffErrorResponse,
-  loadHubstaffWorkflow,
+  loadHubstaffWorkflowOverview,
 } from "@/lib/hubstaff";
 import { resolvePortalContext, portalErrorResponse } from "@/lib/portal-data";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request) {
   try {
     const context = await resolvePortalContext(request.headers);
-    const data = await loadHubstaffWorkflow(context.client.hubstaffProjectUrl);
+    const data = await loadHubstaffWorkflowOverview(context.client.hubstaffProjectUrl);
     return Response.json(data, {
       headers: { "Cache-Control": "private, no-store" },
     });

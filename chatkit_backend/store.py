@@ -28,6 +28,7 @@ class Context:
     thread_id: str | None = None
     artifacts: list = field(default_factory=list)
     tool_calls: int = 0
+    request_attachment_ids: list = field(default_factory=list)
 
     @property
     def scope(self):

@@ -86,7 +86,10 @@ does not make an OpenAI request or consume a monthly chat attempt.
    or “Explain this screenshot,” then send. A file can also be sent by itself.
 4. To remove a pending attachment, use its remove button before sending. After
    sending, it stays with that conversation and can be used in follow-up questions.
-5. Delete a conversation from ChatKit history to remove its uploaded files too.
+5. To retain a file across conversations, explicitly ask the assistant to save
+   it to the client library and confirm that indexing succeeded. See
+   [Persistent client library](CLIENT_LIBRARY_SETUP.md).
+6. Delete a conversation from ChatKit history to remove its ordinary uploaded files too.
    This deletion is permanent. Abandoned uploads expire from access after
    24 hours and are physically cleaned up on a subsequent upload for that client;
    there is no scheduled purge for inactive accounts.

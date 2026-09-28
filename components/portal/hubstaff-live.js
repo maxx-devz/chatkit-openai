@@ -437,6 +437,29 @@ export function HubstaffProjectProgress() {
   );
   const showLiveProject = Boolean(data?.configured);
 
+  useEffect(() => {
+    const doneColumns = Array.isArray(workflow?.columns)
+      ? workflow.columns.filter((column) => column.stage === "done")
+      : [];
+    if (!doneColumns.length) return undefined;
+
+    const preloaded = workflow?.completedTasksByList || {};
+    setColumnTasks((current) => {
+      const next = { ...current };
+      for (const column of doneColumns) {
+        if (!Object.prototype.hasOwnProperty.call(preloaded, column.id)) continue;
+        next[column.id] = {
+          status: "ready",
+          tasks: Array.isArray(preloaded[column.id]?.tasks) ? preloaded[column.id].tasks : [],
+          error: "",
+          source: preloaded[column.id]?.source || null,
+        };
+      }
+      return next;
+    });
+    return undefined;
+  }, [workflow]);
+
   async function toggleColumn(column) {
     if (openColumnId === column.id) {
       setOpenColumnId("");
@@ -517,11 +540,18 @@ export function HubstaffProjectProgress() {
                 const loadedCount = taskState?.status === "ready" ? taskState.tasks.length : null;
                 const isDone = column.stage === "done";
                 const displayedCount = isDone
-                  ? loadedCount === null ? "Load this month" : `${loadedCount} this month`
+                  ? taskState?.status === "loading"
+                    ? "Loading this month"
+                    : loadedCount === null
+                      ? "Load this month"
+                      : `${loadedCount} this month`
                   : `${column.taskCount} ${column.taskCount === 1 ? "task" : "tasks"}`;
                 const progress = isDone
-                  ? loadedCount === null ? 0 : Math.min(100, (loadedCount / maxColumnCount) * 100)
-                  : Math.min(100, (column.taskCount / maxColumnCount) * 100);
+                  ? 100
+                  : Math.max(
+                    0,
+                    100 - (column.taskCount / maxColumnCount) * 100,
+                  );
                 const panelId = `hubstaff-column-${column.id}`;
                 return (
                   <section className={`${styles.workflowGroup} ${styles[`workflow_${column.stage}`] || ""}`} key={column.id}>
@@ -536,7 +566,7 @@ export function HubstaffProjectProgress() {
                       <span className={styles.workflowCopy}>
                         <strong>{column.name}</strong>
                         <small>{displayedCount}</small>
-                        <i><b style={{ width: `${progress}%` }} /></i>
+                        {!isDone ? <i><b style={{ width: `${progress}%` }} /></i> : null}
                       </span>
                       <span className={styles.workflowChevron} aria-hidden="true">{isOpen ? "−" : "+"}</span>
                     </button>

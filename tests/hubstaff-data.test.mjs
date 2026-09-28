@@ -172,6 +172,8 @@ test("creates tenant-scoped Hubstaff task links from normalized workflow tasks",
     done: false,
     due_on: "2026-09-30",
     updated_at: "2026-09-20T10:00:00Z",
+    assignee_ids: [7],
+    follower_ids: [8, 9],
   }, { organizationId: 12, projectId: 34 }), {
     id: "44",
     title: "Review landing page",
@@ -179,9 +181,34 @@ test("creates tenant-scoped Hubstaff task links from normalized workflow tasks",
     href: "https://tasks.hubstaff.com/app/organizations/12/projects/34/tasks/44",
     done: false,
     doneAt: "",
+    createdAt: "",
     dueAt: "2026-09-30",
     updatedAt: "2026-09-20T10:00:00Z",
+    assigneeIds: [7],
+    followerIds: [8, 9],
   });
+});
+
+test("assistant snapshots retain only verified assignee and follower display names", () => {
+  const snapshot = buildHubstaffAssistantSnapshot({
+    configured: true,
+    available: true,
+    project: { id: 7, name: "SPP", url: "https://tasks.hubstaff.com/app/organizations/1/projects/2" },
+    hours: { used: null, limit: null, remaining: null, over: null },
+    taskSummary: { total: 1, todo: 1, inProgress: 0, done: 0, completedThisMonth: 0 },
+    tasks: [{
+      id: "44", title: "Dev - Non-Blank Space", status: "active", column: "To-do's",
+      stage: "todo", completedAt: "", createdAt: "", updatedAt: "", dueAt: "",
+      assignees: ["Assigned Member"], assigneeNamesAvailable: true,
+      followers: ["Following Member"], followerNamesAvailable: true,
+      assigneeIds: [7], followerIds: [8],
+    }],
+    source: { fetchedAt: "2026-09-24T00:00:00Z", partial: false },
+  });
+  assert.deepEqual(snapshot.tasks[0].assignees, ["Assigned Member"]);
+  assert.deepEqual(snapshot.tasks[0].followers, ["Following Member"]);
+  assert.equal("assigneeIds" in snapshot.tasks[0], false);
+  assert.equal("followerIds" in snapshot.tasks[0], false);
 });
 
 test("redacts sensitive task-description values and external contact links", () => {

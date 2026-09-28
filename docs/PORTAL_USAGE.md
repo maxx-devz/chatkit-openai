@@ -1,114 +1,67 @@
-# Portal usage and the shared OpenAI account
+# Portal AI request capacity
 
-Open `/admin` and select **AI usage**. It refreshes every 15 seconds while the
-page is visible, on returning to the tab, or when you click **Refresh usage**.
-No new API key is needed for this view.
+Open `/admin` and select **AI usage**. The panel refreshes every 15 seconds while
+visible, when the browser regains focus, after an admin reply, or when **Refresh
+usage** is selected.
 
-The page shows two independent sets of figures:
+## What the progress bars mean
 
-- **Current client allowances:** requests used and remaining under each client's
-  monthly portal limit. Paused clients cannot use their allowance. These limits
-  are not a pooled OpenAI token wallet. Existing usage is preserved, including
-  the effect of any previous admin resets.
-- **Recorded AI activity:** text-agent tokens and runs from client ChatKit,
-  the admin assistant, and staff draft tests. A run means an attempted assistant
-  reply; it can make several model calls. These totals start when the updated
-  service runs, with the first recorded date shown. Earlier requests are not
-  reconstructed. Month boundaries use UTC. They are independent of allowance
-  resets and contain no prompt text or account identifiers.
+The progress bars show **remaining portal requests**, not tokens or an estimated
+OpenAI cash balance:
 
-Completed or failed runs are recorded after they finish. **Without token report**
-means the provider did not return usable usage information; it does not mean the
-request was free. A timeout, connection failure, or interrupted stream can leave
-partial or missing usage. Logs report database recording failures. Image-model
-tokens and file-search/storage/tool charges are not included in the text-agent
-totals. Local and deployed services using the same database share these totals;
-use a separate development database if you want production-only figures.
+- The administrator sees the combined remaining capacity and one bar for each
+  client.
+- A selected client's control panel shows that client's remaining percentage.
+- Each client sees a compact remaining-request bar above AOC-GPT.
+- Bars begin full and decrease as requests are accepted during the UTC month.
+- Changing a client's monthly request limit in `/admin` immediately changes its
+  bar. Resetting usage restores that client to its configured capacity.
 
-The admin assistant currently has no monthly portal allowance. Draft tests have
-a separate limit of 20 replies per staff member per hour. Client request and
-file-attempt limits remain configured per client.
+The request limit remains enforced by the server. It is not merely a visual
+counter, and a client cannot change it from the browser.
 
-## Setup and rollout
+## OpenAI status versus OpenAI credits
 
-1. Keep the current `.env.local` credentials.
-2. Run `npm run usage:migrate` against the database shared by the target frontend
-   and Python backend. This adds one table; it does not reset anything.
-3. Restart `npm run dev` locally to load the updated Python code. On Vercel,
-   deploy both projects from the updated release. The frontend alone cannot
-   record client/draft token usage from an older Python deployment.
-4. Open `/admin` → **AI usage**. Existing client allowances appear immediately.
-5. After API billing is ready, try a client reply, an admin reply, and a draft
-   test. Refresh after each finishes and verify the corresponding source row.
+The administrator panel also shows the last recorded OpenAI result for the
+current server API key. A successful admin request records **Available**; known
+billing, quota, credential, model-access, or rate-limit failures show the
+appropriate warning. Changing `OPENAI_API_KEY` begins with **Not checked** until
+an admin assistant request tests the new key.
 
-The database configured locally was migrated during implementation. Run the
-migration separately for a different preview or production database. Builds do
-not run migrations automatically. If the new table is missing, the panel shows
-the setup step and still displays current client allowances.
+OpenAI's Agents observability data exposes best-effort token usage for recorded
+turns. OpenAI explicitly states that those counts are not a final bill. A normal
+project API key does not provide a supported real-time remaining-credit balance,
+and there is no reliable conversion from credits to “prompts left”: models,
+history, tools, files, and answer length make every request cost different.
 
-## Billing errors and API request status
+For that reason, this portal does not manufacture an account-credit percentage.
+Use the [OpenAI billing page](https://platform.openai.com/settings/organization/billing/overview)
+for the account's monetary credits and billing controls. The portal progress bars
+remain accurate for the request allowances AOC controls whether the configured
+OpenAI project is trial-funded, prepaid, or paid.
 
-The status panel now shows the **last recorded admin assistant API result**:
-credits exhausted, quota/billing limit reached, temporary rate limit, credential
-or model access error, incomplete response, or a successful request. Billing
-errors include a direct link to OpenAI billing. The same explanation appears
-inside the failed chat message, including when OpenAI fails after streaming has
-started. Partial text is preserved. The retry button explains when billing or
-credentials need attention first.
+Official reference: [OpenAI Agents observability and usage](https://developers.openai.com/api/docs/guides/agents-api/observability).
 
-AI usage refreshes immediately when an admin request finishes, as well as on its
-regular interval. The result is dated and scoped to the current server API key;
-changing the key starts with unknown status. A successful subsequent request
-replaces the warning. Refreshing the usage panel reads the stored result; it
-does not query OpenAI or spend tokens. After topping up, retry your message to
-verify access. A model-list request cannot verify available credits.
+## Storage and privacy
 
-Rerun `npm run usage:migrate` to add the status table. The migration is safe to
-repeat. No new credentials are needed. Status currently covers the admin text
-assistant; Python client/draft failures are not monitored by this status panel.
-It does not automatically disable the composer or block recovery retries.
+Provider-reported token totals continue to be recorded internally for operational
+diagnostics, but raw token numbers are no longer sent to or displayed in the
+administrator and client usage interfaces. No prompts, replies, API keys, or
+account identifiers are stored in the usage summary tables.
 
-Credit exhaustion and temporary throughput limits can both produce HTTP 429,
-so the portal uses the provider's error code to distinguish them. Unknown errors
-do not expose raw provider messages, keys, or private request contents.
-[Official error-code guidance](https://developers.openai.com/api/docs/guides/error-codes).
+Other applications using the same OpenAI account are not part of this portal's
+client request allowances.
 
-## Why the OpenAI balance says “Amount unavailable”
+## Setup
 
-You chose portal-only usage reporting for now. The billing warning comes from
-actual request failures. The application does not fetch
-organization-wide OpenAI costs or credit balance, and it does not need an
-`OPENAI_ADMIN_KEY` for this implementation.
+Existing installations do not need a new environment variable or database
+migration for the progress bars. Keep the current environment values, restart
+the local services, and deploy both services normally:
 
-OpenAI documents organization Usage and Costs APIs for aggregate consumption
-and spending. Those are separate from each response's token report. They should
-not be treated as a fixed count of remaining prompts; request sizes, models, and
-tools vary. No supported real-time remaining-credit endpoint was verified during
-this implementation. Check the API Platform's usage/billing pages for the
-account's billing status. An organization usage/cost connection can be added
-later with appropriate organization credentials and project scoping.
-[Official Usage API reference](https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/usage).
+```powershell
+npm run setup:check
+npm run dev
+```
 
-If both Vercel services use API keys from the same OpenAI project, their calls
-are billed to that project. Other apps may consume the same account's credits
-without appearing in this portal's database. ChatGPT Business subscription
-access is separate from API billing.
-
-## Decisions from answer.txt
-
-- English by default; professional, humble, attentive to available chat context.
-- AOC builds, migrates, and customizes ecommerce stores, mainly Shopify,
-  BigCommerce, and WooCommerce.
-- Staff approve and publish instructions/tools once. Generated outputs do not
-  require a separate per-file approval step under the current configuration.
-- Flexible DOCX and image generation remain available when staff enable and
-  publish them for a client. Client chat history stays until deleted.
-- Client attachments are now supported; follow [upload setup](UPLOADS_SETUP.md).
-  You subsequently requested removal of the external virus-scan API. Format and
-  size validation remain, with no malware scanner or malware-based automatic
-  account blocking. An AI model is not a replacement for a scanner.
-- Approved company/client documents have not been supplied. Google Drive and
-  spreadsheet generation remain future integrations. Existing Hubstaff portal
-  views do not give the ChatKit agent live Hubstaff access automatically.
-- Use the existing `maxx` login for the final client acceptance test; no password
-  was supplied or changed. Publishing rules for that client is a staff action.
+If API status storage was never installed, run `npm run usage:migrate` once
+against the target database. Builds do not run migrations automatically.

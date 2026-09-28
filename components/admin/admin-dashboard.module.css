@@ -447,8 +447,11 @@
 .clientCopy > i { display: block; height: 3px; margin-top: 7px; overflow: hidden; border-radius: 99px; background: #e5edf4; }
 .clientCopy > i b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #0c85d0, #16b3d2); }
 
-.live,
-.paused {
+.online,
+.offline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 4px 6px;
   border-radius: 999px;
   background: #e9f8f1;
@@ -458,7 +461,16 @@
   text-transform: uppercase;
 }
 
-.paused { background: #f2f3f5; color: #7b8796; }
+.online::before,
+.offline::before {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.offline { background: #f2f3f5; color: #7b8796; }
 .emptyList { margin: 20px 8px; color: #8290a2; font-size: 12px; text-align: center; }
 
 .controlPanel { min-width: 0; background: #fff; }
@@ -530,7 +542,7 @@
   padding: 17px 18px;
   border: 1px solid #d8e8f4;
   border-radius: 14px;
-  grid-template-columns: auto minmax(220px, 1fr) auto;
+  grid-template-columns: auto minmax(220px, 1fr);
   gap: 17px;
   background:
     radial-gradient(circle at 93% 8%, rgba(24, 167, 220, 0.11), transparent 27%),
@@ -570,19 +582,6 @@
 .usageOverview > span { display: block; margin-top: 4px; color: #75869a; font-size: 10px; }
 .usageOverview > div { height: 6px; margin-top: 12px; overflow: hidden; border-radius: 99px; background: #dae8f1; }
 .usageOverview > div i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #0b86ce, #13b1d2); }
-
-.tokenSummary {
-  display: grid;
-  min-width: 210px;
-  margin: 0;
-  padding-left: 18px;
-  border-left: 1px solid #d6e5ef;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 13px;
-}
-
-.tokenSummary dt { color: #8090a3; font-size: 10px; text-transform: uppercase; }
-.tokenSummary dd { margin: 5px 0 0; color: #20394f; font-size: 14px; font-weight: 800; }
 
 .settingsGrid {
   display: grid;
@@ -627,12 +626,10 @@
 .fieldGrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 11px; }
 .fieldGrid label,
 .nameField,
-.instructionsField,
 .vectorField,
 .dialogGrid label { display: grid; gap: 6px; color: #455a72; font-size: 11px; font-weight: 730; }
 .fieldGrid input,
 .nameField input,
-.instructionsField textarea,
 .vectorField input,
 .dialogGrid input {
   width: 100%;
@@ -646,14 +643,11 @@
   font-size: 13px;
 }
 
-.instructionsField textarea { min-height: 122px; resize: vertical; line-height: 1.55; }
 .fieldGrid input:focus,
 .nameField input:focus,
-.instructionsField textarea:focus,
 .vectorField input:focus,
 .dialogGrid input:focus { border-color: #7fbae2; box-shadow: 0 0 0 3px rgba(16, 131, 202, 0.08); }
 .fieldGrid small,
-.instructionsField small,
 .vectorField small { color: #8b98a8; font-size: 10px; font-weight: 500; line-height: 1.4; }
 
 .resetButton {
@@ -751,7 +745,6 @@
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .workspace { grid-template-columns: 245px minmax(0, 1fr); }
   .usageHero { grid-template-columns: auto minmax(0, 1fr); }
-  .tokenSummary { grid-column: 1 / -1; padding: 13px 0 0; border-top: 1px solid #d6e5ef; border-left: 0; }
 }
 
 @media (max-width: 900px) {

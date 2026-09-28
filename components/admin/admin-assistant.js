@@ -76,6 +76,7 @@ function normalizeHistory(value) {
       title: typeof candidate.title === "string" && candidate.title.trim()
         ? candidate.title.trim().slice(0, 70)
         : "New conversation",
+      customTitle: candidate.customTitle === true,
       clientSlug: typeof candidate.clientSlug === "string"
         ? candidate.clientSlug.slice(0, 50)
         : "",
@@ -84,6 +85,17 @@ function normalizeHistory(value) {
         : new Date().toISOString(),
       messages,
     }];
+  });
+}
+
+function compactEmptySessions(sessions) {
+  const emptyContexts = new Set();
+  return sessions.filter((session) => {
+    if (session.messages.length) return true;
+    const contextKey = session.clientSlug || "__all_aoc__";
+    if (emptyContexts.has(contextKey)) return false;
+    emptyContexts.add(contextKey);
+    return true;
   });
 }
 
@@ -232,6 +244,8 @@ export default function AdminAssistant({ clients }) {
   const [modelsNotice, setModelsNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [renamingSessionId, setRenamingSessionId] = useState("");
+  const [renameValue, setRenameValue] = useState("");
   const activeRequestRef = useRef(null);
 
   const selectedClient = useMemo(
@@ -253,7 +267,9 @@ export default function AdminAssistant({ clients }) {
   useEffect(() => {
     let stored = [];
     try {
-      stored = normalizeHistory(JSON.parse(window.localStorage.getItem(HISTORY_STORAGE_KEY) || "[]"));
+      stored = compactEmptySessions(
+        normalizeHistory(JSON.parse(window.localStorage.getItem(HISTORY_STORAGE_KEY) || "[]")),
+      );
     } catch {
       stored = [];
     }
@@ -281,7 +297,9 @@ export default function AdminAssistant({ clients }) {
           const firstUserMessage = messages.find((message) => message.role === "user");
           return {
             ...session,
-            title: firstUserMessage?.content?.trim().slice(0, 70) || "New conversation",
+            title: session.customTitle
+              ? session.title
+              : firstUserMessage?.content?.trim().slice(0, 70) || "New conversation",
             clientSlug,
             messages: messages.slice(-MAX_HISTORY_MESSAGES),
             updatedAt: new Date().toISOString(),
@@ -324,10 +342,21 @@ export default function AdminAssistant({ clients }) {
 
   function chooseClient(value) {
     if (value === clientSlug) return;
+    const existingSession = sessions.find((session) => session.clientSlug === value);
+    if (existingSession) {
+      selectSession(existingSession);
+      return;
+    }
     startNewSession(value);
   }
 
   function startNewSession(nextClientSlug = "") {
+    const activeSession = sessions.find((session) => session.id === activeSessionId);
+    if (
+      activeSession
+      && !activeSession.messages.length
+      && activeSession.clientSlug === nextClientSlug
+    ) return;
     cancelActiveRequest();
     const nextSession = createSession({ clientSlug: nextClientSlug });
     setSessions((current) => [nextSession, ...current].slice(0, MAX_HISTORY_SESSIONS));
@@ -346,6 +375,28 @@ export default function AdminAssistant({ clients }) {
     setClientSlug(session.clientSlug || "");
     setMessages(nextMessages);
     setError("");
+  }
+
+  function beginRenameSession(session) {
+    setRenamingSessionId(session.id);
+    setRenameValue(session.title);
+  }
+
+  function saveSessionName(sessionIdToRename) {
+    const nextTitle = renameValue.trim().slice(0, 70);
+    if (!nextTitle) return;
+    let nextSessions;
+    setSessions((current) => {
+      nextSessions = current.map((session) => (
+        session.id === sessionIdToRename
+          ? { ...session, title: nextTitle, customTitle: true }
+          : session
+      ));
+      persistHistory(nextSessions);
+      return nextSessions;
+    });
+    setRenamingSessionId("");
+    setRenameValue("");
   }
 
   function deleteSession(sessionIdToDelete) {
@@ -604,7 +655,7 @@ export default function AdminAssistant({ clients }) {
       <div className={styles.body}>
         <aside className={styles.history} aria-label="Previous admin conversations">
           <div className={styles.historyHeader}>
-            <div><span>Workspace</span><h3>Conversations</h3></div>
+            <div><span>Workspace</span><h3>Conversation history</h3></div>
             <div className={styles.historyActions}>
               <button
                 className={styles.clearHistory}
@@ -623,21 +674,54 @@ export default function AdminAssistant({ clients }) {
                 className={session.id === activeSessionId ? styles.activeSession : ""}
                 key={session.id}
               >
-                <button type="button" onClick={() => selectSession(session)}>
-                <strong>{session.title}</strong>
-                <small>{session.clientSlug ? clients.find((client) => client.slug === session.clientSlug)?.name || session.clientSlug : "All AOC operations"} · {historyDate(session.updatedAt)}</small>
-                </button>
-                {session.messages.length ? (
-                  <button
-                    className={styles.deleteSession}
-                    type="button"
-                    onClick={() => deleteSession(session.id)}
-                    aria-label={`Delete ${session.title}`}
-                    title="Delete conversation"
-                  >
-                    ×
-                  </button>
-                ) : null}
+                {renamingSessionId === session.id ? (
+                  <form className={styles.renameSessionForm} onSubmit={(event) => {
+                    event.preventDefault();
+                    saveSessionName(session.id);
+                  }}>
+                    <input
+                      autoFocus
+                      maxLength={70}
+                      value={renameValue}
+                      onChange={(event) => setRenameValue(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape") setRenamingSessionId("");
+                      }}
+                      aria-label="Conversation name"
+                    />
+                    <button type="submit" disabled={!renameValue.trim()}>Save</button>
+                    <button type="button" onClick={() => setRenamingSessionId("")}>Cancel</button>
+                  </form>
+                ) : (
+                  <>
+                    <button className={styles.sessionSelect} type="button" onClick={() => selectSession(session)}>
+                      <strong>{session.title}</strong>
+                      <small>{session.clientSlug ? clients.find((client) => client.slug === session.clientSlug)?.name || session.clientSlug : "All AOC operations"} · {historyDate(session.updatedAt)}</small>
+                    </button>
+                    <div className={styles.sessionActions}>
+                      <button
+                        className={styles.renameSession}
+                        type="button"
+                        onClick={() => beginRenameSession(session)}
+                        aria-label={`Rename ${session.title}`}
+                        title="Rename conversation"
+                      >
+                        &#9998;
+                      </button>
+                      {session.messages.length ? (
+                        <button
+                          className={styles.deleteSession}
+                          type="button"
+                          onClick={() => deleteSession(session.id)}
+                          aria-label={`Delete ${session.title}`}
+                          title="Delete conversation"
+                        >
+                          &times;
+                        </button>
+                      ) : null}
+                    </div>
+                  </>
+                )}
               </div>
             ))}
             {!sessions.length ? <p className={styles.noHistory}>No previous conversations.</p> : null}

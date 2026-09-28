@@ -7,6 +7,7 @@ import HubstaffProvider, {
   HubstaffMonthGlance,
   HubstaffProjectProgress,
 } from "@/components/portal/hubstaff-live";
+import PresenceHeartbeat from "@/components/portal/presence-heartbeat";
 import aocIcon from "@/aoc-icon.png";
 import aocLogo from "@/aoc-logo.png";
 import { PORTAL_CONFIG } from "@/config/portal";
@@ -14,7 +15,7 @@ import styles from "./client-portal.module.css";
 
 const NAV_ITEMS = [
   ["dashboard", "Dashboard"],
-  ["sparkles", "AI Assistant", "#ai-assistant"],
+  ["sparkles", "AOC AI", "#ai-assistant"],
   ["clock", "Monthly Time"],
   ["chart", "Project Status"],
   ["clipboard", "Recent Work"],
@@ -156,6 +157,7 @@ export default function ClientPortal({ portalContext }) {
 
   return (
     <div className={styles.portalShell}>
+      <PresenceHeartbeat />
       <PortalSidebar portal={portal} />
       <div className={styles.portalMain}>
         <PortalHeader portal={portal} />
