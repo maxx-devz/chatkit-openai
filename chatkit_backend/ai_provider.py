@@ -3,7 +3,7 @@ import os
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
-from agents import set_default_openai_client
+from agents import set_default_openai_api, set_default_openai_client
 from openai import AsyncOpenAI
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
@@ -77,8 +77,21 @@ def configure_agents():
     config = provider_config()
     if not config.api_key:
         return
+    # OpenRouter's most mature compatibility surface for streamed function
+    # tools is Chat Completions. The Agents SDK otherwise defaults to Responses,
+    # which can fail after ChatKit has already stored the user's message. Keep
+    # genuine OpenAI traffic on the recommended Responses path.
+    set_default_openai_api(
+        "chat_completions" if config.name == "openrouter" else "responses"
+    )
     set_default_openai_client(
-        active_client(timeout=75, max_retries=2),
+        active_client(
+            timeout=75,
+            # A free OpenRouter failure can count toward its daily allowance.
+            # Let ChatKit expose one retry action instead of silently spending
+            # up to three provider requests for one user prompt.
+            max_retries=0 if config.name == "openrouter" else 2,
+        ),
         use_for_tracing=False,
     )
 
