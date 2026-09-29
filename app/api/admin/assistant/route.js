@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { aiClientOptions, resolveAiProvider } from "@/lib/ai-provider";
 import { recordAdminUsage } from "@/lib/portal-usage";
 import { openaiIssue } from "@/lib/openai-issues";
 import { consumeAdminResponse } from "@/lib/admin-response-stream";
@@ -27,6 +28,8 @@ export const maxDuration = 60;
 const MAX_MESSAGES = 40;
 const MAX_MESSAGE_LENGTH = 12000;
 const MAX_TOTAL_LENGTH = 50000;
+const MAX_UPSTREAM_MESSAGES = 13;
+const MAX_OUTPUT_TOKENS = 900;
 
 function normalizeMessages(value) {
   if (!Array.isArray(value) || value.length === 0) {
@@ -63,10 +66,47 @@ function normalizeMessages(value) {
   return messages;
 }
 
-function diagnostic(error, model) {
+function recentMessages(messages) {
+  return messages.slice(-MAX_UPSTREAM_MESSAGES);
+}
+
+function selectedClientContext(client, provider) {
+  if (!client) {
+    return "No client is selected. Answer only from the administrator conversation and general AOC instructions.";
+  }
+
+  const lastSeen = client.lastSeenAt
+    ? new Date(client.lastSeenAt).toISOString()
+    : "No recorded portal activity";
+
+  return [
+    `Selected client: ${client.name} (${client.slug}).`,
+    "Verified portal snapshot from the AOC database:",
+    `- Portal access: ${client.portalEnabled ? "enabled" : "disabled"}`,
+    `- AI assistant: ${client.aiEnabled ? "enabled" : "disabled"}`,
+    `- Current monthly AI usage: ${client.requestsUsed} of ${client.monthlyPromptLimit} requests (${client.requestsRemaining} remaining)`,
+    `- Portal members: ${client.memberCount}`,
+    `- Saved client conversations: ${client.conversationCount}`,
+    `- Knowledge records: ${client.approvedKnowledge} approved, ${client.pendingKnowledge} pending`,
+    `- Presence: ${client.isOnline ? "online now" : "offline"}; last seen: ${lastSeen}`,
+    `- Hubstaff project: ${client.hubstaffProjectUrl ? "connected" : "not connected"}`,
+    `- Approved website: ${client.approvedWebsiteUrl ? "connected" : "not connected"}`,
+    `- OpenAI file knowledge base: ${client.vectorStoreId
+      ? provider.supportsOpenAiHostedTools
+        ? "connected and available"
+        : `connected but unavailable through ${provider.label}`
+      : "not connected"}`,
+    "These are portal database facts, not live Hubstaff metrics. Do not invent Hubstaff hours, tasks, or budget values.",
+    client.instructions
+      ? `Approved client instructions:\n${client.instructions.slice(0, 12000)}`
+      : "No approved client-specific instructions are connected.",
+  ].join("\n");
+}
+
+function diagnostic(error, model, provider = resolveAiProvider()) {
   return {
-    provider: "openai",
-    category: "openai_error",
+    provider: provider.id,
+    category: "ai_provider_error",
     code: typeof error?.code === "string" ? error.code : "",
     httpStatus: Number.isInteger(error?.status) ? error.status : undefined,
     requestId: error?.request_id || error?._request_id || "",
@@ -99,9 +139,10 @@ async function catalogForRequest() {
 export async function GET(request) {
   try {
     await resolveAdminContext(request.headers);
-    if (!process.env.OPENAI_API_KEY) {
+    const provider = resolveAiProvider();
+    if (!provider.apiKey) {
       return Response.json(
-        { error: "OPENAI_API_KEY is not configured on the server." },
+        { error: "OPENAI_API_KEY or OPENROUTER_API_KEY is not configured on the server." },
         { status: 503 },
       );
     }
@@ -111,10 +152,14 @@ export async function GET(request) {
       {
         defaultModel: catalog.defaultModel,
         models: catalog.models,
+        provider: catalog.provider,
+        providerLabel: catalog.providerLabel,
         verified: catalog.verified,
         notice: catalog.verified
-          ? "Models returned by this server's OpenAI API key."
-          : "Model access could not be verified. The configured server default is shown.",
+          ? catalog.provider === "openrouter"
+            ? "Free models returned by OpenRouter's live catalog."
+            : "Models returned by this server's OpenAI API key."
+          : `${catalog.providerLabel} model access could not be verified. The configured server default is shown.`,
       },
       { headers: { "Cache-Control": "private, no-store, max-age=0" } },
     );
@@ -140,9 +185,10 @@ export async function POST(request) {
 
   try {
     await resolveAdminContext(request.headers);
-    if (!process.env.OPENAI_API_KEY) {
+    const provider = resolveAiProvider();
+    if (!provider.apiKey) {
       return Response.json(
-        { error: "OPENAI_API_KEY is not configured on the server.", code: "openai_not_configured" },
+        { error: "OPENAI_API_KEY or OPENROUTER_API_KEY is not configured on the server.", code: "ai_provider_not_configured" },
         { status: 503 },
       );
     }
@@ -156,19 +202,9 @@ export async function POST(request) {
     }
 
     const selectedClient = await loadAdminAssistantClient(body?.clientSlug, request.headers);
-    const clientContext = selectedClient
-      ? [
-          `Selected client: ${selectedClient.name} (${selectedClient.slug}).`,
-          selectedClient.instructions
-            ? `Approved client instructions:\n${selectedClient.instructions.slice(0, 12000)}`
-            : "No approved client-specific instructions are connected.",
-          selectedClient.vectorStoreId
-            ? "An approved client-specific knowledge base is connected. Use file search when relevant."
-            : "No client-specific file knowledge base is connected.",
-        ].join("\n\n")
-      : "No client is selected. Answer only from the administrator conversation and general AOC instructions.";
+    const clientContext = selectedClientContext(selectedClient, provider);
 
-    const tools = selectedClient?.vectorStoreId
+    const tools = provider.supportsOpenAiHostedTools && selectedClient?.vectorStoreId
       ? [{
           type: "file_search",
           vector_store_ids: [selectedClient.vectorStoreId],
@@ -176,7 +212,9 @@ export async function POST(request) {
         }]
       : [];
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0 });
+    // The SDK respects Retry-After and applies bounded backoff for eligible
+    // temporary 429/503 responses. Keep the overall route deadline below Vercel's limit.
+    const openai = new OpenAI(aiClientOptions(process.env, { maxRetries: 2 }));
     const upstreamController = new AbortController();
     const timeout = setTimeout(() => {
       upstreamController.abort(new Error("Admin assistant request timed out."));
@@ -194,8 +232,8 @@ export async function POST(request) {
         {
           model,
           instructions: `${ADMIN_ASSISTANT_INSTRUCTIONS}\n\n${clientContext}`,
-          input: messages,
-          max_output_tokens: 1800,
+          input: recentMessages(messages),
+          max_output_tokens: MAX_OUTPUT_TOKENS,
           stream: true,
           store: false,
           ...(tools.length ? { tools } : {}),
@@ -204,7 +242,7 @@ export async function POST(request) {
       ).withResponse();
     } catch (error) {
       clearTimeout(timeout);
-      await recordAdminUsage(startedAt, null, { code: openaiIssue(error).code, model });
+      await recordAdminUsage(startedAt, null, { code: openaiIssue(error, provider.id).code, model });
       throw error;
     }
 
@@ -228,7 +266,7 @@ export async function POST(request) {
             onDelta: delta => sendLine(controller, { type: "delta", delta }),
           });
         } catch (error) {
-          failure = openaiIssue(error);
+          failure = openaiIssue(error, provider.id);
         } finally {
           clearTimeout(timeout);
           await recordAdminUsage(startedAt, usage, { code: failure?.code || "ready", model });
@@ -247,14 +285,15 @@ export async function POST(request) {
     return new Response(stream, { headers: streamHeaders() });
   } catch (error) {
     const model = typeof body?.model === "string" ? body.model.slice(0, 120) : "";
-    console.error("Admin assistant request failed", diagnostic(error, model));
+    const provider = resolveAiProvider();
+    console.error("Admin assistant request failed", diagnostic(error, model, provider));
     if (error?.publicDetails) return adminErrorResponse(error);
-    const issue = openaiIssue(error);
+    const issue = openaiIssue(error, provider.id);
     return Response.json(
       {
         error: issue.message,
         code: issue.code,
-        diagnostic: diagnostic(error, model),
+        diagnostic: diagnostic(error, model, provider),
       },
       { status: issue.httpStatus, headers: { "Cache-Control": "private, no-store" } },
     );

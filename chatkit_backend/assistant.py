@@ -16,8 +16,10 @@ from provider_errors import provider_issue
 from uploads import AttachmentConverter, MAX_CONTEXT_ATTACHMENTS
 from usage_tracking import record_usage
 from client_library import client_library_tools
+from ai_provider import configure_agents, provider_config, supports_openai_hosted_tools
 
 logger = logging.getLogger(__name__)
+configure_agents()
 
 
 def hubstaff_tools(context):
@@ -35,6 +37,8 @@ def hubstaff_tools(context):
 
 def website_tools(context):
     """Expose hosted web search only for the administrator-approved client domain."""
+    if not supports_openai_hosted_tools():
+        return []
     value = (context.client.get("approved_website_url") or "").strip()
     try:
         parsed = urlsplit(value)
@@ -53,7 +57,8 @@ def make_agent(context, emit=None):
                      if getattr(context, "client_id", None) and not getattr(context, "preview", False)
                      else [])
     tools = generation_tools(context, emit) + hubstaff_tools(context) + website_tools(context) + library_tools
-    if config.get("fileSearch", True) and config.get("vectorStoreId"):
+    if (supports_openai_hosted_tools() and config.get("fileSearch", True)
+            and config.get("vectorStoreId")):
         tools.append(FileSearchTool(vector_store_ids=[config["vectorStoreId"]], max_num_results=5))
     instructions = "\n\n".join([
         context.instructions,
@@ -130,7 +135,7 @@ def make_agent(context, emit=None):
         "At most two generated files per reply. Ask for missing facts instead of inventing approved business details. "
         "Older conversation turns may be outside your context.",
     ])
-    return Agent(name="AOC client assistant", model=os.getenv("OPENAI_MODEL", "gpt-5.4-mini"),
+    return Agent(name="AOC client assistant", model=provider_config().model,
                  instructions=instructions, tools=tools,
                  model_settings=ModelSettings(max_tokens=5000, parallel_tool_calls=False, store=False))
 

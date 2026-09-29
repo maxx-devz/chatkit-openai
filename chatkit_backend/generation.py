@@ -9,9 +9,9 @@ from pathlib import Path
 from agents import function_tool
 from docx import Document
 from docx.shared import Pt
-from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 from chatkit.widgets import WidgetTemplate
+from ai_provider import has_openai_hosted_key, openai_hosted_client
 
 FILE_CARD = WidgetTemplate.from_file(str(Path(__file__).with_name("generated-file.widget")))
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -100,7 +100,10 @@ async def create_image_artifact(context, title, prompt, emit=None):
     if not 1 <= len(title) <= 200 or not 1 <= len(prompt) <= 4000:
         raise ValueError("Image title or description is too long")
     await reserve_tool(context, "images")
-    async with AsyncOpenAI(timeout=75, max_retries=0) as api:
+    api = openai_hosted_client(timeout=75, max_retries=2)
+    if api is None:
+        raise ValueError("Image generation requires a separate OpenAI API key")
+    async with api:
         result = await api.images.generate(
             model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-2"),
             prompt="Approved client instructions:\n" + context.config["instructions"]
@@ -124,4 +127,5 @@ def generation_tools(context, emit=None):
         """Generate one image when the user asks, following approved client instructions and branding. Describe the intended image in prompt."""
         return await create_image_artifact(context, title, prompt, emit)
 
-    return ([create_document] if context.config.get("documents") else []) + ([create_image] if context.config.get("images") else [])
+    image_available = context.config.get("images") and has_openai_hosted_key()
+    return ([create_document] if context.config.get("documents") else []) + ([create_image] if image_available else [])

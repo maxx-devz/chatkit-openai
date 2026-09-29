@@ -22,6 +22,7 @@ from database import connect_database
 from preview import router as preview_router
 from uploads import (MAX_ATTACHMENTS, MAX_FILE_BYTES, UPLOAD_ID, PrivateAttachmentStore,
                      UploadError, load_upload, upload_file, uploads_enabled)
+from ai_provider import provider_config
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(preview_router)
@@ -181,7 +182,7 @@ async def chatkit(request: Request):
             if not isinstance(item, UserMessageItem):
                 raise HTTPException(400, "Retry requires a user message")
         if parsed.type in GENERATE:
-            if not os.getenv("OPENAI_API_KEY"):
+            if not provider_config().api_key:
                 raise HTTPException(503, "Backend is not configured")
             message = getattr(parsed.params, "input", None)
             if message and message.attachments:

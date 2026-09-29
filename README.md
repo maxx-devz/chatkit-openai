@@ -1,7 +1,8 @@
 # AOC-GPT Client Portal
 
 The client portal uses OpenAI ChatKit for conversations and interactive file cards.
-A Python ChatKit server runs the assistant through the Agents SDK and Responses API.
+A Python ChatKit server runs the assistant through the Agents SDK and a compatible
+Responses API. Chat replies can use OpenAI or OpenRouter without changing the UI.
 Next.js handles the portal, Better Auth login, administrator tools, and authenticated
 requests. Neon stores client settings, conversations, usage, and generated files.
 
@@ -33,6 +34,24 @@ npm run dev
 Open <http://127.0.0.1:3000>. The dev command starts Next.js and the local Python
 service together. Ctrl+C stops both. After editing Python code, restart the dev
 command. The setup guide covers credentials and migrations for a fresh checkout.
+
+## OpenAI or OpenRouter
+
+Provider selection is automatic and server-only:
+
+- `OPENAI_API_KEY=sk-proj-...` uses OpenAI and `OPENAI_MODEL`.
+- `OPENROUTER_API_KEY=sk-or-v1-...` uses OpenRouter and `OPENROUTER_MODEL`.
+- An `sk-or-v1-...` key placed in the legacy `OPENAI_API_KEY` variable is also
+  detected as OpenRouter for backwards compatibility.
+- OpenRouter defaults to `openrouter/free`; the admin model selector loads the
+  current free model catalog rather than keeping a hard-coded list.
+
+Use the exact variable spelling—`OPENAI_API_KEY`, not `OPENAI__APY_KEY`. A
+genuine OpenAI key can remain in `OPENAI_API_KEY` alongside
+`OPENROUTER_API_KEY` for image generation and OpenAI file management. Hosted
+OpenAI vector-store search is not attached to OpenRouter chat requests; switch
+chat back to OpenAI when that tool is required. The dedicated OpenRouter
+variable takes priority for normal chat.
 
 ## Included
 
@@ -137,4 +156,4 @@ cannot add new tools or connect external applications.
 
 Accounts without a Hubstaff project show an unconfigured state instead of sample
 hours or tasks. Password recovery and automatic knowledge synchronization are not implemented.
-OpenAI API billing is separate from ChatGPT Business.
+API-provider billing is separate from ChatGPT Business.
