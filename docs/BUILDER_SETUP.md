@@ -42,8 +42,10 @@ Both projects can deploy from the same GitHub repository.
 | `DATABASE_URL` | Existing Neon database | Same database |
 | `BETTER_AUTH_URL` | Exact frontend origin | Not needed |
 | `BETTER_AUTH_SECRET` | Existing auth secret | Not needed |
-| `OPENAI_API_KEY` | Existing uses can keep it | Required for tests and client replies |
-| `OPENAI_MODEL` | Existing uses can keep it | Text model, default `gpt-5.4-mini` |
+| `OPENAI_API_KEY` | OpenAI key or legacy location for an auto-detected OpenRouter key | Same value when used |
+| `OPENAI_MODEL` | OpenAI text model | OpenAI text model, default `gpt-5.4-mini` |
+| `OPENROUTER_API_KEY` | Preferred OpenRouter chat key | Identical key |
+| `OPENROUTER_MODEL` | OpenRouter chat model; default `openrouter/free` | Same model |
 | `OPENAI_IMAGE_MODEL` | Optional existing uses | Optional; default `gpt-image-2` |
 | `CHATKIT_BACKEND_URL` | Python project's HTTPS origin | Not needed |
 | `CHATKIT_BACKEND_SECRET` | Existing shared secret | Same secret |
@@ -51,8 +53,10 @@ Both projects can deploy from the same GitHub repository.
 | `CHATKIT_VERCEL_PROTECTION_BYPASS` | If backend deployment protection requires it | Not needed |
 
 There is no additional builder API key or storage account. Only the ChatKit
-domain key is public. Model access and API billing must be active on the OpenAI
-project. The editor and its plain test conversation do not require loading the
+domain key is public. Model access must be active on the selected provider.
+Image generation requires a genuine OpenAI key. OpenAI-hosted vector search is
+attached only when OpenAI is the active chat provider; neither hosted tool is
+sent through OpenRouter. The editor and its plain test conversation do not require loading the
 ChatKit browser embed; client ChatKit still requires the registered domain key.
 
 ## 3. Deploy

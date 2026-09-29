@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import styles from "./portal-usage.module.css";
-import { providerStatus, OPENAI_BILLING_URL } from "@/lib/openai-issues";
+import { providerBillingUrl, providerStatus } from "@/lib/openai-issues";
 
 const number = value => new Intl.NumberFormat().format(Number(value) || 0);
 
@@ -69,7 +69,9 @@ export default function PortalUsage() {
   }, []);
 
   const { data, error } = snapshot;
-  const apiStatus = providerStatus(data?.apiStatus?.code);
+  const provider = data?.provider === "openrouter" ? "openrouter" : "openai";
+  const providerLabel = data?.providerLabel || (provider === "openrouter" ? "OpenRouter" : "OpenAI");
+  const apiStatus = providerStatus(data?.apiStatus?.code, provider);
   const enabledClients = data?.clients.filter(client => client.enabled) || [];
   const combinedAllowance = enabledClients.reduce((sum, client) => sum + client.allowance, 0);
   const combinedRemaining = enabledClients.reduce((sum, client) => sum + client.remaining, 0);
@@ -81,7 +83,7 @@ export default function PortalUsage() {
   return (
     <section className={styles.panel} id="portal-usage" aria-labelledby="portal-usage-title">
       <div className={styles.heading}>
-        <div><h2 id="portal-usage-title">AI request capacity</h2><p>Live portal allowances and the latest recorded OpenAI connection status.</p></div>
+        <div><h2 id="portal-usage-title">AI request capacity</h2><p>Live portal allowances and the latest recorded {providerLabel} connection status.</p></div>
         <button type="button" onClick={() => refreshRef.current?.()}>Refresh usage</button>
       </div>
       {error && <p className={styles.error} role="alert">{error} {data ? "The figures below are from the last successful refresh." : ""}</p>}
@@ -90,10 +92,10 @@ export default function PortalUsage() {
         <div className={apiStatus.code === "unknown" || apiStatus.code === "ready" ? styles.apiStatus : styles.apiBlocked} role="status">
           <strong>{apiStatus.title}</strong>
           <p>{apiStatus.message}</p>
-          {apiStatus.billing && <a href={OPENAI_BILLING_URL} target="_blank" rel="noreferrer">Open OpenAI billing</a>}
+          {apiStatus.billing && <a href={providerBillingUrl(provider)} target="_blank" rel="noreferrer">Open {provider === "openrouter" ? "OpenRouter credits" : "OpenAI billing"}</a>}
           <small>{data.apiStatus?.observedAt
             ? `Admin assistant · ${data.apiStatus.model} · Last observed ${new Date(data.apiStatus.observedAt).toLocaleString()}.`
-            : "No recorded API result for the current key."} This status updates after an admin assistant request; refreshing does not make an OpenAI request.</small>
+            : "No recorded API result for the current key."} This status updates after an admin assistant request; refreshing does not make a provider request.</small>
         </div>
 
         <div className={styles.metrics}>
@@ -109,9 +111,9 @@ export default function PortalUsage() {
             <small>{number((data.clients || []).length - enabledClients.length)} paused or unavailable</small>
           </div>
           <div>
-            <span>OpenAI API status</span>
+            <span>{providerLabel} API status</span>
             <strong>{accountStatus}</strong>
-            <small>Numeric credits are available only in the OpenAI billing portal</small>
+            <small>Provider credits are separate from portal request allowances</small>
           </div>
         </div>
 
@@ -135,8 +137,8 @@ export default function PortalUsage() {
           {data.clients.length === 0 && <p>No client accounts yet.</p>}
         </div>
 
-        <p className={styles.note}>These progress bars represent the request limits configured inside this portal. OpenAI does not provide a supported real-time remaining-credit balance through the normal project API key. A free-credit or paid account therefore cannot be converted into an accurate “prompts left” number because every request can use different models, tools, and amounts of work.</p>
-        <p className={styles.updated}>Updated {new Date(data.fetchedAt).toLocaleTimeString()}. Refreshes every 15 seconds while visible. Other applications using the same OpenAI account are not part of these portal allowances.</p>
+        <p className={styles.note}>These progress bars represent request limits configured inside this portal, not the provider account&apos;s cash or free-request balance. Requests can use different models, tools, and amounts of work.</p>
+        <p className={styles.updated}>Updated {new Date(data.fetchedAt).toLocaleTimeString()}. Refreshes every 15 seconds while visible. Other applications using the same {providerLabel} account are not part of these portal allowances.</p>
       </>}
     </section>
   );

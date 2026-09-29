@@ -3,7 +3,7 @@ import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from zipfile import ZipFile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -33,7 +33,9 @@ class BuilderTests(unittest.TestCase):
         context = SimpleNamespace(config=config, instructions="Global", client={"display_name": "Test"})
         self.assertEqual(make_agent(context).tools, [])
         config.update(documents=True, images=True, vectorStoreId="vs_client")
-        agent = make_agent(context)
+        with patch("assistant.supports_openai_hosted_tools", return_value=True), \
+                patch("generation.has_openai_hosted_key", return_value=True):
+            agent = make_agent(context)
         self.assertEqual(len(agent.tools), 3)
         self.assertEqual(agent.tools[-1].vector_store_ids, ["vs_client"])
         self.assertEqual(agent.tools[0].params_json_schema["additionalProperties"], False)
@@ -49,10 +51,12 @@ class BuilderTests(unittest.TestCase):
 
     def test_website_tool_is_restricted_to_the_approved_client_domain(self):
         context = SimpleNamespace(client={"approved_website_url": "https://www.example.com/"})
-        tools = website_tools(context)
+        with patch("assistant.supports_openai_hosted_tools", return_value=True):
+            tools = website_tools(context)
         self.assertEqual(len(tools), 1)
         self.assertEqual(tools[0].filters.allowed_domains, ["www.example.com"])
-        self.assertEqual(website_tools(SimpleNamespace(client={})), [])
+        with patch("assistant.supports_openai_hosted_tools", return_value=True):
+            self.assertEqual(website_tools(SimpleNamespace(client={})), [])
 
     def test_widget_template_escapes_data_and_emits_client_download_action(self):
         widget = FILE_CARD.build({"title": 'A "quote"', "filename": "proposal.docx", "id": "test-id"}).model_dump()

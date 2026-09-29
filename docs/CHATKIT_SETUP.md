@@ -50,8 +50,11 @@ For a fresh checkout, copy `.env.example` to `.env.local` and fill the values.
 | `DATABASE_URL` | Existing Neon connection string |
 | `BETTER_AUTH_SECRET` | Existing login secret, at least 32 characters |
 | `BETTER_AUTH_URL` | `http://127.0.0.1:3000` exactly |
-| `OPENAI_API_KEY` | Server-only OpenAI API project key |
-| `OPENAI_MODEL` | Available text model; default `gpt-5.4-mini` |
+| `OPENAI_API_KEY` | OpenAI project key; an `sk-or-v1-...` value is auto-detected for backwards compatibility |
+| `OPENAI_MODEL` | OpenAI text model; default `gpt-5.4-mini` |
+| `OPENROUTER_API_KEY` | Preferred variable for an OpenRouter `sk-or-v1-...` key |
+| `OPENROUTER_MODEL` | OpenRouter model; default `openrouter/free` |
+| `OPENROUTER_SITE_URL` | Optional public portal origin for OpenRouter attribution |
 | `OPENAI_IMAGE_MODEL` | `gpt-image-2` when enabling images |
 | `NEXT_PUBLIC_CHATKIT_DOMAIN_KEY` | Public ChatKit domain key |
 | `CHATKIT_BACKEND_URL` | `http://127.0.0.1:8000` |
@@ -64,6 +67,13 @@ For a fresh checkout, copy `.env.example` to `.env.local` and fill the values.
 Create/manage your API key in the [API Platform](https://platform.openai.com/api-keys).
 ChatGPT Business and API usage have separate billing. An existing custom GPT's
 link, ChatGPT login cookie, or Business subscription cannot replace an API key.
+
+For OpenRouter, create the key in your OpenRouter account and set
+`OPENROUTER_API_KEY` in both services. The app recognizes the `sk-or-v1-` prefix,
+uses `https://openrouter.ai/api/v1`, and defaults to `openrouter/free`. A genuine
+OpenAI key is still required for image generation and OpenAI vector-store
+management. Hosted vector-store search is available only when OpenAI is the
+active chat provider.
 
 In the API Platform's ChatKit domain registration settings, register your actual
 frontend domains, including local `127.0.0.1` and
@@ -190,8 +200,11 @@ and branch names; do not push an incomplete setup straight to production.
 | `DATABASE_URL` | Existing Neon DB | Same DB |
 | `BETTER_AUTH_URL` | `https://quantum-project-xi.vercel.app` | Not needed |
 | `BETTER_AUTH_SECRET` | Keep existing production auth secret | Not needed |
-| `OPENAI_API_KEY` | Required by the existing admin assistant | Required for client replies and draft tests |
-| `OPENAI_MODEL` | Existing admin model | Client text model, default `gpt-5.4-mini` |
+| `OPENAI_API_KEY` | OpenAI chat/hosted-tool key, or legacy location for an OpenRouter key | Same value when used |
+| `OPENAI_MODEL` | OpenAI admin model | OpenAI client model, default `gpt-5.4-mini` |
+| `OPENROUTER_API_KEY` | OpenRouter chat key; takes priority when set | Identical key |
+| `OPENROUTER_MODEL` | OpenRouter admin model; default `openrouter/free` | Same client model |
+| `OPENROUTER_SITE_URL` | Exact public frontend origin (optional attribution) | Same origin (optional) |
 | `OPENAI_IMAGE_MODEL` | Not needed for client generation | `gpt-image-2` |
 | `CHATKIT_UPLOADS_ENABLED` | Optional; defaults to `true` | Optional; defaults to `true` |
 | `NEXT_PUBLIC_CHATKIT_DOMAIN_KEY` | Key registered for this frontend | Not needed |

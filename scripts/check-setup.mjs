@@ -20,9 +20,11 @@ function configured(name) {
   return value && !/your[-_ ]|example|replace[-_ ]|placeholder/i.test(value);
 }
 check(Number(process.versions.node.split(".")[0]) >= 22, "Node.js 22+", "Update Node.js and reopen your terminal.");
-for (const name of ["DATABASE_URL", "OPENAI_API_KEY", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "NEXT_PUBLIC_CHATKIT_DOMAIN_KEY"]) {
+for (const name of ["DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "NEXT_PUBLIC_CHATKIT_DOMAIN_KEY"]) {
   check(Boolean(configured(name)), name, "Set this in .env.local / the Vercel frontend environment settings.");
 }
+check(Boolean(configured("OPENAI_API_KEY") || configured("OPENROUTER_API_KEY")), "AI provider API key",
+  "Set OPENAI_API_KEY or OPENROUTER_API_KEY in .env.local / both Vercel projects.");
 check((process.env.BETTER_AUTH_SECRET?.length || 0) >= 32, "Authentication secret length", "Use at least 32 characters; preserve the existing production secret.");
 let origin;
 try {

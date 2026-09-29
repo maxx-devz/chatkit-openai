@@ -20,9 +20,13 @@ Run this against the same Neon database used by the portal and Python backend:
 npm run library:migrate
 ```
 
-No new secret is required. The backend reuses `OPENAI_API_KEY`. If a client does
-not yet have an OpenAI vector store, the first permanent file creates one and
-saves its ID to `portal_clients.openai_vector_store_id`.
+Semantic indexing uses a genuine OpenAI key from `OPENAI_API_KEY`. With only an
+OpenRouter key, the private Neon library still saves files and links, but OpenAI
+semantic indexing is unavailable. Even when both keys are present, hosted
+OpenAI vector-store search is attached only to OpenAI chat requests, not
+OpenRouter requests. If a client does not yet have an OpenAI vector store, the
+first indexed permanent file creates one and saves its ID to
+`portal_clients.openai_vector_store_id` for use when OpenAI is active.
 
 Deploy the Python backend and Next.js frontend from the same revision after the
 migration. Run `npm run setup:check` to confirm the table exists.

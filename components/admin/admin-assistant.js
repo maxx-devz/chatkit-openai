@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import aocIcon from "@/aoc-icon.png";
 import styles from "./admin-assistant.module.css";
-import { openaiIssue, OPENAI_BILLING_URL } from "@/lib/openai-issues";
+import { openaiIssue, providerBillingUrl } from "@/lib/openai-issues";
 
 const STARTERS = [
   "Give me a concise operations summary for the selected client.",
@@ -202,10 +202,10 @@ function labelForModel(model) {
   return model?.label || model?.id || "Configured model";
 }
 
-function AdminMessage({ message, onRetry }) {
+function AdminMessage({ message, onRetry, provider }) {
   const isUser = message.role === "user";
   const canRetry = !isUser && !message.pending && (message.paused || message.errorMessage);
-  const issue = message.errorCode ? openaiIssue({ code: message.errorCode }) : null;
+  const issue = message.errorCode ? openaiIssue({ code: message.errorCode }, provider) : null;
 
   return (
     <div className={`${styles.messageRow} ${isUser ? styles.userRow : styles.assistantRow}`}>
@@ -218,7 +218,7 @@ function AdminMessage({ message, onRetry }) {
         <span className={styles.messageAuthor}>{isUser ? "You" : "AOC Admin Assistant"}</span>
         {message.content || message.pending ? <p>{message.content || "Thinking..."}</p> : null}
         {message.errorMessage ? <p role="alert">{message.errorMessage}</p> : null}
-        {issue?.billing ? <a href={OPENAI_BILLING_URL} target="_blank" rel="noreferrer">Open OpenAI billing</a> : null}
+        {issue?.billing ? <a href={providerBillingUrl(provider)} target="_blank" rel="noreferrer">Open {provider === "openrouter" ? "OpenRouter credits" : "OpenAI billing"}</a> : null}
         {canRetry ? (
           <div className={styles.interruptedMessage}>
             {!message.errorMessage ? <span>This response is paused.</span> : null}
@@ -242,6 +242,7 @@ export default function AdminAssistant({ clients }) {
   const [models, setModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [modelsNotice, setModelsNotice] = useState("");
+  const [provider, setProvider] = useState("openai");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [renamingSessionId, setRenamingSessionId] = useState("");
@@ -330,6 +331,7 @@ export default function AdminAssistant({ clients }) {
         setModels(available);
         setSelectedModel(payload?.defaultModel || available[0]?.id || "");
         setModelsNotice(payload?.notice || "");
+        setProvider(payload?.provider === "openrouter" ? "openrouter" : "openai");
       })
       .catch((loadError) => {
         if (active) setModelsNotice(loadError.message || "Model list unavailable.");
@@ -751,6 +753,7 @@ export default function AdminAssistant({ clients }) {
               key={message.id}
               message={message}
               onRetry={retryMessage}
+              provider={provider}
             />
           ))}
         </div>

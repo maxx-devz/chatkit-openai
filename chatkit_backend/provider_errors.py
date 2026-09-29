@@ -1,4 +1,4 @@
-"""Curated client messages for OpenAI failures, including errors inside HTTP 200 streams."""
+"""Curated client messages for provider failures, including HTTP 200 streams."""
 from dataclasses import dataclass
 
 from openai import APIError
@@ -15,14 +15,14 @@ CONTACT = "Please contact Always Open Commerce."
 ISSUES = {
     "credit_balance_exhausted": ProviderIssue(
         "credit_balance_exhausted",
-        "AI replies are unavailable because the service's OpenAI API credits are exhausted. "
-        "OpenAI code: credit_balance_exhausted. " + CONTACT,
+        "AI replies are unavailable because the configured provider credits are exhausted. "
+        "Provider code: credit_balance_exhausted. " + CONTACT,
         False,
     ),
     "insufficient_quota": ProviderIssue(
         "insufficient_quota",
-        "AI replies are unavailable because the service has reached an OpenAI API quota or billing limit. "
-        "OpenAI code: insufficient_quota. " + CONTACT,
+        "AI replies are unavailable because the configured provider reached an API quota or billing limit. "
+        "Provider code: insufficient_quota. " + CONTACT,
         False,
     ),
     "rate_limit_exceeded": ProviderIssue(
@@ -32,12 +32,12 @@ ISSUES = {
     ),
     "authentication_failed": ProviderIssue(
         "authentication_failed",
-        "The AI service's OpenAI connection needs attention. " + CONTACT,
+        "The AI provider connection needs attention. " + CONTACT,
         False,
     ),
     "model_unavailable": ProviderIssue(
         "model_unavailable",
-        "The AI service cannot access the selected OpenAI model or resource. " + CONTACT,
+        "The AI service cannot access the selected provider model or resource. " + CONTACT,
         False,
     ),
     "request_failed": ProviderIssue(
