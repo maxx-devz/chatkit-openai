@@ -13,6 +13,7 @@ requests. Neon stores client settings, conversations, usage, and generated files
 **Connect client work: [Hubstaff dashboard and assistant](docs/HUBSTAFF_SETUP.md).**
 **Restrict public web research: [Approved client websites](docs/WEBSITE_ACCESS_SETUP.md).**
 **Save cross-conversation files: [Persistent client library](docs/CLIENT_LIBRARY_SETUP.md).**
+**Employee work dashboard: [Employee prototype setup and security](docs/EMPLOYEE_PORTAL.md).**
 
 The portal's AOC-GPT is an API assistant. Your team's existing custom GPT inside
 ChatGPT Business does not automatically connect or synchronize with it. Transfer
@@ -84,6 +85,12 @@ Existing accounts, client records, conversations, and administrator tools are re
 | `npm run dev` | Start Next.js and local Python |
 | `npm run dev:web` | Start Next.js when Python is already running |
 | `npm run setup:check` | Check local configuration and database tables without displaying secrets |
+| `npm run setup:check -- --employee` | Also check the optional employee schema and encryption key |
+| `npm run employee:migrate` | Add the separate employee access and encrypted connection table |
+| `npm run employee:create -- USERNAME "DISPLAY NAME" APPROVED_HUBSTAFF_USER_ID` | Privately provision employee-only access; password is prompted |
+| `npm run test:employee` | Employee authorization, Hubstaff isolation, credential safety, and real Better Auth login tests |
+| `npm run test:employee:database` | Employee SQL checks in rolled-back temporary tables |
+| `npm run test:employee:ui` | Isolated desktop/mobile browser checks; requires installed Chrome |
 | `npm run lint` | Check JavaScript/React |
 | `npm test` | Run JavaScript security/configuration tests |
 | `npm run test:http` | Check local routes while both dev services are running |

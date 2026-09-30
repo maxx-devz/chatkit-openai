@@ -25,6 +25,13 @@
     "hubstaff:check": "node --conditions=react-server --env-file=.env.local scripts/check-hubstaff.mjs",
     "admin:create": "node --env-file=.env.local scripts/create-admin.mjs",
     "setup:check": "node scripts/check-setup.mjs",
+    "employee:migrate": "node --env-file=.env.local scripts/migrate-employee.mjs",
+    "employee:create": "node --env-file=.env.local scripts/create-employee.mjs",
+    "test:employee": "node --conditions=react-server --experimental-test-module-mocks --import ./tests/employee/aliases.mjs --test tests/employee/*.test.mjs",
+    "test:employee:database": "node --env-file=.env.local scripts/check-employee-database.mjs",
+    "test:employee:ui": "playwright test --config tests/employee/playwright.config.mjs",
+    "test:employee:http": "node --env-file=.env.local scripts/check-employee-http.mjs",
+    "test:employee:secrets": "node --env-file=.env.local scripts/check-employee-secrets.mjs",
     "test": "node --test \"tests/*.test.mjs\"",
     "test:http": "node scripts/check-builder-http.mjs"
   },
@@ -43,6 +50,7 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.3"
   }

@@ -53,7 +53,7 @@ const hubstaffTimeZone = process.env.HUBSTAFF_REPORT_TIME_ZONE?.trim();
 check(!hubstaffTimeZone || normalizeReportTimeZone(hubstaffTimeZone) === hubstaffTimeZone,
   "Hubstaff reporting timezone", "Use a valid IANA timezone such as Asia/Manila.");
 const hubstaffPatConfigured = Boolean(configured("HUBSTAFF_PAT_REFRESH_TOKEN"));
-if (hubstaffPatConfigured) {
+if (hubstaffPatConfigured || process.argv.includes("--employee")) {
   check((process.env.HUBSTAFF_TOKEN_ENCRYPTION_KEY?.trim().length || 0) >= 32,
     "Hubstaff PAT encryption key",
     "Set HUBSTAFF_TOKEN_ENCRYPTION_KEY to a stable random value containing at least 32 characters.");
@@ -74,6 +74,7 @@ if (configured("DATABASE_URL")) {
       "library:migrate": ["portal_client_library"],
       "usage:migrate": ["portal_ai_activity_monthly", "portal_ai_provider_status"],
       "builder:migrate": ["portal_assistant_configs", "portal_assistant_versions", "portal_assistant_files", "portal_assistant_tool_usage", "portal_assistant_preview_usage"],
+      ...(process.argv.includes("--employee") ? { "employee:migrate": ["portal_employees"] } : {}),
     };
     for (const [migration, tables] of Object.entries(groups)) {
       const result = await db.query("SELECT name, to_regclass('public.' || quote_ident(name)) IS NOT NULL AS present FROM unnest($1::text[]) AS name", [tables]);
