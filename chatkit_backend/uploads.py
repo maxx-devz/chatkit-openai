@@ -164,6 +164,14 @@ class AttachmentConverter(ThreadItemConverter):
         self.included_ids = included_ids
         self.sent_ids = set()
 
+    async def assistant_message_to_input(self, item):
+        # ChatKit 1.6.5 returns an easy-input message containing output_text.
+        # The Chat Completions adapter rejects that combination on follow-ups.
+        # Plain assistant text is supported by both Responses and Completions;
+        # keep roles and the saved reply intact instead of dropping history.
+        return {"type": "message", "role": "assistant",
+                "content": "\n".join(part.text for part in item.content)}
+
     async def attachment_to_message_content(self, attachment):
         if attachment.id not in self.included_ids:
             return {"type": "input_text", "text": "[Older attachment omitted from this reply's context. Ask the user to attach it again if needed.]"}

@@ -1,8 +1,11 @@
 import OpenAI from "openai";
-import { aiClientOptions, resolveAiProvider } from "@/lib/ai-provider";
+import { resolveAiProvider } from "@/lib/ai-provider";
+import { getRuntimeProvider } from "@/lib/provider-settings";
 import { recordAdminUsage } from "@/lib/portal-usage";
 import { openaiIssue } from "@/lib/openai-issues";
 import { consumeAdminResponse } from "@/lib/admin-response-stream";
+import { getSiteAiModel, saveSiteAiModel } from "@/lib/site-ai-settings";
+import { validateSiteModel } from "@/lib/site-ai-repository";
 
 import { ADMIN_ASSISTANT_INSTRUCTIONS } from "@/config/assistant";
 import {
@@ -13,7 +16,6 @@ import {
 import {
   getFallbackModelCatalog,
   getModelCatalog,
-  resolveRequestedModel,
 } from "@/lib/openai-models";
 import {
   assertTrustedOrigin,
@@ -122,9 +124,9 @@ function streamHeaders() {
   };
 }
 
-async function catalogForRequest() {
+async function catalogForRequest(provider) {
   try {
-    return await getModelCatalog();
+    return await getModelCatalog(provider);
   } catch (error) {
     console.error("Admin assistant model list failed", {
       name: error?.name,
@@ -132,32 +134,35 @@ async function catalogForRequest() {
       code: error?.code,
       requestId: error?.request_id,
     });
-    return getFallbackModelCatalog();
+    return getFallbackModelCatalog(provider);
   }
 }
 
 export async function GET(request) {
   try {
     await resolveAdminContext(request.headers);
-    const provider = resolveAiProvider();
+    const provider = await getRuntimeProvider();
     if (!provider.apiKey) {
       return Response.json(
-        { error: "OPENAI_API_KEY or OPENROUTER_API_KEY is not configured on the server." },
+        { error: "Configure a provider in AOC Admin AI provider settings." },
         { status: 503 },
       );
     }
 
-    const catalog = await catalogForRequest();
+    const [catalog, setting] = await Promise.all([catalogForRequest(provider), getSiteAiModel(provider)]);
     return Response.json(
       {
-        defaultModel: catalog.defaultModel,
-        models: catalog.models,
+        defaultModel: setting.model,
+        settingSource: setting.source,
+        settingsReady: setting.ready,
+        models: catalog.models.some((model) => model.id === setting.model) ? catalog.models
+          : [{ id: setting.model, label: `${setting.model} (current; not in catalog)`, supportsTools: false }, ...catalog.models],
         provider: catalog.provider,
         providerLabel: catalog.providerLabel,
         verified: catalog.verified,
         notice: catalog.verified
           ? catalog.provider === "openrouter"
-            ? "Free models returned by OpenRouter's live catalog."
+          ? "Models returned by OpenRouter's live catalog. Provider pricing applies."
             : "Models returned by this server's OpenAI API key."
           : `${catalog.providerLabel} model access could not be verified. The configured server default is shown.`,
       },
@@ -168,9 +173,34 @@ export async function GET(request) {
   }
 }
 
+export async function PUT(request) {
+  try {
+    assertTrustedOrigin(request.headers);
+    const { admin } = await resolveAdminContext(request.headers);
+    const body = await readJsonRequest(request, 2000);
+    const provider = await getRuntimeProvider();
+    if (body.provider !== provider.id) {
+      return Response.json({ error: "The AI provider changed. Refresh this page before saving." }, { status: 409 });
+    }
+    const catalog = await getModelCatalog(provider);
+    let model;
+    try { model = validateSiteModel(body.model, catalog); }
+    catch (error) { return Response.json({ error: error.message }, { status: 400 }); }
+    const setting = await saveSiteAiModel(provider, model, admin.id);
+    return Response.json({ ...setting, provider: provider.id },
+      { headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) {
+    if (error?.code === "42P01") {
+      return Response.json({ error: "Run npm run site-ai:migrate to enable site-wide model settings." }, { status: 503 });
+    }
+    return requestSecurityErrorResponse(error) || adminErrorResponse(error);
+  }
+}
+
 export async function POST(request) {
   let body;
   let messages;
+  let provider;
 
   try {
     assertTrustedOrigin(request.headers);
@@ -185,21 +215,16 @@ export async function POST(request) {
 
   try {
     await resolveAdminContext(request.headers);
-    const provider = resolveAiProvider();
+    provider = await getRuntimeProvider();
     if (!provider.apiKey) {
       return Response.json(
-        { error: "OPENAI_API_KEY or OPENROUTER_API_KEY is not configured on the server.", code: "ai_provider_not_configured" },
+        { error: "Configure a provider in AOC Admin AI provider settings.", code: "ai_provider_not_configured" },
         { status: 503 },
       );
     }
 
-    const catalog = await catalogForRequest();
-    let model;
-    try {
-      model = resolveRequestedModel(body?.model, catalog);
-    } catch (error) {
-      return Response.json({ error: error.message, code: "invalid_model" }, { status: 400 });
-    }
+    // Browser overrides must not bypass the administrator's site-wide selection.
+    const model = provider.model;
 
     const selectedClient = await loadAdminAssistantClient(body?.clientSlug, request.headers);
     const clientContext = selectedClientContext(selectedClient, provider);
@@ -214,7 +239,8 @@ export async function POST(request) {
 
     // The SDK respects Retry-After and applies bounded backoff for eligible
     // temporary 429/503 responses. Keep the overall route deadline below Vercel's limit.
-    const openai = new OpenAI(aiClientOptions(process.env, { maxRetries: 2 }));
+    const openai = new OpenAI({ apiKey: provider.apiKey, baseURL: provider.baseURL,
+      defaultHeaders: provider.defaultHeaders, maxRetries: provider.id === "openrouter" ? 0 : 2 });
     const upstreamController = new AbortController();
     const timeout = setTimeout(() => {
       upstreamController.abort(new Error("Admin assistant request timed out."));
@@ -242,7 +268,7 @@ export async function POST(request) {
       ).withResponse();
     } catch (error) {
       clearTimeout(timeout);
-      await recordAdminUsage(startedAt, null, { code: openaiIssue(error, provider.id).code, model });
+      await recordAdminUsage(startedAt, null, { code: openaiIssue(error, provider.id).code, model, provider });
       throw error;
     }
 
@@ -269,7 +295,7 @@ export async function POST(request) {
           failure = openaiIssue(error, provider.id);
         } finally {
           clearTimeout(timeout);
-          await recordAdminUsage(startedAt, usage, { code: failure?.code || "ready", model });
+          await recordAdminUsage(startedAt, usage, { code: failure?.code || "ready", model, provider });
           try {
             sendLine(controller, failure
               ? { type: "error", message: failure.message, code: failure.code }
@@ -285,7 +311,7 @@ export async function POST(request) {
     return new Response(stream, { headers: streamHeaders() });
   } catch (error) {
     const model = typeof body?.model === "string" ? body.model.slice(0, 120) : "";
-    const provider = resolveAiProvider();
+    provider ||= resolveAiProvider();
     console.error("Admin assistant request failed", diagnostic(error, model, provider));
     if (error?.publicDetails) return adminErrorResponse(error);
     const issue = openaiIssue(error, provider.id);

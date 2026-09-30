@@ -29,6 +29,10 @@ class Context:
     artifacts: list = field(default_factory=list)
     tool_calls: int = 0
     request_attachment_ids: list = field(default_factory=list)
+    ai_model: str | None = None
+    ai_provider: object = field(default=None, repr=False)
+    ai_client: object = field(default=None, repr=False)
+    hosted_client: object = field(default=None, repr=False)
 
     @property
     def scope(self):

@@ -15,6 +15,7 @@ from database import connect_database
 from security import verify_signature
 from store import Context
 from usage_tracking import record_usage
+from provider_settings import load_provider_settings, close_provider_clients
 
 router = APIRouter()
 HEADERS = {"Cache-Control": "private, no-store"}
@@ -76,15 +77,20 @@ async def preview(request: Request):
                     config=AssistantConfig.model_validate(client["draft"]).model_dump(), preview=True,
                     portal_origin=data.portal_origin.rstrip("/"), hubstaff=data.hubstaff)
                 started_at = datetime.now(timezone.utc)
-                result = Runner.run_streamed(make_agent(context), [item.model_dump() for item in data.messages],
-                    context=context, max_turns=5, run_config=RunConfig(tracing_disabled=True, trace_include_sensitive_data=False))
+                context.ai_provider = await load_provider_settings(db)
+                context.ai_model = context.ai_provider.model
+                result = None
                 try:
+                    result = Runner.run_streamed(make_agent(context), [item.model_dump() for item in data.messages],
+                        context=context, max_turns=5, run_config=RunConfig(tracing_disabled=True, trace_include_sensitive_data=False))
                     async for _ in result.stream_events():
                         pass
                 finally:
-                    if not result.is_complete:
+                    if result and not result.is_complete:
                         result.cancel()
-                    await record_usage(db, "preview", started_at, result.context_wrapper.usage)
+                    await close_provider_clients(context)
+                    if result:
+                        await record_usage(db, "preview", started_at, result.context_wrapper.usage)
                 return JSONResponse({"text": str(result.final_output), "files": context.artifacts}, headers=HEADERS)
     except Exception:
         # API/provider/database exceptions can contain prompts or configuration.

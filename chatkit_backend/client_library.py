@@ -110,7 +110,7 @@ async def ensure_vector_store(context):
     if current:
         context.config["vectorStoreId"] = current
         return current
-    client = openai_hosted_client()
+    client = openai_hosted_client(context)
     if client is None:
         raise LibraryError("Semantic indexing requires a separate OpenAI API key")
     store = await client.vector_stores.create(name=f"AOC client {context.client_id} knowledge")
@@ -185,7 +185,7 @@ async def save_attachment(context, *, filename, title, description="", period_st
                     "searchStatus": "saved_not_searchable",
                     "downloadUrl": f"{context.portal_origin}/api/client-library/{identifier}"}
         store_id = await ensure_vector_store(context)
-        client = openai_hosted_client()
+        client = openai_hosted_client(context)
         if client is None:
             raise LibraryError("Semantic indexing requires a separate OpenAI API key")
         indexed = await client.vector_stores.files.upload_and_poll(

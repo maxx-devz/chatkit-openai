@@ -17,6 +17,7 @@
     "library:migrate": "node --env-file=.env.local scripts/migrate-library.mjs",
     "builder:migrate": "node --env-file=.env.local scripts/migrate-builder.mjs",
     "usage:migrate": "node --env-file=.env.local scripts/migrate-usage.mjs",
+    "site-ai:migrate": "node --env-file=.env.local scripts/migrate-site-ai.mjs",
     "test:builder": "node --test tests/builder-config.test.mjs",
     "test:chatkit": "node --test tests/chatkit-security.test.mjs",
     "client:create": "node --env-file=.env.local scripts/create-client.mjs",

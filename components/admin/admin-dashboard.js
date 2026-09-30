@@ -9,6 +9,7 @@ import aocLogo from "@/aoc-logo.png";
 import SignOutButton from "@/components/auth/sign-out-button";
 import AdminAssistant from "@/components/admin/admin-assistant";
 import PortalUsage from "@/components/admin/portal-usage";
+import ProviderSettings from "@/components/admin/provider-settings";
 import styles from "./admin-dashboard.module.css";
 
 const ICONS = {
@@ -360,6 +361,7 @@ export default function AdminDashboard({ initialData }) {
           </section>
 
           <PortalUsage />
+          <ProviderSettings />
           <AdminAssistant clients={clients} />
 
           <section className={styles.workspace} id="clients">

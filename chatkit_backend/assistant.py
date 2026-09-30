@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 from agents import Agent, FileSearchTool, ModelSettings, RunConfig, Runner, WebSearchTool, function_tool
-from chatkit.agents import AgentContext, stream_agent_response
 from chatkit.errors import CustomStreamError
 from chatkit.server import ChatKitServer
 from chatkit.types import UserMessageItem
@@ -16,7 +15,9 @@ from provider_errors import provider_issue
 from uploads import AttachmentConverter, MAX_CONTEXT_ATTACHMENTS
 from usage_tracking import record_usage
 from client_library import client_library_tools
-from ai_provider import configure_agents, provider_config, supports_openai_hosted_tools
+from ai_provider import agent_model, configure_agents, supports_openai_hosted_tools
+from streaming import PortalAgentContext, stream_portal_response
+from provider_settings import close_provider_clients
 
 logger = logging.getLogger(__name__)
 configure_agents()
@@ -37,7 +38,7 @@ def hubstaff_tools(context):
 
 def website_tools(context):
     """Expose hosted web search only for the administrator-approved client domain."""
-    if not supports_openai_hosted_tools():
+    if not supports_openai_hosted_tools(context):
         return []
     value = (context.client.get("approved_website_url") or "").strip()
     try:
@@ -57,7 +58,7 @@ def make_agent(context, emit=None):
                      if getattr(context, "client_id", None) and not getattr(context, "preview", False)
                      else [])
     tools = generation_tools(context, emit) + hubstaff_tools(context) + website_tools(context) + library_tools
-    if (supports_openai_hosted_tools() and config.get("fileSearch", True)
+    if (supports_openai_hosted_tools(context) and config.get("fileSearch", True)
             and config.get("vectorStoreId")):
         tools.append(FileSearchTool(vector_store_ids=[config["vectorStoreId"]], max_num_results=5))
     instructions = "\n\n".join([
@@ -135,7 +136,7 @@ def make_agent(context, emit=None):
         "At most two generated files per reply. Ask for missing facts instead of inventing approved business details. "
         "Older conversation turns may be outside your context.",
     ])
-    return Agent(name="AOC client assistant", model=provider_config().model,
+    return Agent(name="AOC client assistant", model=agent_model(getattr(context, "ai_model", None), context),
                  instructions=instructions, tools=tools,
                  model_settings=ModelSettings(max_tokens=5000, parallel_tool_calls=False, store=False))
 
@@ -143,6 +144,7 @@ def make_agent(context, emit=None):
 class PortalChatKitServer(ChatKitServer[Context]):
     async def respond(self, thread, input_user_message, context):
         result = None
+        agent_context = None
         started_at = datetime.now(timezone.utc)
         try:
             page = await self.store.load_thread_items(thread.id, None, 40, "desc", context)
@@ -163,13 +165,13 @@ class PortalChatKitServer(ChatKitServer[Context]):
             recent_attachments = [attachment.id for item in reversed(items) if isinstance(item, UserMessageItem)
                                   for attachment in item.attachments][:MAX_CONTEXT_ATTACHMENTS]
             agent_input = await AttachmentConverter(context, set(recent_attachments)).to_agent_input(items)
-            agent_context = AgentContext(thread=thread, store=self.store, request_context=context)
+            agent_context = PortalAgentContext(thread=thread, store=self.store, request_context=context)
             agent = make_agent(context, agent_context.stream_widget)
             result = Runner.run_streamed(
                 agent, agent_input, context=agent_context, max_turns=5,
                 run_config=RunConfig(tracing_disabled=True, trace_include_sensitive_data=False),
             )
-            async for event in stream_agent_response(agent_context, result):
+            async for event in stream_portal_response(agent_context, result):
                 yield event
         except Exception as error:
             issue = provider_issue(error)
@@ -177,6 +179,8 @@ class PortalChatKitServer(ChatKitServer[Context]):
             logger.error("Assistant response failed: %s code=%s", type(error).__name__, issue.code)
             raise CustomStreamError(issue.message, allow_retry=issue.allow_retry) from None
         finally:
+            if agent_context is not None:
+                await agent_context.close_stream()
             if result:
                 if not result.is_complete:
                     result.cancel()
@@ -193,3 +197,4 @@ class PortalChatKitServer(ChatKitServer[Context]):
                               context.client_id, context.period_start))
                     except Exception as error:
                         logger.error("ChatKit token accounting failed: %s", type(error).__name__)
+            await close_provider_clients(context)

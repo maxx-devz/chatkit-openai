@@ -37,21 +37,20 @@ command. The setup guide covers credentials and migrations for a fresh checkout.
 
 ## OpenAI or OpenRouter
 
-Provider selection is automatic and server-only:
+Use **AOC Admin → AI provider settings** to choose a provider, enter its key,
+load the live model catalog, then save and activate it across admin/client chat.
+Both providers retain separate encrypted keys and model selections. Saved keys
+are masked and never returned to the browser. Models without tool support are
+disabled; OpenRouter free and paid choices are labeled.
 
-- `OPENAI_API_KEY=sk-proj-...` uses OpenAI and `OPENAI_MODEL`.
-- `OPENROUTER_API_KEY=sk-or-v1-...` uses OpenRouter and `OPENROUTER_MODEL`.
-- An `sk-or-v1-...` key placed in the legacy `OPENAI_API_KEY` variable is also
-  detected as OpenRouter for backwards compatibility.
-- OpenRouter defaults to `openrouter/free`; the admin model selector loads the
-  current free model catalog rather than keeping a hard-coded list.
+Run `npm run site-ai:migrate` and set the same stable `PROVIDER_SETTINGS_SECRET`
+on both services. Keep `DATABASE_URL` in deployment configuration: it is required
+before admin login. See [provider setup and migration](docs/SITE_AI_MODEL.md).
+Old key/model environment variables remain compatibility fallbacks only.
 
-Use the exact variable spelling—`OPENAI_API_KEY`, not `OPENAI__APY_KEY`. A
-genuine OpenAI key can remain in `OPENAI_API_KEY` alongside
-`OPENROUTER_API_KEY` for image generation and OpenAI file management. Hosted
-OpenAI vector-store search is not attached to OpenRouter chat requests; switch
-chat back to OpenAI when that tool is required. The dedicated OpenRouter
-variable takes priority for normal chat.
+A saved genuine OpenAI key is required for OpenAI images and library indexing,
+even when chat uses OpenRouter. Hosted OpenAI vector-store search is not attached
+to OpenRouter chat requests; switch chat back to OpenAI when that tool is required.
 
 ## Included
 

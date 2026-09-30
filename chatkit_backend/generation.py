@@ -100,16 +100,15 @@ async def create_image_artifact(context, title, prompt, emit=None):
     if not 1 <= len(title) <= 200 or not 1 <= len(prompt) <= 4000:
         raise ValueError("Image title or description is too long")
     await reserve_tool(context, "images")
-    api = openai_hosted_client(timeout=75, max_retries=2)
+    api = openai_hosted_client(context, timeout=75, max_retries=2)
     if api is None:
         raise ValueError("Image generation requires a separate OpenAI API key")
-    async with api:
-        result = await api.images.generate(
-            model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-2"),
-            prompt="Approved client instructions:\n" + context.config["instructions"]
-                + "\n\nRequested image:\n" + prompt,
-            n=1, size="1024x1024", quality="medium", output_format="webp",
-        )
+    result = await api.images.generate(
+        model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-2"),
+        prompt="Approved client instructions:\n" + context.config["instructions"]
+            + "\n\nRequested image:\n" + prompt,
+        n=1, size="1024x1024", quality="medium", output_format="webp",
+    )
     if not result.data or not result.data[0].b64_json:
         raise ValueError("Image generation returned no image")
     content = base64.b64decode(result.data[0].b64_json, validate=True)
@@ -127,5 +126,5 @@ def generation_tools(context, emit=None):
         """Generate one image when the user asks, following approved client instructions and branding. Describe the intended image in prompt."""
         return await create_image_artifact(context, title, prompt, emit)
 
-    image_available = context.config.get("images") and has_openai_hosted_key()
+    image_available = context.config.get("images") and has_openai_hosted_key(context)
     return ([create_document] if context.config.get("documents") else []) + ([create_image] if image_available else [])

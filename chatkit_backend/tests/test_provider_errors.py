@@ -1,4 +1,5 @@
 import json
+import asyncio
 import sys
 import unittest
 from pathlib import Path
@@ -27,6 +28,16 @@ def api_error(code=None, status=None):
 
 
 class ProviderIssueTests(unittest.TestCase):
+    def test_openrouter_policy_404_is_not_reported_as_a_missing_model(self):
+        request = httpx2.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
+        error = APIStatusError(PRIVATE_MESSAGE, response=httpx2.Response(404, request=request), body={
+            "message": "0 endpoints matching your guardrail restrictions and data policy. ZDR violation (account settings): 7 endpoints excluded. " + PRIVATE_MESSAGE,
+        })
+        issue = provider_issue(error)
+        self.assertEqual(issue.code, "provider_policy_restricted")
+        self.assertFalse(issue.allow_retry)
+        self.assertNotIn(PRIVATE_MESSAGE, issue.message)
+
     def test_stream_errors_are_classified_without_an_http_error_status(self):
         for code, expected in [
             ("credit_balance_exhausted", "credit_balance_exhausted"),
@@ -92,6 +103,7 @@ class ChatKitProviderStreamTests(unittest.IsolatedAsyncioTestCase):
                 store.add_thread_item.side_effect = save_item
                 store.load_thread_items.side_effect = load_items
                 db = AsyncMock()
+                tasks_before = asyncio.all_tasks()
                 context = Context(db, "1", "2", "Test instructions", {"display_name": "Test client"})
                 server = PortalChatKitServer(store)
                 async with AsyncOpenAI(api_key="test-only", max_retries=0,
@@ -120,6 +132,10 @@ class ChatKitProviderStreamTests(unittest.IsolatedAsyncioTestCase):
                 db.execute.assert_awaited_once()
                 self.assertIn("portal_ai_activity_monthly", db.execute.await_args.args[0])
                 self.assertEqual(db.execute.await_args.args[1][2:6], (0, 0, 0, 0))
+                await asyncio.sleep(0)
+                leaked_readers = [task for task in asyncio.all_tasks() - tasks_before
+                                  if "_AsyncQueueIterator.__anext__" in repr(task.get_coro())]
+                self.assertEqual(leaked_readers, [])
 
 
 if __name__ == "__main__":

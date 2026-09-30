@@ -13,6 +13,12 @@ class ProviderIssue:
 
 CONTACT = "Please contact Always Open Commerce."
 ISSUES = {
+    "provider_policy_restricted": ProviderIssue(
+        "provider_policy_restricted",
+        "The AI provider's privacy or routing policy blocks the selected model. "
+        "An AOC administrator needs to select an allowed site-wide model or review the provider settings.",
+        False,
+    ),
     "credit_balance_exhausted": ProviderIssue(
         "credit_balance_exhausted",
         "AI replies are unavailable because the configured provider credits are exhausted. "
@@ -59,6 +65,17 @@ def provider_issue(error: Exception) -> ProviderIssue:
     # never infer exhausted credits from HTTP 429 or match raw error messages.
     if not isinstance(error, APIError):
         return ISSUES["request_failed"]
+    # OpenRouter uses HTTP 404 for policy exclusions as well as missing models.
+    # Classify only its known diagnostic phrases; never forward raw provider text.
+    body = error.body if isinstance(error.body, dict) else {}
+    message = body.get("message")
+    if (getattr(error, "status_code", None) == 404
+            and error.request.url.host == "openrouter.ai" and isinstance(message, str)
+            and any(marker in message.lower() for marker in (
+                "zdr violation", "no endpoints found matching your data policy",
+                "matching your guardrail restrictions and data policy",
+            ))):
+        return ISSUES["provider_policy_restricted"]
     code = error.code
     if isinstance(code, str):
         code = ALIASES.get(code, code)

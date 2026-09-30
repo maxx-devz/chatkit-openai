@@ -198,10 +198,6 @@ async function readJsonLines(response, onEvent) {
   if (!receivedDone) throw new Error("The response ended before it was complete.");
 }
 
-function labelForModel(model) {
-  return model?.label || model?.id || "Configured model";
-}
-
 function AdminMessage({ message, onRetry, provider }) {
   const isUser = message.role === "user";
   const canRetry = !isUser && !message.pending && (message.paused || message.errorMessage);
@@ -239,9 +235,7 @@ export default function AdminAssistant({ clients }) {
   const [historyReady, setHistoryReady] = useState(false);
   const [input, setInput] = useState("");
   const [clientSlug, setClientSlug] = useState("");
-  const [models, setModels] = useState([]);
-  const [selectedModel, setSelectedModel] = useState("");
-  const [modelsNotice, setModelsNotice] = useState("");
+  const [savedModel, setSavedModel] = useState("");
   const [provider, setProvider] = useState("openai");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -318,28 +312,16 @@ export default function AdminAssistant({ clients }) {
 
   useEffect(() => {
     let active = true;
-
-    fetch("/api/admin/assistant", { cache: "no-store" })
-      .then(async (response) => {
-        const payload = await response.json().catch(() => null);
-        if (!response.ok) throw new Error(payload?.error || "Models could not be loaded.");
-        return payload;
-      })
+    const refresh = () => fetch("/api/admin/provider-settings", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : null)
       .then((payload) => {
-        if (!active) return;
-        const available = Array.isArray(payload?.models) ? payload.models : [];
-        setModels(available);
-        setSelectedModel(payload?.defaultModel || available[0]?.id || "");
-        setModelsNotice(payload?.notice || "");
-        setProvider(payload?.provider === "openrouter" ? "openrouter" : "openai");
-      })
-      .catch((loadError) => {
-        if (active) setModelsNotice(loadError.message || "Model list unavailable.");
-      });
-
-    return () => {
-      active = false;
-    };
+        if (!active || !payload) return;
+        setProvider(payload.activeProvider);
+        setSavedModel(payload.providers.find((item) => item.id === payload.activeProvider)?.model || "");
+      }).catch(() => {});
+    refresh();
+    window.addEventListener("aoc:provider-settings-changed", refresh);
+    return () => { active = false; window.removeEventListener("aoc:provider-settings-changed", refresh); };
   }, []);
 
   function chooseClient(value) {
@@ -533,7 +515,6 @@ export default function AdminAssistant({ clients }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         messages: requestMessages,
-        ...(selectedModel ? { model: selectedModel } : {}),
         ...(clientSlug ? { clientSlug } : {}),
       }),
       signal: controller.signal,
@@ -637,22 +618,10 @@ export default function AdminAssistant({ clients }) {
               ))}
             </select>
           </label>
-          <label>
-            <span>Model</span>
-            <select
-              value={selectedModel}
-              onChange={(event) => setSelectedModel(event.target.value)}
-              disabled={!models.length}
-            >
-              {models.length ? models.map((model) => (
-                <option key={model.id} value={model.id}>{labelForModel(model)}</option>
-              )) : <option value="">Loading models...</option>}
-            </select>
-          </label>
+          <a className={styles.applyModel} href="#ai-provider-settings">Provider settings</a>
         </div>
       </header>
-
-      {modelsNotice ? <p className={styles.notice}>{modelsNotice}</p> : null}
+      <p className={styles.modelStatus}>Active: {savedModel || "Configure a provider above"}</p>
 
       <div className={styles.body}>
         <aside className={styles.history} aria-label="Previous admin conversations">

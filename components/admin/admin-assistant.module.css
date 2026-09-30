@@ -90,6 +90,32 @@
   flex: 0 0 auto;
   align-items: flex-end;
   gap: 9px;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.applyModel {
+  min-height: 35px;
+  padding: 7px 12px;
+  border: 1px solid #087fc6;
+  border-radius: 8px;
+  background: #087fc6;
+  color: white;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.applyModel:disabled { opacity: .5; cursor: not-allowed; }
+.applyModel:focus-visible { outline: 2px solid #19324e; outline-offset: 2px; }
+.modelStatus {
+  position: relative;
+  margin: 0;
+  padding: 9px 26px;
+  color: #334b65;
+  background: #f3f9ff;
+  border-bottom: 1px solid #e7eef5;
+  font-size: 11px;
 }
 
 .contextControls label {

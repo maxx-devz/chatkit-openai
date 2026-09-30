@@ -23,8 +23,8 @@ check(Number(process.versions.node.split(".")[0]) >= 22, "Node.js 22+", "Update 
 for (const name of ["DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "NEXT_PUBLIC_CHATKIT_DOMAIN_KEY"]) {
   check(Boolean(configured(name)), name, "Set this in .env.local / the Vercel frontend environment settings.");
 }
-check(Boolean(configured("OPENAI_API_KEY") || configured("OPENROUTER_API_KEY")), "AI provider API key",
-  "Set OPENAI_API_KEY or OPENROUTER_API_KEY in .env.local / both Vercel projects.");
+check((process.env.PROVIDER_SETTINGS_SECRET?.length || 0) >= 32, "Provider encryption secret",
+  "Set the same stable PROVIDER_SETTINGS_SECRET (32+ chars) on both services; manage API keys in AOC Admin.");
 check((process.env.BETTER_AUTH_SECRET?.length || 0) >= 32, "Authentication secret length", "Use at least 32 characters; preserve the existing production secret.");
 let origin;
 try {
@@ -73,6 +73,7 @@ if (configured("DATABASE_URL")) {
       } : {}),
       "library:migrate": ["portal_client_library"],
       "usage:migrate": ["portal_ai_activity_monthly", "portal_ai_provider_status"],
+      "site-ai:migrate": ["portal_site_ai_settings", "portal_ai_credentials", "portal_ai_active_provider"],
       "builder:migrate": ["portal_assistant_configs", "portal_assistant_versions", "portal_assistant_files", "portal_assistant_tool_usage", "portal_assistant_preview_usage"],
     };
     for (const [migration, tables] of Object.entries(groups)) {
