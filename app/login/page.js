@@ -6,7 +6,7 @@ import { isPortalAuthConfigured } from "@/lib/auth";
 import styles from "@/components/auth/login.module.css";
 
 export const metadata = {
-  title: "Client sign in | AOC Portal",
+  title: "Sign in | AOC Portal",
 };
 
 export const dynamic = "force-dynamic";
@@ -26,12 +26,12 @@ export default function LoginPage() {
         <div className={styles.intro}>
           <h1 id="login-title" style={{textAlign:"center"}}>Welcome back</h1>
           <p style={{textAlign:"center"}}>
-            Sign in to your private client workspace, saved conversations, and
-            AOC AI assistant.
+            Sign in to your AOC workspace. Your account opens your client,
+            administrator, or employee portal.
           </p>
         </div>
         <LoginForm configured={isPortalAuthConfigured()} />
-        <p className={styles.footer}>Always Open Commerce Client Portal</p>
+        <p className={styles.footer}>Always Open Commerce Portal</p>
       </section>
     </main>
   );

@@ -22,6 +22,7 @@ export default async function HomePage() {
     portalContext = await resolvePortalContext(requestHeaders);
   } catch (error) {
     if (error?.publicDetails?.status === 401) redirect("/login");
+    if (error?.publicDetails?.code === "employee_only") redirect("/employee");
 
     let isAdministrator = false;
     try {
