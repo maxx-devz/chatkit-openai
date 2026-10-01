@@ -960,6 +960,32 @@
   line-height: 1.4;
 }
 
+.workflowTaskHeading {
+  display: flex;
+  align-items: start;
+  gap: 6px;
+}
+
+.workflowTaskHeading strong {
+  min-width: 0;
+}
+
+.workflowPriority {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 7.5px;
+  font-style: normal;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.priority_urgent { border-color: #efb7b7; background: #fff0f0; color: #a92323; }
+.priority_high { border-color: #f0c795; background: #fff6e8; color: #925113; }
+.priority_medium { border-color: #a9c8ed; background: #edf5ff; color: #245f9e; }
+.priority_low { border-color: #c8d1dc; background: #f4f6f8; color: #596879; }
+
 .workflowTasks small {
   margin-top: 2px;
   color: #8492a3;
