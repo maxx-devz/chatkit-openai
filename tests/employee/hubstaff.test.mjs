@@ -27,6 +27,19 @@ test('GET-only adapter verifies identity and filters cross-employee, cross-proje
   for (const value of [testToken, 'assignee_ids', 'private@example.invalid', 'pay_rate', 'encrypted_access_token']) assert.equal(serialized.includes(value), false);
 });
 
+test('resolves Hubstaff priority labels for assigned tasks', async () => {
+  const fixture = hubstaffFixture({
+    tasks: [task({ label_ids: [901, 902] })],
+    labels: { 77: [
+      { id: 901, name: 'Client review', project_id: 77, color: '#abcdef' },
+      { id: 902, name: 'High Priority', project_id: 77, color: '#ff9900' },
+    ] },
+  });
+  const data = await createEmployeeHubstaff(fixture).dashboard(testToken, employeeA.hubstaff_user_id);
+  assert.deepEqual(data.tasks[0].priority, { name: 'High Priority', level: 'high' });
+  assert.equal(fixture.calls.some(({ url }) => url.pathname === '/api/v1/projects/77/labels'), true);
+});
+
 test('new PAT is exchanged once using the fixed Hubstaff token endpoint, with rotated credentials kept server-side', async () => {
   const access = 'fixture-access-jwt-never-real-0001';
   const nextRefresh = 'fixture-rotated-pat-never-real-0002';
@@ -141,11 +154,93 @@ test('invalid, expired and denied tokens produce fixed safe errors, never upstre
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
 });
 
-test('only approved fields are emitted and exact credential echoes are redacted', async () => {
+test('only approved fields are emitted and task details redact credential-like content', async () => {
   const data = await createEmployeeHubstaff(hubstaffFixture({ tasks: [task({ subject: testToken, description: testToken, pay_rate: 100 })] })).dashboard(testToken, '101');
   assert.equal(JSON.stringify(data).includes(testToken), false);
   assert.equal(data.tasks[0].title, '[redacted]');
-  assert.equal(data.tasks[0].description, undefined);
+  assert.equal(data.tasks[0].description, '[redacted]');
+  assert.equal(data.tasks[0].createdAt, '2026-09-20T12:00:00Z');
+  assert.equal(data.tasks[0].href, 'https://tasks.hubstaff.com/app/organizations/9/projects/77/tasks/1');
+  assert.equal(JSON.stringify(data).includes('pay_rate'), false);
+});
+
+test('weekly work summary includes only the verified employee activity and assigned tasks', async () => {
+  const fixture = hubstaffFixture({
+    tasks: [
+      task({ id: 1, due_on: '2026-10-01' }),
+      task({ id: 2, done: true, done_at: '2026-09-29T12:00:00Z' }),
+    ],
+    activities: [
+      { id: 1, user_id: 101, time_slot: '2026-09-28T12:00:00Z', tracked: 7200, input_tracked: 6000, overall: 3000 },
+      { id: 2, user_id: 101, time_slot: '2026-10-01T01:00:00Z', tracked: 1800, input_tracked: 1800, overall: 900 },
+      { id: 3, user_id: 202, time_slot: '2026-10-01T01:00:00Z', tracked: 999999, input_tracked: 999999, overall: 999999 },
+    ],
+  });
+  const data = await createEmployeeHubstaff({ ...fixture, now: () => new Date('2026-10-01T03:00:00Z') })
+    .dashboard(testToken, '101');
+  assert.deepEqual(data.workSummary, {
+    timeAvailable: true, timePartial: false, timeZone: 'UTC',
+    today: { date: '2026-10-01', trackedHours: 0.5, activityRate: 50 },
+    week: { start: '2026-09-28', stop: '2026-10-01', trackedHours: 2.5, activityRate: 50 },
+  });
+  const activityCall = fixture.calls.find(({ url }) => url.pathname.endsWith('/activities'));
+  assert.equal(activityCall.url.searchParams.get('user_ids[]'), '101');
+  assert.equal(activityCall.url.searchParams.get('time_slot[start]'), '2026-09-28T00:00:00.000Z');
+  assert.equal(activityCall.url.searchParams.get('time_slot[stop]'), '2026-10-02T00:00:00.000Z');
+});
+
+test('today uses configured timezone boundaries instead of the organization date label', async () => {
+  const previous = process.env.HUBSTAFF_REPORT_TIME_ZONE;
+  process.env.HUBSTAFF_REPORT_TIME_ZONE = 'America/New_York';
+  try {
+    const fixture = hubstaffFixture({ timeZone: 'Asia/Manila', activities: [
+      { id: 1, user_id: 101, date: '2026-09-30', time_slot: '2026-10-01T01:00:00Z', tracked: 12600,
+        input_tracked: 10800, overall: 5400 },
+      { id: 2, user_id: 101, date: '2026-09-30', time_slot: '2026-09-30T15:30:00Z', tracked: 1800,
+        input_tracked: 1200, overall: 300 },
+    ] });
+    const data = await createEmployeeHubstaff({ ...fixture, now: () => new Date('2026-10-01T03:00:00Z') })
+      .dashboard(testToken, '101');
+    assert.equal(data.workSummary.today.trackedHours, 3.5);
+    assert.equal(data.workSummary.week.trackedHours, 4);
+    assert.equal(data.workSummary.today.activityRate, 50);
+    assert.equal(data.workSummary.week.activityRate, 48);
+    assert.equal(data.workSummary.timeZone, 'Asia/Manila');
+    const activityCall = fixture.calls.find(({ url }) => url.pathname.endsWith('/activities'));
+    assert.equal(activityCall.url.searchParams.get('time_slot[start]'), '2026-09-27T16:00:00.000Z');
+    assert.equal(activityCall.url.searchParams.get('time_slot[stop]'), '2026-10-01T16:00:00.000Z');
+    assert.equal(activityCall.url.searchParams.get('time_zone'), 'Asia/Manila');
+  } finally {
+    if (previous === undefined) delete process.env.HUBSTAFF_REPORT_TIME_ZONE;
+    else process.env.HUBSTAFF_REPORT_TIME_ZONE = previous;
+  }
+});
+
+test('configured report timezone is only a fallback for a missing Hubstaff account timezone', async () => {
+  const previous = process.env.HUBSTAFF_REPORT_TIME_ZONE;
+  process.env.HUBSTAFF_REPORT_TIME_ZONE = 'Asia/Manila';
+  try {
+    const data = await createEmployeeHubstaff({ ...hubstaffFixture({ timeZone: '' }),
+      now: () => new Date('2026-10-01T03:00:00Z') }).dashboard(testToken, '101');
+    assert.equal(data.workSummary.timeZone, 'Asia/Manila');
+  } finally {
+    if (previous === undefined) delete process.env.HUBSTAFF_REPORT_TIME_ZONE;
+    else process.env.HUBSTAFF_REPORT_TIME_ZONE = previous;
+  }
+});
+
+test('restricted time activity does not hide authorized employee assignments', async () => {
+  const fixture = hubstaffFixture();
+  const data = await createEmployeeHubstaff({ fetchImpl: (url, options) =>
+    url.pathname.endsWith('/activities')
+      ? Promise.resolve(Response.json({ error: 'forbidden' }, { status: 403 }))
+      : fixture.fetchImpl(url, options) }).dashboard(testToken, '101');
+  assert.equal(data.tasks.length, 1);
+  assert.equal(data.workSummary.timeAvailable, false);
+  assert.equal(data.workSummary.today.trackedHours, null);
+  assert.equal(data.workSummary.week.trackedHours, null);
+  assert.equal(data.workSummary.today.activityRate, null);
+  assert.equal(data.workSummary.week.activityRate, null);
 });
 
 test('pagination loads later tasks, rejects loops, and marks bounded results incomplete', async () => {
@@ -205,13 +300,21 @@ test('native credential form rejects browser IDs, duplicate fields, unexpected e
 test('task filters, date-only deadlines and completion counts match the dashboard', () => {
   const now = new Date('2026-09-30T12:00:00');
   const tasks = [
-    { id: '1', title: 'Layout', projectName: 'Shop', projectId: '77', stage: 'in_progress', done: false, dueAt: '2026-09-30' },
-    { id: '2', title: 'QA', projectName: 'Shop', projectId: '77', done: false, dueAt: '2026-09-28' },
-    { id: '3', title: 'Import', projectName: 'Store', projectId: '88', done: true, dueAt: '2026-09-29' },
+    { id: '1', title: 'Layout', projectName: 'Shop', projectId: '77', stage: 'in_progress', done: false,
+      dueAt: '2026-09-30', createdAt: '2026-09-30T08:00:00Z', updatedAt: '2026-09-28T08:00:00Z' },
+    { id: '2', title: 'QA', projectName: 'Shop', projectId: '77', done: false,
+      dueAt: '2026-09-28', createdAt: '2026-09-28T08:00:00Z', updatedAt: '2026-09-30T08:00:00Z' },
+    { id: '3', title: 'Import', projectName: 'Store', projectId: '88', done: true,
+      dueAt: '2026-09-29', createdAt: '2026-09-29T08:00:00Z', updatedAt: '2026-09-29T08:00:00Z' },
   ];
   assert.equal(dueState(tasks[0], now), 'soon');
   assert.equal(dueState(tasks[1], now), 'overdue');
   assert.equal(dueState(tasks[2], now), '');
-  assert.deepEqual(selectEmployeeTasks(tasks, { status: 'active' }, now).map(t => t.id), ['2', '1']);
+  assert.deepEqual(selectEmployeeTasks(tasks, { status: 'active' }, now).map(t => t.id), ['1', '2']);
+  assert.deepEqual(selectEmployeeTasks(tasks, { status: 'active', sort: 'updated' }, now).map(t => t.id), ['2', '1']);
+  assert.deepEqual(selectEmployeeTasks(tasks, { status: 'active', sort: 'created', direction: 'asc' }, now).map(t => t.id), ['2', '1']);
+  assert.deepEqual(selectEmployeeTasks(tasks, { status: 'active', sort: 'updated', direction: 'asc' }, now).map(t => t.id), ['1', '2']);
+  assert.deepEqual(selectEmployeeTasks(tasks, { status: 'active', sort: 'due' }, now).map(t => t.id), ['1', '2']);
+  assert.deepEqual(selectEmployeeTasks(tasks, { status: 'active', sort: 'due', direction: 'asc' }, now).map(t => t.id), ['2', '1']);
   assert.deepEqual(selectEmployeeTasks(tasks, { status: 'all', search: 'import', project: '88' }, now).map(t => t.id), ['3']);
 });

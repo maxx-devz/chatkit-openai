@@ -1,10 +1,9 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import aocLogo from '@/aoc-logo.png';
 import SignOutButton from '@/components/auth/sign-out-button';
 import EmployeeDashboard from '@/components/employee/employee-dashboard';
+import EmployeeShell from '@/components/employee/employee-shell';
 import HubstaffConnection from '@/components/employee/hubstaff-connection';
 import { resolveEmployeeContext } from '@/lib/employee-data';
 import { connectionMessages } from '@/lib/employee-view';
@@ -25,13 +24,9 @@ export default async function EmployeePage({ searchParams }) {
   const params = await searchParams;
   const connectionCode = typeof params?.connection === 'string' ? params.connection : '';
   const message = Object.hasOwn(connectionMessages, connectionCode) ? connectionMessages[connectionCode] : '';
-  return <div className={styles.shell}>
-    <header className={styles.header}>
-      <div className={styles.brand}><Image src={aocLogo} alt="Always Open Commerce" priority /><span>Employee Portal</span></div>
-      <div className={styles.account}><span>{profile.name}</span><SignOutButton className={styles.signOut} /></div>
-    </header>
+  return <EmployeeShell name={profile.name}>
     <EmployeeDashboard name={profile.name} connected={profile.connected} connectionMessage={message}>
       <HubstaffConnection connected={profile.connected} />
     </EmployeeDashboard>
-  </div>;
+  </EmployeeShell>;
 }
