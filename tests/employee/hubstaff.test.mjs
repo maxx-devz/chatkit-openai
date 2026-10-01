@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createEmployeeHubstaff, validateEmployeeToken } from '../../lib/employee-hubstaff.js';
-import { encryptEmployeeToken, decryptEmployeeToken, requireActiveEmployee } from '../../lib/employee-repository.js';
+import { encryptEmployeeToken, decryptEmployeeToken, employeeAccessToken, requireActiveEmployee } from '../../lib/employee-repository.js';
 import { employeeErrorResponse } from '../../lib/employee-errors.js';
 import { readEmployeeTokenForm, assertEmployeeRequest } from '../../lib/employee-http.js';
 import { selectEmployeeTasks, dueState } from '../../lib/employee-view.js';
@@ -27,10 +27,97 @@ test('GET-only adapter verifies identity and filters cross-employee, cross-proje
   for (const value of [testToken, 'assignee_ids', 'private@example.invalid', 'pay_rate', 'encrypted_access_token']) assert.equal(serialized.includes(value), false);
 });
 
+test('new PAT is exchanged once using the fixed Hubstaff token endpoint, with rotated credentials kept server-side', async () => {
+  const access = 'fixture-access-jwt-never-real-0001';
+  const nextRefresh = 'fixture-rotated-pat-never-real-0002';
+  const fixture = hubstaffFixture();
+  const calls = [];
+  const hubstaff = createEmployeeHubstaff({ fetchImpl: async (url, options) => {
+    if (String(url) !== 'https://account.hubstaff.com/access_tokens') return fixture.fetchImpl(url, options);
+    calls.push({ url: String(url), options });
+    return Response.json({ access_token: access, refresh_token: nextRefresh, expires_in: 86400 });
+  } });
+  const result = await hubstaff.exchange(testToken);
+  assert.equal(result.accessToken, access);
+  assert.equal(result.refreshToken, nextRefresh);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(calls[0].options.redirect, 'error');
+  assert.equal(calls[0].options.body.get('grant_type'), 'refresh_token');
+  assert.equal(calls[0].options.body.get('refresh_token'), testToken);
+  assert.equal(calls[0].url.includes(testToken), false);
+  assert.equal((await hubstaff.dashboard(access, '101')).tasks.length, 1);
+  assert.equal(fixture.calls.every(call => call.options.headers.Authorization === `Bearer ${access}`), true);
+});
+
+test('PAT exchange errors distinguish Hubstaff rate limits without leaking provider text', async () => {
+  for (const [status, code] of [[400, 'invalid_token'], [429, 'hubstaff_rate_limit'], [500, 'hubstaff_unavailable']]) {
+    const hubstaff = createEmployeeHubstaff({ fetchImpl: async () => Response.json({ error: testToken }, { status }) });
+    await assert.rejects(hubstaff.exchange(testToken), error => {
+      assert.equal(error.publicDetails.code, code);
+      assert.equal(error.message.includes(testToken), false);
+      return true;
+    });
+  }
+  const limited = createEmployeeHubstaff({ fetchImpl: async () => Response.json({ error: 'rate_limit' }, { status: 400 }) });
+  await assert.rejects(limited.exchange(testToken), error => error.publicDetails.code === 'hubstaff_rate_limit');
+});
+
+test('expired PAT access is renewed and rotated; a stale request reuses the saved token', async () => {
+  const secret = 'fixture-employee-secret-more-than-thirty-two-chars';
+  const row = { ...employeeA, encrypted_access_token: encryptEmployeeToken('fixture-expired-access-never-real', employeeA, secret),
+    encrypted_refresh_token: encryptEmployeeToken(testToken, employeeA, secret),
+    access_expires_at: new Date(Date.now() - 1000) };
+  let exchanges = 0;
+  const db = { connect: async () => ({ release() {}, query: async (sql, values) => {
+    if (sql.includes('SELECT encrypted_access_token')) return { rows: [row] };
+    if (sql.includes('SET encrypted_access_token')) {
+      row.encrypted_access_token = values[3];
+      row.encrypted_refresh_token = values[4];
+      row.access_expires_at = values[5];
+      return { rowCount: 1 };
+    }
+    return { rowCount: 1 };
+  } }) };
+  const exchange = async token => {
+    exchanges++;
+    assert.equal(token, exchanges === 1 ? testToken : 'fixture-next-refresh-never-real');
+    return { accessToken: `fixture-access-rotated-${exchanges}-never-real`,
+      refreshToken: 'fixture-next-refresh-never-real', expiresAt: new Date(Date.now() + 86400000) };
+  };
+  const first = await employeeAccessToken(db, { ...row }, secret, exchange);
+  assert.equal(exchanges, 1);
+  assert.equal(first, 'fixture-access-rotated-1-never-real');
+  assert.equal(decryptEmployeeToken(row, secret), first);
+  assert.equal(await employeeAccessToken(db, { ...row, access_expires_at: new Date(0) }, secret, exchange), first);
+  assert.equal(await employeeAccessToken(db, { ...row }, secret, exchange, 'fixture-expired-access-never-real'), first);
+  assert.equal(exchanges, 1);
+  assert.equal(await employeeAccessToken(db, { ...row }, secret, exchange, first), 'fixture-access-rotated-2-never-real');
+  assert.equal(exchanges, 2);
+});
+
 test('a token for employee B cannot retrieve any tasks for employee A; identity runs first', async () => {
   const fixture = hubstaffFixture({ userId: 202 });
   await assert.rejects(createEmployeeHubstaff(fixture).dashboard(testToken, '101'), e => e.publicDetails.code === 'identity_mismatch');
   assert.equal(fixture.calls.length, 1);
+});
+
+test('Tasks member IDs differ from V2 user IDs, and later pages contain current assignments', async () => {
+  const base = hubstaffFixture({ userId: 101, memberId: 303 });
+  const oldTasks = Array.from({ length: 500 }, (_, index) => task({ id: index + 1,
+    assignee_ids: [303], done: true }));
+  const api = createEmployeeHubstaff({ fetchImpl: async (url, options) => {
+    if (url.pathname !== '/api/v1/tasks/my/assigned') return base.fetchImpl(url, options);
+    assert.equal(url.searchParams.get('page_limit'), '500');
+    return Response.json(url.searchParams.has('page_start_id')
+      ? { tasks: [task({ id: 501, assignee_ids: [303], done: false })] }
+      : { tasks: oldTasks, pagination: { next_page_start_id: 501 } });
+  } });
+  const result = await api.dashboard(testToken, '101');
+  assert.equal(result.tasks.length, 501);
+  assert.equal(result.tasks.filter(item => !item.done).length, 1);
+  assert.equal(result.tasks.at(-1).id, '501');
+  assert.equal(result.truncated, false);
 });
 
 test('employee B receives only B assignments, with no shared cache', async () => {
@@ -82,7 +169,7 @@ test('pagination loads later tasks, rejects loops, and marks bounded results inc
 
 test('missing identity and malformed task collections fail closed', async () => {
   const base = hubstaffFixture();
-  for (const path of ['/v2/users/me', '/api/v1/tasks/my/assigned']) {
+  for (const path of ['/v2/users/me', '/api/v1/members/me', '/api/v1/tasks/my/assigned']) {
     const api = createEmployeeHubstaff({ fetchImpl: (url, options) => url.pathname === path ? Promise.resolve(Response.json({})) : base.fetchImpl(url, options) });
     await assert.rejects(api.dashboard(testToken, '101'));
   }

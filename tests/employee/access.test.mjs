@@ -11,6 +11,7 @@ const db = { query: async (query, values) => {
   if (query.startsWith('SELECT to_regclass')) return { rows: [{ relation: 'portal_employees' }] };
   if (query.includes('FROM portal_employees e')) return { rows: employee ? [employee] : [] };
   if (query.includes('SET next_request_at')) return { rowCount: claimed ? 1 : 0, rows: [] };
+  if (query.includes('SELECT encrypted_refresh_token, access_expires_at')) return { rows: [] };
   if (query.includes('SET encrypted_access_token')) { savedCiphertext = values[3]; return { rowCount: 1 }; }
   if (query.includes('SET last_synced_at')) return { rowCount: 1, rows: [{ last_synced_at: new Date() }] };
   throw new Error('Unexpected SQL');
@@ -92,7 +93,10 @@ test('active employee endpoint returns no legacy state and refuses every browser
 test('connection POST validates identity, stores ciphertext only, rejects origin/body injection and rate-limits', async () => {
   employee = { ...employeeA };
   const fixture = hubstaffFixture();
-  globalThis.fetch = fixture.fetchImpl;
+  globalThis.fetch = (url, options) => String(url) === 'https://account.hubstaff.com/access_tokens'
+    ? Promise.resolve(Response.json({ access_token: 'fixture-exchanged-access-never-real',
+      refresh_token: 'fixture-rotated-refresh-never-real', expires_in: 86400 }))
+    : fixture.fetchImpl(url, options);
   let response = await connect(request('/api/employee/connection', 'POST', new URLSearchParams({ token: testToken })));
   assert.equal(response.status, 303);
   assert.equal(response.headers.get('location'), '/employee?connection=connected');
@@ -110,7 +114,11 @@ test('connection POST validates identity, stores ciphertext only, rejects origin
   assert.equal(response.headers.get('location'), '/employee?connection=refresh_limited');
   assert.equal(fixture.calls.length, calls);
   claimed = true;
-  globalThis.fetch = hubstaffFixture({ userId: 202 }).fetchImpl;
+  const otherUser = hubstaffFixture({ userId: 202 });
+  globalThis.fetch = (url, options) => String(url) === 'https://account.hubstaff.com/access_tokens'
+    ? Promise.resolve(Response.json({ access_token: 'fixture-exchanged-access-never-real',
+      refresh_token: 'fixture-rotated-refresh-never-real', expires_in: 86400 }))
+    : otherUser.fetchImpl(url, options);
   const saved = savedCiphertext;
   response = await connect(request('/api/employee/connection', 'POST', new URLSearchParams({ token: testToken })));
   assert.equal(response.headers.get('location'), '/employee?connection=identity_mismatch');
