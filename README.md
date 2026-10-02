@@ -67,6 +67,10 @@ to OpenRouter chat requests; switch chat back to OpenAI when that tool is requir
 - Staff-only settings at `/builder`: drafts, tests, publishing, versions,
   greeting, colors, and starter prompts.
 - Existing administrator dashboard and staff assistant at `/admin`.
+- Administrator Employee Controls for provisioning employee-only accounts,
+  assigning positions, enabling portal panels, and pausing access.
+- One Employee Portal with separate My Work, Team Workspace, and Settings
+  containers, each protected by the employee panel policy.
 - Staff usage panel with client allowances and recorded client/admin/draft tokens.
 - Per-client Hubstaff project, task, and monthly time reads for the dashboard
   and read-only AOC-GPT answers.
@@ -85,7 +89,7 @@ Existing accounts, client records, conversations, and administrator tools are re
 | `npm run dev:web` | Start Next.js when Python is already running |
 | `npm run setup:check` | Check local configuration and database tables without displaying secrets |
 | `npm run setup:check -- --employee` | Also check the optional employee schema and encryption key |
-| `npm run employee:migrate` | Add the separate employee access and encrypted connection table |
+| `npm run employee:migrate` | Add/update employee access, position, panel policy, and encrypted connection storage |
 | `npm run employee:create -- USERNAME "DISPLAY NAME" APPROVED_HUBSTAFF_USER_ID` | Privately provision employee-only access; password is prompted |
 | `npm run test:employee` | Employee authorization, Hubstaff isolation, credential safety, and real Better Auth login tests |
 | `npm run test:employee:database` | Employee SQL checks in rolled-back temporary tables |

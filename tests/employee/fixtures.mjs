@@ -1,5 +1,7 @@
 export const testToken = 'fixture-personal-access-token-never-real';
-export const employeeA = { user_id: '1', hubstaff_user_id: '101', role: 'employee', is_active: true, connection_version: '0', display_name: 'Fixture Employee A' };
+export const employeeA = { user_id: '1', hubstaff_user_id: '101', role: 'employee', position: 'team_member',
+  panel_access: ['overview', 'my_tasks', 'activity', 'hubstaff'], is_active: true,
+  connection_version: '0', display_name: 'Fixture Employee A' };
 export const employeeB = { ...employeeA, user_id: '2', hubstaff_user_id: '202', display_name: 'Fixture Employee B' };
 export function task(overrides = {}) {
   return { id: 1, subject: 'Fix product layout', assignee_ids: [101], list_id: 10,

@@ -9,7 +9,7 @@ export const maxDuration = 60;
 
 function backToDashboard(code) {
   return new Response(null, { status: 303, headers: {
-    Location: `/employee?connection=${encodeURIComponent(code)}`, 'Cache-Control': 'private, no-store',
+    Location: `/employee/settings?connection=${encodeURIComponent(code)}`, 'Cache-Control': 'private, no-store',
   } });
 }
 
