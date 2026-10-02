@@ -8,6 +8,7 @@ import aocIcon from "@/aoc-icon.png";
 import aocLogo from "@/aoc-logo.png";
 import SignOutButton from "@/components/auth/sign-out-button";
 import AdminAssistant from "@/components/admin/admin-assistant";
+import EmployeeControls from "@/components/admin/employee-controls";
 import PortalUsage from "@/components/admin/portal-usage";
 import ProviderSettings from "@/components/admin/provider-settings";
 import styles from "./admin-dashboard.module.css";
@@ -295,6 +296,7 @@ export default function AdminDashboard({ initialData }) {
           <a className={styles.activeNav} href="#overview"><Icon name="overview" />Overview</a>
           <a href="#portal-usage"><Icon name="activity" />AI usage</a>
           <a href="#clients"><Icon name="clients" />Client controls</a>
+          <a href="#employees"><Icon name="user" />Employee controls</a>
           <a href="#assistant"><Icon name="spark" />AI assistant</a>
           <Link href="/builder"><Icon name="spark" />Assistant settings</Link>
           <a href="#ai-controls"><Icon name="activity" />AI allowances</a>
@@ -319,8 +321,8 @@ export default function AdminDashboard({ initialData }) {
         <header className={styles.topbar}>
           <div>
             <p>AOC operations</p>
-            <h1>Client AI control center</h1>
-            <span>Manage access, monthly AI allowances, and client knowledge.</span>
+            <h1>Portal control center</h1>
+            <span>Manage client AI settings and position-based employee access.</span>
           </div>
           <div className={styles.topbarActions}>
             <span className={styles.secureBadge}><Icon name="shield" />Admin protected</span>
@@ -352,10 +354,10 @@ export default function AdminDashboard({ initialData }) {
               tone="violet"
             />
             <Metric
-              icon="overview"
-              label="Saved conversations"
-              value={number(summary.conversations)}
-              detail="Across private client workspaces"
+              icon="user"
+              label="Employee accounts"
+              value={number(initialData.employees?.length)}
+              detail={`${number(initialData.employees?.filter((employee) => employee.active).length)} portal enabled`}
               tone="green"
             />
           </section>
@@ -631,6 +633,11 @@ export default function AdminDashboard({ initialData }) {
               )}
             </section>
           </section>
+
+          <EmployeeControls
+            initialEmployees={initialData.employees || []}
+            schemaReady={initialData.employeeSchemaReady === true}
+          />
         </main>
       </div>
 

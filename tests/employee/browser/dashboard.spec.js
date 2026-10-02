@@ -22,22 +22,21 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 800, height: 900
     await page.setViewportSize(viewport);
     const pageErrors = [];
     page.on('pageerror', error => pageErrors.push(error.message));
-    await page.route('**/api/employee/dashboard', route => route.fulfill({ json: fixture() }));
+    await page.route('**/api/employee/dashboard**', route => route.fulfill({ json: fixture() }));
     await page.goto('/');
     const employeeNav = page.locator('nav[aria-label="Employee portal"]');
     if (viewport.width > 720) {
       await expect(employeeNav).toBeVisible();
-      await expect(employeeNav.getByRole('link')).toHaveText(['Overview', 'My tasks', 'Activity', 'Hubstaff']);
-      if (viewport.width <= 900) await expect(employeeNav.getByText('Overview')).toBeHidden();
+      await expect(employeeNav.getByRole('link')).toHaveText(['My Work', 'Settings']);
+      if (viewport.width <= 900) await expect(employeeNav.getByText('My Work')).toBeHidden();
     } else {
       await expect(employeeNav).toBeHidden();
-      await expect(page.getByText('My work overview')).toBeVisible();
+      await expect(page.getByRole('banner').getByText('My Work', { exact: true })).toBeVisible();
     }
     const assigned = page.getByRole('region', { name: 'My Assigned Tasks' });
     await expect(assigned.getByRole('heading', { name: 'Fix PDP layout' })).toBeVisible();
     await expect(assigned.getByLabel('Priority: High Priority')).toBeVisible();
     await expect(assigned.getByRole('heading', { name: 'Accessibility QA' })).toHaveCount(0);
-    await expect(page.getByText('Connected', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Project', { exact: true }).locator('option')).toHaveText([
       'All projects (2)', 'Shop Alpha (1)', 'Shop Beta (1)',
     ]);
@@ -57,7 +56,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 800, height: 900
     await expect(page.getByText('67%', { exact: true })).toBeVisible();
     await expect(page.getByText('2.5h', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Needs attention' })).toBeVisible();
-    await expect(page.locator('main aside h2')).toHaveText(['To Do', 'Hubstaff connection']);
+    await expect(page.locator('main aside h2')).toHaveText(['To Do']);
     await expect(page.getByRole('heading', { name: 'Recent task activity' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Recently completed' })).toBeVisible();
     const panelPositions = await page.getByRole('heading', { name: /My Assigned Tasks|Recent task activity|Recently completed/ })
@@ -99,6 +98,68 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 800, height: 900
   });
 }
 
+test('project manager policy adds team panels and a server-fed employee directory', async ({ page }) => {
+  const data = { ...fixture(), teamMembers: [
+    { id: '1', name: 'Fixture Employee', position: 'Project Manager', connected: true },
+    { id: '2', name: 'Taylor Team', position: 'Team Member', connected: false },
+  ] };
+  await page.route('**/api/employee/dashboard**', route => route.fulfill({ json: data }));
+  await page.goto('/employee?manager=true');
+  const employeeNav = page.locator('nav[aria-label="Employee portal"]');
+  await expect(employeeNav.getByRole('link')).toHaveText(['My Work', 'Team Workspace', 'Settings']);
+  await expect(page.getByRole('heading', { name: 'My Assigned Tasks' })).toBeVisible();
+  await employeeNav.getByRole('link', { name: 'Team Workspace' }).click();
+  await expect(page).toHaveURL(/\/employee\/team$/);
+  await expect(page.getByRole('heading', { name: 'My Assigned Tasks' })).toHaveCount(0);
+  const directory = page.locator('#team-directory');
+  await expect(directory.getByRole('heading', { name: 'Team directory' })).toBeVisible();
+  await expect(directory.getByText('Taylor Team')).toBeVisible();
+  await expect(directory.getByText('Setup needed')).toBeVisible();
+  const teamTasks = page.locator('#team-tasks');
+  await expect(teamTasks.getByRole('heading', { name: 'Team tasks' })).toBeVisible();
+  await expect(teamTasks.getByText('Planned', { exact: true })).toBeVisible();
+});
+
+test('workspace navigation reuses loaded data and keeps Hubstaff refresh in the shared header', async ({ page }) => {
+  const requests = { personal: 0, team: 0, settings: 0 };
+  await page.route('**/api/employee/dashboard**', route => {
+    const workspace = new URL(route.request().url()).searchParams.get('workspace') || 'personal';
+    requests[workspace] += 1;
+    return route.fulfill({ json: { ...fixture(), teamMembers: [
+      { id: '1', name: 'Fixture Employee', position: 'Project Manager', connected: true },
+    ] } });
+  });
+
+  await page.goto('/employee');
+  await expect(page.getByRole('heading', { name: 'Fix PDP layout' })).toBeVisible();
+  expect(requests.personal).toBe(1);
+
+  const employeeNav = page.locator('nav[aria-label="Employee portal"]');
+  await employeeNav.getByRole('link', { name: 'Team Workspace' }).click();
+  const directory = page.locator('#team-directory');
+  await expect(directory.getByText('Fixture Employee')).toBeVisible();
+  await expect.poll(() => requests.team).toBe(1);
+  const refresh = page.getByRole('banner').getByRole('button', { name: 'Refresh Hubstaff data' });
+  await expect(refresh).toBeVisible();
+  await refresh.click();
+  await expect(page.getByRole('banner').getByText('Hubstaff data updated.')).toBeVisible();
+  expect(requests.personal).toBe(2);
+
+  await employeeNav.getByRole('link', { name: 'My Work' }).click();
+  await expect(page.getByRole('heading', { name: 'Fix PDP layout' })).toBeVisible();
+  expect(requests.personal).toBe(2);
+
+  await employeeNav.getByRole('link', { name: 'Team Workspace' }).click();
+  await expect(directory.getByText('Fixture Employee')).toBeVisible();
+  await page.waitForTimeout(100);
+  expect(requests.team).toBe(1);
+
+  await employeeNav.getByRole('link', { name: 'Settings' }).click();
+  await expect(page.getByRole('heading', { name: 'Hubstaff connection' })).toBeVisible();
+  await expect(page.getByRole('banner').getByRole('button', { name: 'Refresh Hubstaff data' })).toBeVisible();
+  await expect.poll(() => requests.settings).toBe(1);
+});
+
 test('workflow statuses have distinct badge treatments', async ({ page }) => {
   const data = fixture();
   const base = data.tasks[0];
@@ -108,7 +169,7 @@ test('workflow statuses have distinct badge treatments', async ({ page }) => {
     { ...base, id: 'done', title: 'Done task', status: 'Complete', stage: 'done', done: true },
     { ...base, id: 'review', title: 'Review task', status: 'Client Review', stage: 'review', done: false },
   ];
-  await page.route('**/api/employee/dashboard', route => route.fulfill({ json: data }));
+  await page.route('**/api/employee/dashboard**', route => route.fulfill({ json: data }));
   await page.goto('/');
   await page.getByLabel('Status', { exact: true }).selectOption('all');
   const assigned = page.getByRole('region', { name: 'My Assigned Tasks' });
@@ -130,7 +191,7 @@ test('urgent active tasks appear in Needs attention without requiring a due date
     { ...base, id: 'regular', title: 'Regular undated task', dueAt: '', priority: { name: 'High Priority', level: 'high' } },
     { ...base, id: 'completed-urgent', title: 'Completed urgent task', dueAt: '', done: true, stage: 'done', priority: { name: 'Urgent', level: 'urgent' } },
   ];
-  await page.route('**/api/employee/dashboard', route => route.fulfill({ json: data }));
+  await page.route('**/api/employee/dashboard**', route => route.fulfill({ json: data }));
   await page.goto('/');
   const attention = page.getByRole('region', { name: 'Needs attention' });
   await expect(attention.getByText('Urgent undated task', { exact: true })).toBeVisible();
@@ -142,18 +203,18 @@ test('urgent active tasks appear in Needs attention without requiring a due date
 test('loading, empty and safe error states work without showing stale task data', async ({ page }) => {
   let release;
   const gate = new Promise(resolve => { release = resolve; });
-  await page.route('**/api/employee/dashboard', async route => { await gate; await route.fulfill({ json: fixture() }); });
+  await page.route('**/api/employee/dashboard**', async route => { await gate; await route.fulfill({ json: fixture() }); });
   await page.goto('/');
   await expect(page.getByText('Loading your assigned tasks')).toBeAttached();
   release();
-  await expect(page.getByText('Connected', { exact: true })).toBeVisible();
-  await page.unroute('**/api/employee/dashboard');
-  await page.route('**/api/employee/dashboard', route => route.fulfill({ status: 400, json: { error: 'Your Hubstaff access token is invalid or expired. Please reconnect.' } }));
+  await expect(page.getByRole('heading', { name: 'Fix PDP layout' })).toBeVisible();
+  await page.unroute('**/api/employee/dashboard**');
+  await page.route('**/api/employee/dashboard**', route => route.fulfill({ status: 400, json: { error: 'Your Hubstaff access token is invalid or expired. Please reconnect.' } }));
   await page.getByRole('button', { name: 'Refresh Hubstaff data' }).click();
   await expect(page.getByRole('main').getByRole('alert')).toContainText('invalid or expired');
   await expect(page.getByRole('heading', { name: 'Fix PDP layout' })).toHaveCount(0);
-  await page.unroute('**/api/employee/dashboard');
-  await page.route('**/api/employee/dashboard', route => route.fulfill({ json: { ...fixture(), tasks: [] } }));
+  await page.unroute('**/api/employee/dashboard**');
+  await page.route('**/api/employee/dashboard**', route => route.fulfill({ json: { ...fixture(), tasks: [] } }));
   await page.getByRole('button', { name: 'Refresh Hubstaff data' }).click();
   await expect(page.getByRole('heading', { name: 'No assigned tasks yet' })).toBeVisible();
 });
@@ -165,7 +226,7 @@ test('assigned tasks are paginated and filters return to the first page', async 
     dueAt: new Date(Date.now() + (index + 4) * 86400000).toISOString(),
     createdAt: new Date(Date.now() - index * 86400000).toISOString(), updatedAt: new Date().toISOString(),
   }));
-  await page.route('**/api/employee/dashboard', route => route.fulfill({ json: { ...fixture(), tasks } }));
+  await page.route('**/api/employee/dashboard**', route => route.fulfill({ json: { ...fixture(), tasks } }));
   await page.goto('/');
   const assigned = page.getByRole('region', { name: 'My Assigned Tasks' });
   await expect(assigned.getByText('Showing 1-10 of 35 matching tasks')).toBeVisible();
@@ -191,7 +252,7 @@ test('assigned tasks are paginated and filters return to the first page', async 
 });
 
 test('today plan supports drag, sequencing, focus, local completion, persistence, and clearing', async ({ page }) => {
-  await page.route('**/api/employee/dashboard', route => route.fulfill({ json: fixture() }));
+  await page.route('**/api/employee/dashboard**', route => route.fulfill({ json: fixture() }));
   await page.goto('/');
   const assigned = page.getByRole('region', { name: 'My Assigned Tasks' });
   const todayPlan = page.getByRole('region', { name: 'To Do' });
@@ -235,7 +296,7 @@ test('today plan offers unfinished tasks from yesterday once', async ({ page }) 
       taskIds: ['1', '2'], workingTaskId: '1', completedTaskIds: [], carryOverHandled: false,
     }));
   });
-  await page.route('**/api/employee/dashboard', route => route.fulfill({ json: fixture() }));
+  await page.route('**/api/employee/dashboard**', route => route.fulfill({ json: fixture() }));
   await page.goto('/');
   const todayPlan = page.getByRole('region', { name: 'To Do' });
   await expect(todayPlan.getByText('Continue yesterday’s plan?')).toBeVisible();
@@ -249,7 +310,12 @@ test('today plan offers unfinished tasks from yesterday once', async ({ page }) 
 });
 
 test('token entry is a native password POST with no browser storage or URL token', async ({ page }) => {
-  await page.goto('/?connected=false');
+  await page.route('**/api/employee/dashboard**', route => route.fulfill({ json: {
+    connection: { connected: false }, tasks: [], projects: [], teamMembers: [], syncedAt: null,
+  } }));
+  await page.goto('/employee/settings?connected=false');
+  await expect(page.getByRole('heading', { name: 'My Assigned Tasks' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Hubstaff connection' })).toBeVisible();
   const input = page.getByLabel('Personal access token', { exact: true });
   await expect(input).toHaveAttribute('type', 'password');
   const synthetic = 'browser-fixture-token-not-a-real-credential';
@@ -258,7 +324,7 @@ test('token entry is a native password POST with no browser storage or URL token
     expect(route.request().method()).toBe('POST');
     expect(route.request().url()).not.toContain(synthetic);
     expect(new URLSearchParams(route.request().postData()).get('token')).toBe(synthetic);
-    await route.fulfill({ status: 303, headers: { location: '/?connected=false' } });
+    await route.fulfill({ status: 303, headers: { location: '/employee/settings?connected=false' } });
   });
   await page.getByRole('button', { name: 'Validate and connect' }).click();
   await expect(input).toHaveValue('');

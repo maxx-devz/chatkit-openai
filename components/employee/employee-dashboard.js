@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useEmployeeWorkspace } from './employee-workspace-provider';
 import { dueState, selectEmployeeTasks } from '@/lib/employee-view';
 import styles from './employee-dashboard.module.css';
 
@@ -86,10 +87,21 @@ function normalizeStoredPlan(value) {
   };
 }
 
-export default function EmployeeDashboard({ name, connected, connectionMessage, children }) {
-  const [data, setData] = useState(null);
-  const [busy, setBusy] = useState(connected);
-  const [error, setError] = useState('');
+export default function EmployeeDashboard({ name, position, panelAccess = [], workspace = 'personal', connected, connectionMessage, children }) {
+  const panels = new Set(panelAccess);
+  const isPersonal = workspace === 'personal';
+  const isTeam = workspace === 'team';
+  const isSettings = workspace === 'settings';
+  const canOverview = panels.has('overview');
+  const canViewTasks = panels.has('my_tasks');
+  const canViewActivity = panels.has('activity');
+  const canViewTeam = panels.has('team_directory');
+  const canViewTeamTasks = panels.has('team_tasks');
+  const canConnectHubstaff = panels.has('hubstaff');
+  const shouldLoadDashboard = isSettings
+    || (isPersonal && connected)
+    || (isTeam && (canViewTeam || canViewTeamTasks));
+  const { data, busy, error } = useEmployeeWorkspace(workspace, { enabled: shouldLoadDashboard });
   const [search, setSearch] = useState('');
   const [project, setProject] = useState('all');
   const [status, setStatus] = useState('active');
@@ -109,27 +121,6 @@ export default function EmployeeDashboard({ name, connected, connectionMessage, 
   const [now, setNow] = useState(() => new Date());
   const planStorageKey = todayPlanStorageKey(name, now);
   const previousPlanStorageKey = todayPlanStorageKey(name, previousDay(now));
-  const refresh = useCallback(async (signal) => {
-    setBusy(true);
-    setError('');
-    try {
-      const response = await fetch('/api/employee/dashboard', { cache: 'no-store', signal });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Your work could not be loaded. Please try again.');
-      if (!signal?.aborted) { setData(result); setNow(new Date()); setPage(1); }
-    } catch (failure) {
-      if (!signal?.aborted) {
-        setData(null);
-        setError(failure.message === 'Failed to fetch' ? 'Connection interrupted. Please try again.' : failure.message);
-      }
-    } finally { if (!signal?.aborted) setBusy(false); }
-  }, []);
-  useEffect(() => {
-    if (!connected) return;
-    const controller = new AbortController();
-    const timer = setTimeout(() => refresh(controller.signal), 0);
-    return () => { clearTimeout(timer); controller.abort(); };
-  }, [connected, refresh]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       let storedPlan = normalizeStoredPlan(null);
@@ -240,17 +231,21 @@ export default function EmployeeDashboard({ name, connected, connectionMessage, 
     ['soon', 'Due in 3 days', active.filter(task => dueState(task, now) === 'soon').length],
     ['overdue', 'Overdue', active.filter(task => dueState(task, now) === 'overdue').length],
   ];
+  const workspaceCopy = isTeam
+    ? { title: 'Your team, in view.', detail: 'Review the people and team tools available to your position.' }
+    : isSettings
+      ? { title: 'Connections & settings.', detail: 'Manage the services connected to your employee workspace.' }
+      : { title: 'Your work, in focus.', detail: 'Review your own assignments, priorities, and recent activity.' };
 
-  return <main className={styles.main} id="overview">
+  return <main className={styles.main}>
     <section className={styles.intro}>
-      <div><p className={styles.eyebrow}>MY WORKSPACE</p><h1>Your work, in focus.</h1>
-        <p>Welcome, {name}. Here is the work assigned to you across your projects.</p></div>
-      <button className={styles.primary} disabled={busy || !connected} onClick={() => refresh()} type="button">{busy ? 'Refreshing…' : 'Refresh Hubstaff data'}</button>
+      <div><p className={styles.eyebrow}>{String(position || 'Team Member').toUpperCase()}</p><h1>{workspaceCopy.title}</h1>
+        <p>Welcome, {name}. {workspaceCopy.detail}</p></div>
     </section>
     {connectionMessage && <p className={styles.notice} role="status">{connectionMessage}</p>}
     {error && <p className={styles.error} role="alert">{error}</p>}
-    {data?.truncated && <p className={styles.notice}>Showing a limited snapshot of your work. Some tasks or projects may be missing; counts reflect only this snapshot.</p>}
-    <section className={styles.stats} aria-label="My task counts">
+    {isPersonal && data?.truncated && <p className={styles.notice}>Showing a limited snapshot of your work. Some tasks or projects may be missing; counts reflect only this snapshot.</p>}
+    {isPersonal && canOverview && <><section className={styles.stats} aria-label="My task counts">
       {counts.map(([key, title, count]) => <button key={key} type="button" onClick={() => { setStatus(key); setPage(1); }} aria-pressed={status === key}>
         <span>{title}</span><strong>{busy || !data ? '—' : count}</strong><small>View tasks →</small>
       </button>)}
@@ -285,8 +280,9 @@ export default function EmployeeDashboard({ name, connected, connectionMessage, 
           })}</ul> : <p className={styles.emptySmall}>Nothing urgent right now.</p>}
       </section>
     </div>
-    <div className={styles.grid}>
-      <section className={`${styles.panel} ${styles.anchorSection}`} aria-labelledby="assigned-title" aria-busy={busy} id="assigned-tasks">
+    </>}
+    {isPersonal && canViewTasks && <div className={styles.grid}>
+      {canViewTasks && <section className={`${styles.panel} ${styles.anchorSection}`} aria-labelledby="assigned-title" aria-busy={busy} id="assigned-tasks">
         <div className={styles.sectionHeading}><div><h2 id="assigned-title">My Assigned Tasks</h2><p>Your personal task list. Changes are managed in Hubstaff.</p></div>
           <span className={styles.readOnly}>Read only</span></div>
         <div className={styles.filters}>
@@ -355,9 +351,9 @@ export default function EmployeeDashboard({ name, connected, connectionMessage, 
             </nav>}
           </div>
         </div>}
-      </section>
+      </section>}
       <aside className={styles.sidebar}>
-        <section className={`${styles.panel} ${styles.todoPanel}`} aria-labelledby="today-plan-title"
+        {canViewTasks && <section className={`${styles.panel} ${styles.todoPanel}`} aria-labelledby="today-plan-title"
           onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = todayTaskIds.includes(draggedTaskId) ? 'move' : 'copy'; setTodoDropActive(true); }}
           onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget)) setTodoDropActive(false); }}
           onDrop={event => dropTodayTask(event)}>
@@ -395,20 +391,43 @@ export default function EmployeeDashboard({ name, connected, connectionMessage, 
           </section>}
           <div className={styles.todoFooter}><p className={styles.todoStorageNote}>Saved in this browser for today only.</p>
             {(todayTaskIds.length > 0 || completedTodayTaskIds.length > 0) && <button type="button" onClick={clearTodayPlan}>Clear plan</button>}</div>
-        </section>
-        <section className={`${styles.panel} ${styles.anchorSection}`} id="hubstaff-connection"><h2>Hubstaff connection</h2>
-          <p className={styles.health}><span className={data?.connection.connected && !error ? styles.healthy : styles.pending} />{busy ? 'Checking connection…' : error ? 'Needs attention' : data?.connection.connected ? 'Connected' : connected ? 'Ready to verify' : 'Not connected'}</p>
-          <p>{data?.connection.name || 'Your approved personal Hubstaff account'}</p>
-          <small>{data?.syncedAt ? `Last synchronized ${new Date(data.syncedAt).toLocaleString()}` : 'No successful synchronization in this view yet.'}</small>
-          {children}
-        </section>
+        </section>}
       </aside>
-    </div>
-    <div className={styles.bottomGrid} id="activity">
+    </div>}
+    {isSettings && canConnectHubstaff && <div className={`${styles.grid} ${styles.singleColumnGrid}`}>
+      <section className={`${styles.panel} ${styles.settingsPanel}`} id="hubstaff-connection">
+        <div className={styles.sectionHeading}><div><h2>Hubstaff connection</h2><p>Connect the approved personal account used for your work data.</p></div>
+          <span className={data?.connection.connected && !error ? styles.connectionReady : styles.connectionPending}>
+            {data?.connection.connected && !error ? 'Connected' : 'Setup needed'}
+          </span></div>
+        <p className={styles.health}><span className={data?.connection.connected && !error ? styles.healthy : styles.pending} />{busy ? 'Checking connection…' : error ? 'Needs attention' : data?.connection.connected ? 'Connected and ready' : connected ? 'Ready to verify' : 'Not connected'}</p>
+        <p>{data?.connection.name || 'Your approved personal Hubstaff account'}</p>
+        <small>{data?.syncedAt ? `Last synchronized ${new Date(data.syncedAt).toLocaleString()}` : 'No successful synchronization recorded yet.'}</small>
+        {children}
+      </section>
+    </div>}
+    {isTeam && (canViewTeam || canViewTeamTasks) && <div className={`${styles.bottomGrid} ${canViewTeam !== canViewTeamTasks ? styles.singleColumnGrid : ''}`}>
+      {canViewTeam && <section className={`${styles.panel} ${styles.anchorSection}`} id="team-directory">
+        <div className={styles.sectionHeading}><div><h2>Team directory</h2><p>Active employees and their current portal positions.</p></div>
+          <span className={styles.readOnly}>{data?.teamMembers?.length || 0} active</span></div>
+        {busy && !data ? <div className={styles.skeleton} role="status"><span className="sr-only">Loading team directory</span><i /><i /></div>
+          : data?.teamMembers?.length ? <ul className={styles.teamMembers}>{data.teamMembers.map(member => <li key={member.id}>
+            <span>{member.name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase()}</span>
+            <div><strong>{member.name}</strong><small>{member.position}</small></div>
+            <b className={member.connected ? styles.teamConnected : styles.teamPending}>{member.connected ? 'Connected' : 'Setup needed'}</b>
+          </li>)}</ul> : <p className={styles.emptySmall}>No active employees are available.</p>}
+      </section>}
+      {canViewTeamTasks && <section className={`${styles.panel} ${styles.anchorSection}`} id="team-tasks">
+        <div className={styles.sectionHeading}><div><h2>Team tasks</h2><p>Organization-wide task status and assignment.</p></div><span className={styles.plannedBadge}>Planned</span></div>
+        <div className={styles.stagedPanel}><strong>Access is reserved for this position</strong>
+          <p>Team task reads and assignment actions will be enabled when an organization-level Hubstaff workflow is configured. Personal employee tokens are never combined here.</p></div>
+      </section>}
+    </div>}
+    {isPersonal && canViewActivity && <div className={styles.bottomGrid} id="activity">
       <section className={`${styles.panel} ${styles.anchorSection}`}><h2>Recent task activity</h2><p>Latest updates to your assigned tasks.</p>
         {recent.length ? <ul className={styles.activity}>{recent.map(task => <li key={task.id}><div><strong>{task.title}</strong><span>{task.projectName} · {task.status}</span></div><time>{displayDate(task.updatedAt)}</time></li>)}</ul> : <p className={styles.emptySmall}>No recent activity to show.</p>}</section>
       <section className={styles.panel}><h2>Recently completed</h2><p>Your most recent finished assignments.</p>
         {completed.length ? <ul className={styles.activity}>{completed.map(task => <li key={task.id}><div><strong>{task.title}</strong><span>{task.projectName}</span></div><time>{displayDate(task.completedAt)}</time></li>)}</ul> : <p className={styles.emptySmall}>Completed tasks with a completion date appear here.</p>}</section>
-    </div>
+    </div>}
   </main>;
 }

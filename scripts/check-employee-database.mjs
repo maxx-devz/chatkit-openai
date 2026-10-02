@@ -29,6 +29,12 @@ try {
   await db.query('INSERT INTO portal_employees(user_id,hubstaff_user_id) VALUES(1,101),(2,202)');
   const a = await findEmployee(db, 'employee-a');
   const b = await findEmployee(db, 'employee-b');
+  assert.equal(a.position, 'team_member');
+  assert.deepEqual(a.panel_access, ['overview', 'my_tasks', 'activity', 'hubstaff']);
+  await db.query(`UPDATE portal_employees SET position='project_manager',
+    panel_access='["overview","my_tasks","activity","team_directory","team_tasks","hubstaff"]'::jsonb
+    WHERE user_id=2`);
+  assert.equal((await findEmployee(db, 'employee-b')).position, 'project_manager');
   assert.equal(await findEmployee(db, 'client'), null);
   assert.equal(await findEmployee(db, 'admin'), null);
   const secret = 'test-only-database-encryption-secret-longer-than-32';

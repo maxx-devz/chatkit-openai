@@ -81,13 +81,38 @@ test('employees, including inactive or accidentally dual-role accounts, cannot e
 test('active employee endpoint returns no legacy state and refuses every browser-selected identity', async () => {
   employee = { ...employeeA };
   session = { user: { id: 'employee-a', name: 'Employee A' } };
-  assert.equal((await resolveEmployeeContext(headers)).profile.name, employeeA.display_name);
+  const context = await resolveEmployeeContext(headers);
+  assert.equal(context.profile.name, employeeA.display_name);
+  assert.equal(context.profile.position, 'Team Member');
+  assert.deepEqual(context.profile.panels, ['overview', 'my_tasks', 'activity', 'hubstaff']);
   const response = await employeeDashboard(request('/api/employee/dashboard'));
   assert.deepEqual((await response.json()).tasks, []);
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  assert.equal((await employeeDashboard(request('/api/employee/dashboard?workspace=team'))).status, 403);
+  assert.equal((await employeeDashboard(request('/api/employee/dashboard?workspace=settings'))).status, 200);
   for (const key of ['employee_id', 'hubstaff_user_id', 'project_id', 'client_id']) {
     assert.equal((await employeeDashboard(request(`/api/employee/dashboard?${key}=2`))).status, 400);
   }
+});
+
+test('project manager access exposes the team directory without exposing browser-selected identities', async () => {
+  employee = { ...employeeA, position: 'project_manager', panel_access: undefined };
+  session = { user: { id: 'employee-a', name: 'Manager' } };
+  const response = await employeeDashboard(request('/api/employee/dashboard?workspace=team'));
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.access.position, 'Project Manager');
+  assert.equal(payload.access.panels.includes('team_directory'), true);
+  assert.equal(payload.teamMembers.length, 1);
+  assert.deepEqual(Object.keys(payload.teamMembers[0]).sort(), ['connected', 'id', 'name', 'position']);
+});
+
+test('an employee without the Hubstaff panel cannot submit a connection token directly', async () => {
+  employee = { ...employeeA, panel_access: ['overview'] };
+  session = { user: { id: 'employee-a', name: 'Employee A' } };
+  const response = await connect(request('/api/employee/connection', 'POST', new URLSearchParams({ token: testToken })));
+  assert.equal(response.status, 303);
+  assert.equal(response.headers.get('location'), '/employee/settings?connection=panel_forbidden');
 });
 
 test('connection POST validates identity, stores ciphertext only, rejects origin/body injection and rate-limits', async () => {
@@ -99,7 +124,7 @@ test('connection POST validates identity, stores ciphertext only, rejects origin
     : fixture.fetchImpl(url, options);
   let response = await connect(request('/api/employee/connection', 'POST', new URLSearchParams({ token: testToken })));
   assert.equal(response.status, 303);
-  assert.equal(response.headers.get('location'), '/employee?connection=connected');
+  assert.equal(response.headers.get('location'), '/employee/settings?connection=connected');
   assert.equal(savedCiphertext.startsWith('v1.'), true);
   assert.equal(savedCiphertext.includes(testToken), false);
   assert.equal((await response.text()).includes(testToken), false);
@@ -107,11 +132,11 @@ test('connection POST validates identity, stores ciphertext only, rejects origin
   response = await connect(new Request('https://portal.example/api/employee/connection', { method: 'POST', headers: { origin: 'https://evil.example' } }));
   assert.equal(response.status, 403);
   response = await connect(request('/api/employee/connection', 'POST', new URLSearchParams({ token: testToken, hubstaff_user_id: '202' })));
-  assert.equal(response.headers.get('location'), '/employee?connection=invalid_request');
+  assert.equal(response.headers.get('location'), '/employee/settings?connection=invalid_request');
   assert.equal(fixture.calls.length, calls);
   claimed = false;
   response = await connect(request('/api/employee/connection', 'POST', new URLSearchParams({ token: testToken })));
-  assert.equal(response.headers.get('location'), '/employee?connection=refresh_limited');
+  assert.equal(response.headers.get('location'), '/employee/settings?connection=refresh_limited');
   assert.equal(fixture.calls.length, calls);
   claimed = true;
   const otherUser = hubstaffFixture({ userId: 202 });
@@ -121,6 +146,6 @@ test('connection POST validates identity, stores ciphertext only, rejects origin
     : otherUser.fetchImpl(url, options);
   const saved = savedCiphertext;
   response = await connect(request('/api/employee/connection', 'POST', new URLSearchParams({ token: testToken })));
-  assert.equal(response.headers.get('location'), '/employee?connection=identity_mismatch');
+  assert.equal(response.headers.get('location'), '/employee/settings?connection=identity_mismatch');
   assert.equal(savedCiphertext, saved, 'A failed connection never overwrites the working one');
 });

@@ -629,9 +629,11 @@
 .vectorField,
 .dialogGrid label { display: grid; gap: 6px; color: #455a72; font-size: 11px; font-weight: 730; }
 .fieldGrid input,
+.fieldGrid select,
 .nameField input,
 .vectorField input,
-.dialogGrid input {
+.dialogGrid input,
+.dialogGrid select {
   width: 100%;
   min-height: 38px;
   padding: 9px 10px;
@@ -644,9 +646,11 @@
 }
 
 .fieldGrid input:focus,
+.fieldGrid select:focus,
 .nameField input:focus,
 .vectorField input:focus,
-.dialogGrid input:focus { border-color: #7fbae2; box-shadow: 0 0 0 3px rgba(16, 131, 202, 0.08); }
+.dialogGrid input:focus,
+.dialogGrid select:focus { border-color: #7fbae2; box-shadow: 0 0 0 3px rgba(16, 131, 202, 0.08); }
 .fieldGrid small,
 .vectorField small { color: #8b98a8; font-size: 10px; font-weight: 500; line-height: 1.4; }
 
@@ -711,6 +715,41 @@
 .memberList b { padding: 4px 6px; border-radius: 6px; background: #edf5fb; color: #3c7396; font-size: 10px; text-transform: capitalize; }
 .lastActivity { margin: 10px 0 0; color: #8996a6; font-size: 10px; }
 
+.employeeSummary {
+  display: grid;
+  margin: 15px 20px;
+  padding: 14px;
+  border: 1px solid #d8e8f4;
+  border-radius: 13px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  background: #f7fbfe;
+}
+.employeeSummary > div { min-width: 0; padding: 7px 9px; }
+.employeeSummary span,
+.employeeSummary strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.employeeSummary span { color: #8190a2; font-size: 9px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.employeeSummary strong { margin-top: 5px; color: #203a53; font-size: 12px; }
+.controlHint { margin: 13px 0 0; color: #8493a5; font-size: 10px; line-height: 1.55; }
+.workspaceAccessList { display: grid; gap: 14px; }
+.workspaceAccessGroup { padding: 13px; border: 1px solid #e3eaf1; border-radius: 11px; background: #f9fbfd; }
+.workspaceAccessGroup > div:first-child { margin-bottom: 10px; }
+.workspaceAccessGroup > div:first-child strong,
+.workspaceAccessGroup > div:first-child small { display: block; }
+.workspaceAccessGroup > div:first-child strong { color: #213a52; font-size: 12px; }
+.workspaceAccessGroup > div:first-child small { margin-top: 3px; color: #8291a3; font-size: 10px; line-height: 1.45; }
+.panelAccessGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.panelAccessOption { display: grid; min-width: 0; align-items: start; padding: 11px; border: 1px solid #e0e8f0; border-radius: 10px; grid-template-columns: auto minmax(0, 1fr); gap: 9px; background: #fbfdff; cursor: pointer; }
+.panelAccessOption:has(input:checked) { border-color: #9bcbea; background: #f1f9fe; }
+.panelAccessOption input { margin-top: 2px; accent-color: #0878c9; }
+.panelAccessOption strong,
+.panelAccessOption small { display: block; }
+.panelAccessOption strong { color: #30465c; font-size: 11px; }
+.panelAccessOption small { margin-top: 4px; color: #8291a3; font-size: 10px; font-weight: 500; line-height: 1.45; }
+.schemaWorkspace { display: block; min-height: 340px; }
+.schemaWorkspace .noClient { min-height: 340px; }
+.schemaWorkspace code { padding: 2px 5px; border-radius: 5px; background: #eaf2f8; color: #325b77; }
+
 .noClient { display: grid; min-height: 600px; place-items: center; place-content: center; padding: 40px; text-align: center; }
 .noClient img { width: 58px; height: 58px; object-fit: contain; }
 .noClient h2 { margin: 18px 0 0; color: #1c334b; font-size: 19px; }
@@ -761,6 +800,7 @@
   .adminIdentity { display: flex; justify-content: center; }
   .workspace { grid-template-columns: 220px minmax(0, 1fr); }
   .settingsGrid { grid-template-columns: minmax(0, 1fr); }
+  .employeeSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .wideCard { grid-column: auto; }
   .accountStats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -783,6 +823,7 @@
   .usageHero { margin: 12px; padding: 14px; grid-template-columns: minmax(0, 1fr); }
   .usageRing { display: none; }
   .settingsGrid { padding: 0 12px 16px; }
+  .panelAccessGrid { grid-template-columns: minmax(0, 1fr); }
   .fieldGrid { grid-template-columns: minmax(0, 1fr); }
   .dialogGrid { grid-template-columns: minmax(0, 1fr); }
   .dialogWide { grid-column: auto; }

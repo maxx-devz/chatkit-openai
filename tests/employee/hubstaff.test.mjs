@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createEmployeeHubstaff, validateEmployeeToken } from '../../lib/employee-hubstaff.js';
 import { encryptEmployeeToken, decryptEmployeeToken, employeeAccessToken, requireActiveEmployee } from '../../lib/employee-repository.js';
 import { employeeErrorResponse } from '../../lib/employee-errors.js';
-import { readEmployeeTokenForm, assertEmployeeRequest } from '../../lib/employee-http.js';
+import { readEmployeeTokenForm, assertEmployeeRequest, readEmployeeWorkspace } from '../../lib/employee-http.js';
 import { selectEmployeeTasks, dueState } from '../../lib/employee-view.js';
 import { task, hubstaffFixture, testToken, employeeA, employeeB } from './fixtures.mjs';
 
@@ -294,6 +294,11 @@ test('native credential form rejects browser IDs, duplicate fields, unexpected e
   }
   for (const key of ['employee_id', 'hubstaff_user_id', 'project_id', 'client_id']) {
     assert.throws(() => assertEmployeeRequest(new Request(`https://portal.example/api/employee/dashboard?${key}=2`)));
+  }
+  assert.equal(readEmployeeWorkspace(new Request('https://portal.example/api/employee/dashboard')), 'personal');
+  assert.equal(readEmployeeWorkspace(new Request('https://portal.example/api/employee/dashboard?workspace=team')), 'team');
+  for (const search of ['workspace=unknown', 'workspace=team&project_id=2', 'workspace=team&workspace=personal']) {
+    assert.throws(() => readEmployeeWorkspace(new Request(`https://portal.example/api/employee/dashboard?${search}`)));
   }
 });
 
