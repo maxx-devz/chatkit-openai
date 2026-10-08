@@ -169,15 +169,18 @@ async def chatkit(request: Request):
         db = await connect_database(os.environ["DATABASE_URL"])
         client = await load_client(db, envelope)
         context = Context(db, envelope.client_id, envelope.user_id, envelope.instructions, client)
-        context.config = await load_config(db, client)
+        # History and conversation-management requests do not use assistant
+        # settings. Fetch them only when a reply will be generated.
+        if parsed.type in GENERATE:
+            context.config = await load_config(db, client)
         context.portal_origin = envelope.portal_origin.rstrip("/")
         context.hubstaff = envelope.hubstaff
         if parsed.type in MUTATE:
             token = uuid4().hex
             await acquire_lease(context, token)
         thread_id = getattr(parsed.params, "thread_id", None)
-        if thread_id:
-            await store.load_thread(thread_id, context)
+        # The SDK's Store calls verify the scoped thread as each operation is
+        # processed; preloading it here added a duplicate database query.
         if parsed.type == "threads.retry_after_item":
             item = await store.load_item(thread_id, parsed.params.item_id, context)
             if not isinstance(item, UserMessageItem):

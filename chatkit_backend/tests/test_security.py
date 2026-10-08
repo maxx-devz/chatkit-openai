@@ -96,7 +96,7 @@ class EndpointTests(unittest.IsolatedAsyncioTestCase):
         with patch.dict(os.environ, {"CHATKIT_BACKEND_SECRET": SECRET, "DATABASE_URL": "test-only"}), \
                 patch("app.connect_database", new_callable=AsyncMock, return_value=db), \
                 patch("app.load_client", new_callable=AsyncMock, return_value={}), \
-                patch("app.load_config", new_callable=AsyncMock, return_value={}), \
+                patch("app.load_config", new_callable=AsyncMock, return_value={}) as load_config, \
                 patch("app.store.load_threads", new_callable=AsyncMock, side_effect=pages) as load_threads, \
                 patch("app.reserve_request", new_callable=AsyncMock) as reserve:
             for after in [None, first[-1].id]:
@@ -118,6 +118,7 @@ class EndpointTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(args["after"], after)
                 self.assertEqual(args["context"].scope, ("1", "2"))
             reserve.assert_not_awaited()
+            load_config.assert_not_awaited()
             self.assertEqual(db.close.await_count, 2)
 
     async def test_unsigned_direct_backend_request_never_opens_database(self):

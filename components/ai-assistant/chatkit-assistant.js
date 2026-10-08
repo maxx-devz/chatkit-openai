@@ -319,7 +319,9 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
     const controller = new AbortController();
     const refresh = () => { if (!document.hidden) void refreshAccess(controller.signal); };
     refresh();
-    const timer = window.setInterval(refresh, 15_000);
+    // Completed replies and failures refresh the allowance immediately. A
+    // minute-by-minute background check is enough between chat turns.
+    const timer = window.setInterval(refresh, 60_000);
     window.addEventListener("focus", refresh);
     return () => {
       controller.abort();
