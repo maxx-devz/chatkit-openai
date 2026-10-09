@@ -23,10 +23,15 @@ try {
     .replaceAll('CREATE TABLE IF NOT EXISTS', 'CREATE TEMP TABLE IF NOT EXISTS');
   await db.query(schema);
   await db.query(schema);
-  for (const name of ['portal_users', 'portal_employees', 'portal_clients', 'portal_memberships', 'portal_admins']) {
+  for (const name of ['portal_users', 'portal_employees', 'portal_employee_task_guidance', 'portal_clients', 'portal_memberships', 'portal_admins']) {
     assert.equal((await db.query('SELECT relnamespace=pg_my_temp_schema() AS temporary FROM pg_class WHERE oid=$1::regclass', [name])).rows[0].temporary, true);
   }
   await db.query('INSERT INTO portal_employees(user_id,hubstaff_user_id) VALUES(1,101),(2,202)');
+  await db.query(`INSERT INTO portal_employee_task_guidance(employee_id,task_id,fingerprint,label,badge_text,reason)
+    VALUES(1,11,'fixture-fingerprint','review_for_close','AOC should verify before closing','Delivery acknowledged')`);
+  assert.deepEqual((await db.query(`SELECT label,badge_text FROM portal_employee_task_guidance
+    WHERE employee_id=1 AND task_id=11`)).rows[0],
+  { label: 'review_for_close', badge_text: 'AOC should verify before closing' });
   const a = await findEmployee(db, 'employee-a');
   const b = await findEmployee(db, 'employee-b');
   assert.equal(a.position, 'team_member');

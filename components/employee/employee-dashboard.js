@@ -7,7 +7,6 @@ import styles from './employee-dashboard.module.css';
 
 const DEFAULT_TASKS_PER_PAGE = 10;
 const PAGE_SIZE_OPTIONS = [10, 30, 50];
-
 function displayDate(value) {
   if (!value) return 'No due date';
   const date = new Date(value.length === 10 ? `${value}T12:00:00` : value);
@@ -119,6 +118,9 @@ export default function EmployeeDashboard({ name, position, panelAccess = [], wo
   const [draggedTaskId, setDraggedTaskId] = useState('');
   const [todoDropActive, setTodoDropActive] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const [guidanceById, setGuidanceById] = useState({});
+  const [guidanceError, setGuidanceError] = useState(null);
+  const [guidanceRetry, setGuidanceRetry] = useState(0);
   const planStorageKey = todayPlanStorageKey(name, now);
   const previousPlanStorageKey = todayPlanStorageKey(name, previousDay(now));
   useEffect(() => {
@@ -156,6 +158,42 @@ export default function EmployeeDashboard({ name, position, panelAccess = [], wo
   const currentPage = Math.min(page, pageCount);
   const pageStart = (currentPage - 1) * pageSize;
   const visible = filteredTasks.slice(pageStart, pageStart + pageSize);
+  const visibleActiveIds = visible.filter(task => !task.done).map(task => task.id).join(',');
+  const guidanceRunKey = `${data?.syncedAt || ''}:${visibleActiveIds}`;
+  const activeGuidanceError = guidanceError?.key === guidanceRunKey ? guidanceError.message : '';
+  const guidancePending = Boolean(data?.syncedAt && visibleActiveIds && !activeGuidanceError
+    && visible.some(task => !task.done && guidanceById[task.id]?.syncedAt !== data.syncedAt));
+  useEffect(() => {
+    if (!isPersonal || !canViewTasks || !data?.syncedAt || !visibleActiveIds) return;
+    const controller = new AbortController();
+    const ids = visibleActiveIds.split(',');
+    const timer = window.setTimeout(async () => {
+      setGuidanceError(null);
+      try {
+        for (let start = 0; start < ids.length; start += 6) {
+          const batch = ids.slice(start, start + 6);
+          const response = await fetch('/api/employee/task-guidance', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ taskIds: batch }),
+            credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
+          });
+          if (!response.ok) throw new Error('AI task suggestions are unavailable.');
+          const result = await response.json();
+          if (!Array.isArray(result.guidance)
+            || batch.some(id => !result.guidance.some(item => item.taskId === id))) {
+            throw new Error('AI task suggestions are unavailable.');
+          }
+          if (!controller.signal.aborted) setGuidanceById(current => ({ ...current,
+            ...Object.fromEntries(result.guidance.map(item => [item.taskId, { ...item, syncedAt: data.syncedAt }])),
+          }));
+        }
+      } catch {
+        if (!controller.signal.aborted) setGuidanceError({ key: guidanceRunKey,
+          message: 'AI analysis is unavailable. Review task comments in Hubstaff before acting.' });
+      }
+    }, 250);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [canViewTasks, data?.syncedAt, guidanceRetry, guidanceRunKey, isPersonal, visibleActiveIds]);
   const recent = [...tasks].filter(task => task.updatedAt).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5);
   const completed = tasks.filter(task => task.done && task.completedAt).sort((a, b) => b.completedAt.localeCompare(a.completedAt)).slice(0, 4);
   const needsAttention = active.filter(task => isUrgentTask(task) || ['overdue', 'soon'].includes(dueState(task, now)))
@@ -282,9 +320,11 @@ export default function EmployeeDashboard({ name, position, panelAccess = [], wo
     </div>
     </>}
     {isPersonal && canViewTasks && <div className={styles.grid}>
-      {canViewTasks && <section className={`${styles.panel} ${styles.anchorSection}`} aria-labelledby="assigned-title" aria-busy={busy} id="assigned-tasks">
+      {canViewTasks && <section className={`${styles.panel} ${styles.anchorSection}`} aria-labelledby="assigned-title" aria-busy={busy || guidancePending} id="assigned-tasks">
         <div className={styles.sectionHeading}><div><h2 id="assigned-title">My Assigned Tasks</h2><p>Your personal task list. Changes are managed in Hubstaff.</p></div>
           <span className={styles.readOnly}>Read only</span></div>
+        {guidancePending && <p className={styles.guidanceProgress} role="status">Analyzing task conversations before showing recommendations…</p>}
+        {activeGuidanceError && <p className={styles.guidanceError} role="status">{activeGuidanceError} <button type="button" onClick={() => { setGuidanceError(null); setGuidanceRetry(value => value + 1); }}>Retry analysis</button></p>}
         <div className={styles.filters}>
           <label className={styles.search}>Search tasks<input type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} placeholder="Search tasks or projects" /></label>
           <label>Project<select aria-label="Project" value={project} onChange={event => { setProject(event.target.value); setPage(1); }}><option value="all">All projects ({active.length})</option>
@@ -306,9 +346,17 @@ export default function EmployeeDashboard({ name, position, panelAccess = [], wo
                   const detailsId = `employee-task-details-${task.id}`;
                   const dueLabel = due === 'overdue' ? 'Overdue' : due === 'soon' ? 'Due soon' : 'Due';
                   const dueStyle = due === 'overdue' ? styles.dueOverdue : due === 'soon' ? styles.dueSoon : styles.dueDefault;
-                  const statusStyle = task.done || task.stage === 'done' ? styles.finished
-                    : task.stage === 'in_progress' ? styles.progress
-                      : task.stage === 'todo' ? styles.todo : styles.otherStatus;
+                  const guidance = guidanceById[task.id]?.syncedAt === data?.syncedAt ? guidanceById[task.id] : null;
+                  const guidanceLabel = guidance?.label && guidance?.badgeText;
+                  if (!task.done && !guidance && !activeGuidanceError) {
+                    return <li key={task.id} className={styles.taskAnalysisPlaceholder} role="status">
+                      <span>Analyzing task conversation…</span>
+                    </li>;
+                  }
+                  const badgeLabel = task.done ? 'Completed' : guidanceLabel || 'Analysis unavailable';
+                  const badgeStyle = task.done || guidance?.label === 'review_for_close' ? styles.finished
+                    : ['needs_reply', 'urgent_work'].includes(guidance?.label) ? styles.guidanceAction
+                      : guidanceLabel ? styles.guidanceBadge : styles.todo;
                   return <li key={task.id} className={`${!task.done ? styles.draggableTask : ''} ${draggedTaskId === task.id ? styles.draggingTask : ''}`}
                     draggable={!task.done} onDragStart={event => {
                       event.dataTransfer.effectAllowed = plannedToday ? 'move' : 'copy';
@@ -317,17 +365,22 @@ export default function EmployeeDashboard({ name, position, panelAccess = [], wo
                       setDraggedTaskId(task.id);
                     }} onDragEnd={() => { setDraggedTaskId(''); setTodoDropActive(false); }}><div className={styles.taskRow}>
                     <div className={styles.taskMain}><h3>{task.title}</h3><div className={styles.taskContext}><p>{task.projectName}</p>
-                      {task.priority && <span className={`${styles.priority} ${styles[`priority_${task.priority.level}`] || ''}`} aria-label={`Priority: ${task.priority.name}`}>{task.priority.name}</span>}</div></div>
+                      {task.priority && <span className={`${styles.priority} ${styles[`priority_${task.priority.level}`] || ''}`} aria-label={`Priority: ${task.priority.name}`}>{task.priority.name}</span>}</div>
+                      {!task.done && !guidanceLabel && guidance?.reason && <p className={styles.guidanceWarning}>{guidance.reason}</p>}
+                    </div>
                     <div className={styles.taskMeta}>
-                      <span className={`${styles.badge} ${statusStyle}`}>{task.status}</span>
+                      <span className={`${styles.badge} ${!task.done && guidanceLabel ? styles.guidanceBadge : ''} ${badgeStyle}`}
+                        aria-label={task.done ? 'Hubstaff status: Completed' : guidanceLabel ? `AI next action: ${badgeLabel}` : 'AI analysis unavailable'}
+                        title={guidance?.reason || (task.done ? 'Hubstaff marks this task completed.' : 'Check task comments in Hubstaff before acting.')}>{badgeLabel}</span>
                       {task.dueAt && <div className={`${styles.taskDue} ${dueStyle}`} aria-label={`Due date: ${dueLabel}, ${displayDate(task.dueAt)}`}>
                         <small>{dueLabel}</small><span aria-hidden="true">—</span><span>{displayDate(task.dueAt)}</span></div>}
                       {!task.done && <button className={styles.taskPlanButton} type="button" disabled={plannedToday} onClick={() => addToToday(task.id)}>{plannedToday ? 'In today’s plan' : 'Add to today’s plan'}</button>}
-                      <button className={styles.taskDetailsButton} type="button" aria-controls={detailsId} aria-expanded={expanded} aria-label={`${expanded ? 'Hide' : 'View'} details for ${task.title}`} onClick={() => setExpandedTaskId(expanded ? '' : task.id)}>{expanded ? 'Close' : 'Details'}</button>
+                      <button className={styles.taskDetailsButton} type="button" aria-controls={detailsId} aria-expanded={expanded} aria-label={`${expanded ? 'Hide' : 'View'} details for ${task.title}`} onClick={() => setExpandedTaskId(expanded ? '' : task.id)}>{expanded ? 'Hide details' : 'Details'}</button>
                     </div>
                   </div>
                     {expanded && <div className={styles.taskDetails} id={detailsId} role="region" aria-label={`${task.title} details`}>
                       <p>{task.description || 'No task description was provided.'}</p>
+                      {guidance?.reason && <p className={styles.guidanceReason}>{guidance.label ? 'AI suggestion' : 'Analysis unavailable'}: {guidance.reason} {guidance.label && 'Verify in Hubstaff before replying or closing.'}</p>}
                       <dl><div><dt>Project</dt><dd>{task.projectName}</dd></div><div><dt>Status</dt><dd>{task.status}</dd></div>
                         <div><dt>Created</dt><dd>{task.createdAt ? displayDate(task.createdAt) : 'Not available'}</dd></div>
                         <div><dt>Updated</dt><dd>{task.updatedAt ? displayDate(task.updatedAt) : 'Not available'}</dd></div>

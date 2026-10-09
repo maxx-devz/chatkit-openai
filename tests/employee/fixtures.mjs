@@ -12,7 +12,7 @@ export function task(overrides = {}) {
 }
 export function hubstaffFixture({ userId = 101, memberId = userId, timeZone = 'UTC', tasks = [task()],
   projects = [{ id: 77, name: 'Fixture project', organization_id: 9 }],
-  organizations = [{ id: 9, name: 'Fixture organization', status: 'active' }], activities = [], labels = {}, status = 200 } = {}) {
+  organizations = [{ id: 9, name: 'Fixture organization', status: 'active' }], activities = [], labels = {}, comments = {}, members = {}, status = 200 } = {}) {
   const calls = [];
   return { calls, fetchImpl: async (url, options) => {
     calls.push({ url: new URL(url), options });
@@ -24,6 +24,12 @@ export function hubstaffFixture({ userId = 101, memberId = userId, timeZone = 'U
     if (url.pathname === '/api/v1/members/me') return Response.json({ member: { id: memberId, email: 'private@example.invalid' } });
     if (url.pathname === '/api/v1/projects') return Response.json({ projects });
     if (url.pathname === '/api/v1/tasks/my/assigned') return Response.json({ tasks });
+    const singleTask = url.pathname.match(/^\/api\/v1\/tasks\/([1-9][0-9]*)$/)?.[1];
+    if (singleTask) return Response.json({ task: tasks.find(item => String(item.id) === singleTask) || null });
+    const memberProject = url.pathname.match(/^\/api\/v1\/projects\/([1-9][0-9]*)\/members$/)?.[1];
+    if (memberProject) return Response.json({ members: members[memberProject] || [] });
+    const commentTask = url.pathname.match(/^\/api\/v1\/tasks\/([1-9][0-9]*)\/comments$/)?.[1];
+    if (commentTask) return Response.json({ comments: comments[commentTask] || [] });
     const labelProject = url.pathname.match(/^\/api\/v1\/projects\/([1-9][0-9]*)\/labels$/)?.[1];
     if (labelProject) return Response.json({ labels: labels[labelProject] || [] });
     throw new Error('Unexpected fixture endpoint');

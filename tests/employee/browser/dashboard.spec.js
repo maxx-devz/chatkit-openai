@@ -17,6 +17,16 @@ function fixture() {
       week: { start: weekStart, stop: today, trackedHours: 17.75, activityRate: 67 } } };
 }
 
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/employee/task-guidance', async route => {
+    const { taskIds } = route.request().postDataJSON();
+    await route.fulfill({ json: { guidance: taskIds.map(taskId => ({
+      taskId, label: 'continue_work', badgeText: 'AOC should finish the assigned work',
+      reason: 'Continue the assigned work and review the discussion.',
+    })) } });
+  });
+});
+
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 800, height: 900 }, { width: 390, height: 844 }]) {
   test(`assigned tasks, filtering and responsive layout at ${viewport.width}px`, async ({ page }) => {
     await page.setViewportSize(viewport);
@@ -160,7 +170,7 @@ test('workspace navigation reuses loaded data and keeps Hubstaff refresh in the 
   await expect.poll(() => requests.settings).toBe(1);
 });
 
-test('workflow statuses have distinct badge treatments', async ({ page }) => {
+test('AI recommendations replace workflow-stage badges on active task cards', async ({ page }) => {
   const data = fixture();
   const base = data.tasks[0];
   data.tasks = [
@@ -170,18 +180,138 @@ test('workflow statuses have distinct badge treatments', async ({ page }) => {
     { ...base, id: 'review', title: 'Review task', status: 'Client Review', stage: 'review', done: false },
   ];
   await page.route('**/api/employee/dashboard**', route => route.fulfill({ json: data }));
+  await page.route('**/api/employee/task-guidance', async route => {
+    const labels = { todo: 'needs_reply', progress: 'continue_work', review: 'review_for_close' };
+    const badgeTexts = { todo: 'AOC should answer the latest question',
+      progress: 'AOC should finish the requested update',
+      review: 'AOC should verify approval before closing' };
+    const { taskIds } = route.request().postDataJSON();
+    await route.fulfill({ json: { guidance: taskIds.map(taskId => ({
+      taskId, label: labels[taskId], badgeText: badgeTexts[taskId],
+      reason: 'Based on the latest task discussion.',
+    })) } });
+  });
   await page.goto('/');
   await page.getByLabel('Status', { exact: true }).selectOption('all');
   const assigned = page.getByRole('region', { name: 'My Assigned Tasks' });
-  const badges = await Promise.all([
-    ['Todo task', 'To Do'], ['Progress task', 'In Progress'], ['Done task', 'Complete'], ['Review task', 'Client Review'],
-  ].map(async ([title, status]) => assigned.getByRole('listitem').filter({ hasText: title }).getByText(status, { exact: true })
-    .evaluate(element => {
-      const style = getComputedStyle(element);
-      return `${style.color}|${style.backgroundColor}|${style.borderColor}`;
-    })));
-  expect(new Set(badges).size).toBe(4);
+  for (const [title, action] of [
+    ['Todo task', 'AOC should answer the latest question'],
+    ['Progress task', 'AOC should finish the requested update'],
+    ['Done task', 'Completed'], ['Review task', 'AOC should verify approval before closing'],
+  ]) {
+    await expect(assigned.getByRole('listitem').filter({ hasText: title }).getByText(action, { exact: true })).toBeVisible();
+  }
+  await expect(assigned.getByText(/Stage:/)).toHaveCount(0);
 });
+
+test('AI-written badge wording fits a narrow task card', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('**/api/employee/dashboard**', route => route.fulfill({ json: fixture() }));
+  await page.route('**/api/employee/task-guidance', async route => {
+    const { taskIds } = route.request().postDataJSON();
+    await route.fulfill({ json: { guidance: taskIds.map(taskId => ({ taskId,
+      label: 'needs_reply', badgeText: 'AOC should follow up with the external reviewer today',
+      reason: 'The requested confirmation has not arrived.' })) } });
+  });
+  await page.goto('/');
+  const card = page.getByRole('region', { name: 'My Assigned Tasks' })
+    .getByRole('listitem').filter({ hasText: 'Fix PDP layout' });
+  const badge = card.getByLabel('AI next action: AOC should follow up with the external reviewer today');
+  await expect(badge).toBeVisible();
+  const bounds = await card.evaluate(element => {
+    const cardBounds = element.getBoundingClientRect();
+    const badgeBounds = element.querySelector('[aria-label^="AI next action:"]').getBoundingClientRect();
+    return { cardLeft: cardBounds.left, cardRight: cardBounds.right,
+      badgeLeft: badgeBounds.left, badgeRight: badgeBounds.right };
+  });
+  expect(bounds.badgeLeft).toBeGreaterThanOrEqual(bounds.cardLeft);
+  expect(bounds.badgeRight).toBeLessThanOrEqual(bounds.cardRight);
+});
+
+test('task cards wait for AI analysis and then show its recommendation', async ({ page }) => {
+  const data = fixture();
+  let releaseGuidance;
+  const guidanceGate = new Promise(resolve => { releaseGuidance = resolve; });
+  await page.route('**/api/employee/dashboard**', route => route.fulfill({ json: data }));
+  await page.route('**/api/employee/task-guidance', async route => {
+    await guidanceGate;
+    await route.fulfill({ json: { guidance: [
+      { taskId: '1', label: 'review_for_close', badgeText: 'AOC should verify approval before closing',
+        reason: 'The latest participant acknowledged the delivery.' },
+      { taskId: '2', label: 'needs_attention', badgeText: 'AOC should clarify the next change',
+        reason: 'Check the discussion before proceeding.' },
+    ] } });
+  });
+  await page.goto('/');
+  const assigned = page.getByRole('region', { name: 'My Assigned Tasks' });
+  const card = assigned.getByRole('listitem')
+    .filter({ hasText: 'Fix PDP layout' });
+  await expect(assigned.getByText('Analyzing task conversations before showing recommendations…')).toBeVisible();
+  await expect(card).toHaveCount(0);
+  releaseGuidance();
+  await expect(card.getByLabel('AI next action: AOC should verify approval before closing')).toBeVisible();
+  await expect(card.getByText(/Stage:/)).toHaveCount(0);
+  await card.getByRole('button', { name: 'View details for Fix PDP layout' }).click();
+  await expect(card.getByText('In Progress', { exact: true })).toBeVisible();
+  await expect(card.getByText(/The latest participant acknowledged the delivery/)).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Hide details for Fix PDP layout' })).toBeVisible();
+});
+
+test('failed AI analysis never substitutes the Hubstaff stage for a recommendation', async ({ page }) => {
+  await page.route('**/api/employee/dashboard**', route => route.fulfill({ json: fixture() }));
+  await page.route('**/api/employee/task-guidance', route => route.fulfill({ status: 503, json: {} }));
+  await page.goto('/');
+  const assigned = page.getByRole('region', { name: 'My Assigned Tasks' });
+  const card = assigned.getByRole('listitem').filter({ hasText: 'Fix PDP layout' });
+  await expect(card.getByLabel('AI analysis unavailable')).toBeVisible();
+  await expect(card.getByText(/Stage:/)).toHaveCount(0);
+  await expect(assigned.getByRole('button', { name: 'Retry analysis' })).toBeVisible();
+  await card.getByRole('button', { name: 'View details for Fix PDP layout' }).click();
+  await expect(card.getByText('In Progress', { exact: true })).toBeVisible();
+});
+
+test('a rejected provider model shows an actionable reason on the task card', async ({ page }) => {
+  await page.route('**/api/employee/dashboard**', route => route.fulfill({ json: fixture() }));
+  await page.route('**/api/employee/task-guidance', async route => {
+    const { taskIds } = route.request().postDataJSON();
+    await route.fulfill({ json: { guidance: taskIds.map(taskId => ({ taskId, label: null,
+      reason: 'The selected AI model is unavailable. Ask an AOC administrator to choose an available model.' })) } });
+  });
+  await page.goto('/');
+  const assigned = page.getByRole('region', { name: 'My Assigned Tasks' });
+  const card = assigned.getByRole('listitem').filter({ hasText: 'Fix PDP layout' });
+  await expect(card.getByLabel('AI analysis unavailable')).toBeVisible();
+  await expect(card.getByText(/selected AI model is unavailable/)).toBeVisible();
+});
+
+test('AI requests include only active tasks on the current page', async ({ page }) => {
+  const data = fixture();
+  data.tasks = Array.from({ length: 12 }, (_, index) => ({ ...data.tasks[0],
+    id: String(index + 1), title: `Paged task ${index + 1}`,
+    createdAt: new Date(Date.UTC(2026, 9, index + 1)).toISOString(),
+  }));
+  const requested = [];
+  await page.route('**/api/employee/dashboard**', route => route.fulfill({ json: data }));
+  await page.route('**/api/employee/task-guidance', async route => {
+    const { taskIds } = route.request().postDataJSON();
+    requested.push(taskIds);
+    await route.fulfill({ json: { guidance: taskIds.map(taskId => ({ taskId,
+      label: 'continue_work', badgeText: 'AOC should finish the assigned work',
+      reason: 'Continue the assigned work.' })) } });
+  });
+  await page.goto('/');
+  await expect.poll(() => requested.length).toBe(2);
+  assertPageRequests(requested, 10);
+  await page.getByRole('navigation', { name: 'Assigned task pages' }).getByRole('button', { name: 'Next' }).click();
+  await expect.poll(() => requested.length).toBe(3);
+  expect(requested[2]).toHaveLength(2);
+  expect(new Set(requested.flat()).size).toBe(12);
+});
+
+function assertPageRequests(requested, expectedCount) {
+  expect(requested.flat()).toHaveLength(expectedCount);
+  expect(new Set(requested.flat()).size).toBe(expectedCount);
+}
 
 test('urgent active tasks appear in Needs attention without requiring a due date', async ({ page }) => {
   const data = fixture();

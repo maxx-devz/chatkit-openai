@@ -86,12 +86,19 @@
 .draggableTask:hover { border-color: #b9d2ec; box-shadow: 0 4px 14px rgba(30, 77, 124, .07); }
 .draggableTask:active { cursor: grabbing; }
 .draggingTask { opacity: .5; }
-.taskRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(125px, auto); align-items: start; gap: 18px; }
+.taskRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(175px, 245px); align-items: start; gap: 18px; }
 .taskMain { min-width: 0; }
 .taskMain h3 { font-size: 14px; line-height: 1.6; margin: 0; }
 .taskContext { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 9px; margin-top: 5px; }
 .taskContext p { font-size: 12px; margin: 0; }
-.taskMeta { display: flex; flex-direction: column; align-items: flex-end; gap: 9px; }
+.guidanceBadge { display: inline-block; max-width: 100%; padding: 7px 12px; border: 1px solid #bbd5e9; border-radius: 14px; background: #eef7fc; color: #20587c; font-size: 11.5px; font-weight: 750; line-height: 1.4; text-align: center; overflow-wrap: anywhere; }
+.guidanceAction { border-color: #edc69b; background: #fff5e9; color: #8a4714; }
+.guidanceWarning { margin: 9px 0 0 !important; color: #8a4714 !important; font-size: 11px !important; line-height: 1.5; }
+.tasks .taskAnalysisPlaceholder { min-height: 94px; display: flex; align-items: center; padding: 18px; border-color: #e0e9f2; background: linear-gradient(100deg, #f7faff 20%, #edf4fb 50%, #f7faff 80%); color: #58718a; font-size: 11px; }
+.guidanceReason { padding: 9px 11px; border-left: 3px solid #9ecbea; background: #f3f9fd; font-size: 11px !important; }
+.guidanceProgress { margin: 4px 0 0 !important; color: #49647b !important; font-size: 11px !important; }
+.guidanceError { margin: 4px 0 0 !important; color: #8a4714 !important; font-size: 11px !important; }
+.taskMeta { display: flex; min-width: 0; flex-direction: column; align-items: flex-end; gap: 9px; }
 .taskDue { display: inline-flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 5px; padding: 6px 9px; border: 1px solid transparent; border-radius: 7px; font-size: 10px; font-weight: 650; line-height: 1.2; text-align: right; white-space: nowrap; }
 .taskDue small { color: inherit; font-size: 9px; font-weight: 750; letter-spacing: .04em; line-height: 1; text-transform: uppercase; }
 .dueDefault { border-color: #d5dee9; background: #f8fafc; color: #526174; }
@@ -110,6 +117,9 @@
 .taskDetails dd { margin: 4px 0 0; color: var(--ink); font-size: 12px; }
 .taskDetails > a { color: var(--accent); font-size: 12px; font-weight: 700; text-decoration: none; }
 .badge { padding: 5px 9px; border: 1px solid transparent; border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 1.2; }
+.badge.guidanceBadge { padding: 7px 12px; border-color: #bbd5e9; border-radius: 14px; font-size: 11.5px; line-height: 1.4; }
+.badge.guidanceBadge.guidanceAction { border-color: #edc69b; }
+.badge.guidanceBadge.finished { border-color: #a7d7bd; }
 .priority { padding: 4px 9px; border: 1px solid transparent; border-radius: 999px; font-size: 10px; font-weight: 750; letter-spacing: .01em; }
 .priority_urgent { border-color: #efb7b7; background: #fff0f0; color: #a92323; }
 .priority_high { border-color: #f0c795; background: #fff6e8; color: #925113; }
@@ -248,7 +258,8 @@
   .weekStats { grid-template-columns: 1fr 1fr; }
   .sidebar, .bottomGrid { grid-template-columns: 1fr; } .panel { padding: 18px; }
   .filters { grid-template-columns: 1fr 1fr; } .search { grid-column: 1 / -1; }
-  .taskRow { grid-template-columns: minmax(0, 1fr) minmax(105px, auto); gap: 12px; }
+  .taskRow { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .taskMeta { align-items: flex-start; }
   .taskDetails dl { grid-template-columns: 1fr; }
   .listFooter { align-items: stretch; flex-direction: column; } .pageControls { align-items: stretch; flex-direction: column; } .pageSize, .pagination { justify-content: space-between; }
   .activity li { flex-wrap: wrap; }

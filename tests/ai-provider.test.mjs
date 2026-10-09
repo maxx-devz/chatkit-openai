@@ -4,8 +4,14 @@ import assert from "node:assert/strict";
 import {
   aiClientOptions,
   isOpenRouterKey,
+  OPENAI_DEFAULT_MODEL,
   resolveAiProvider,
 } from "../lib/ai-provider.js";
+
+test("new OpenAI connections default to GPT-6 Luna", () => {
+  assert.equal(OPENAI_DEFAULT_MODEL, "gpt-6-luna");
+  assert.equal(resolveAiProvider({ OPENAI_API_KEY: "sk-proj-example" }).model, "gpt-6-luna");
+});
 
 test("detects OpenRouter from an sk-or-v1 key in the legacy variable", () => {
   const provider = resolveAiProvider({

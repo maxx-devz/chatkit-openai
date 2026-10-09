@@ -22,6 +22,20 @@ ALTER TABLE portal_employees ADD COLUMN IF NOT EXISTS position TEXT NOT NULL DEF
 ALTER TABLE portal_employees ADD COLUMN IF NOT EXISTS panel_access JSONB NOT NULL
   DEFAULT '["overview","my_tasks","activity","hubstaff"]'::jsonb;
 
+-- Advisory labels only. Hubstaff task state is never changed by this table.
+CREATE TABLE IF NOT EXISTS portal_employee_task_guidance (
+  employee_id BIGINT NOT NULL REFERENCES portal_employees(user_id) ON DELETE CASCADE,
+  task_id BIGINT NOT NULL CHECK (task_id > 0),
+  fingerprint TEXT NOT NULL,
+  label TEXT NOT NULL,
+  badge_text TEXT NOT NULL DEFAULT '',
+  reason TEXT NOT NULL DEFAULT '',
+  analyzed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (employee_id, task_id)
+);
+
+ALTER TABLE portal_employee_task_guidance ADD COLUMN IF NOT EXISTS badge_text TEXT NOT NULL DEFAULT '';
+
 DO $$
 BEGIN
   IF NOT EXISTS (

@@ -40,6 +40,65 @@ test('resolves Hubstaff priority labels for assigned tasks', async () => {
   assert.equal(fixture.calls.some(({ url }) => url.pathname === '/api/v1/projects/77/labels'), true);
 });
 
+test('task guidance reads recent comments only for the verified employee assignment', async () => {
+  const fixture = hubstaffFixture({ tasks: [task(), task({ id: 2, assignee_ids: [202] })],
+    members: { 77: [{ id: 101, email: 'maxx@alwaysopencommerce.com' },
+      { id: 202, email: 'james@client.example' }] },
+    comments: { 1: [
+      { id: 11, task_id: 1, user_id: 101, created_at: '2026-10-05T10:00:00Z', content: 'The feature is ready.' },
+      { id: 12, task_id: 1, user_id: 202, created_at: '2026-10-06T10:00:00Z', content: 'Looks good, thanks.' },
+      { id: 13, task_id: 1, user_id: 202, created_at: '2026-10-07T10:00:00Z', content: 'API key: fake-secret' },
+    ] } });
+  const api = createEmployeeHubstaff(fixture);
+  const [context] = await api.guidanceContexts(testToken, '101', ['1']);
+  assert.deepEqual(context.comments.map(item => item.content), [
+    'The feature is ready.', 'Looks good, thanks.',
+    '[Credential-related comment redacted; no credential values or outcome disclosed.]',
+  ]);
+  assert.deepEqual(context.comments.map(item => item.role), ['You', 'Outside AOC', 'Outside AOC']);
+  assert.deepEqual(context.comments.map(item => item.author), ['You 101', 'Outside AOC 202', 'Outside AOC 202']);
+  assert.equal(context.sensitiveCommentsRedacted, 1);
+  assert.deepEqual(context.comments.map(item => item.redacted), [false, false, true]);
+  assert.equal(JSON.stringify(context).includes('fake-secret'), false);
+  assert.equal(JSON.stringify(context).includes('james@client.example'), false);
+  assert.equal(fixture.calls.some(({ url }) => url.pathname === '/api/v1/tasks/1/comments'), true);
+  assert.equal(fixture.calls.some(({ url }) => url.pathname === '/api/v1/tasks/my/assigned'), false);
+  assert.equal(fixture.calls.some(({ url }) => url.pathname === '/api/v1/tasks/1'), true);
+  assert.equal(fixture.calls.find(({ url }) => url.pathname === '/api/v1/tasks/1/comments')?.url.searchParams.get('page_limit'), '100');
+  await assert.rejects(api.guidanceContexts(testToken, '101', ['2']), error => error.publicDetails.code === 'panel_forbidden');
+  assert.equal(fixture.calls.some(({ url }) => url.pathname === '/api/v1/tasks/2/comments'), false);
+});
+
+test('task guidance keeps the complete discussion and flags oversized conversations', async () => {
+  const comments = Array.from({ length: 50 }, (_, index) => ({ id: index + 1, task_id: 1, user_id: 202,
+    created_at: new Date(Date.UTC(2026, 9, 1, 0, index)).toISOString(), content: `Update ${index + 1}` }));
+  const fixture = hubstaffFixture({ comments: { 1: comments } });
+  const [context] = await createEmployeeHubstaff(fixture).guidanceContexts(testToken, '101', ['1']);
+  assert.equal(context.comments.length, 50);
+  assert.equal(context.commentsTruncated, false);
+  assert.equal(context.conversationTooLong, false);
+  const long = hubstaffFixture({ comments: { 1: comments.map(comment => ({ ...comment,
+    content: `Update ${comment.id} ${'detail '.repeat(150)}` })) } });
+  const [longContext] = await createEmployeeHubstaff(long).guidanceContexts(testToken, '101', ['1']);
+  assert.equal(longContext.conversationTooLong, true);
+});
+
+test('task guidance does not invent comments when Hubstaff denies comment access', async () => {
+  const fixture = hubstaffFixture();
+  const api = createEmployeeHubstaff({ fetchImpl: (url, options) =>
+    url.pathname.endsWith('/comments') ? Response.json({}, { status: 403 }) : fixture.fetchImpl(url, options) });
+  const [context] = await api.guidanceContexts(testToken, '101', ['1']);
+  assert.equal(context.commentsAvailable, false);
+  assert.deepEqual(context.comments, []);
+});
+
+test('task guidance rejects a mismatched identity before reading any task comments', async () => {
+  const fixture = hubstaffFixture({ userId: 202 });
+  await assert.rejects(createEmployeeHubstaff(fixture).guidanceContexts(testToken, '101', ['1']),
+    error => error.publicDetails.code === 'identity_mismatch');
+  assert.deepEqual(fixture.calls.map(({ url }) => url.pathname), ['/v2/users/me']);
+});
+
 test('new PAT is exchanged once using the fixed Hubstaff token endpoint, with rotated credentials kept server-side', async () => {
   const access = 'fixture-access-jwt-never-real-0001';
   const nextRefresh = 'fixture-rotated-pat-never-real-0002';
