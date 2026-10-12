@@ -38,7 +38,14 @@ class ClientStreamTests(unittest.IsolatedAsyncioTestCase):
     async def test_follow_ups_preserve_existing_legacy_reply(self):
         await self.check_client_reply("vendor/model:free", follow_up=True, legacy=True)
 
-    async def check_client_reply(self, model, site_model=None, follow_up=False, legacy=False):
+    async def test_independent_question_sends_no_tool_schemas(self):
+        await self.check_client_reply("vendor/model:free", general=True)
+
+    async def test_clear_task_question_reuses_prefetched_snapshot_in_one_model_call(self):
+        await self.check_client_reply("vendor/model:free", prompt="What tasks are in progress?")
+
+    async def check_client_reply(self, model, site_model=None, follow_up=False, legacy=False,
+                                 general=False, prompt="Who are you?"):
         requests = []
         wires = []
 
@@ -84,7 +91,7 @@ class ClientStreamTests(unittest.IsolatedAsyncioTestCase):
         store.load_thread.side_effect = load_thread
         store.load_thread_items.side_effect = load_items
         context = Context(AsyncMock(), "1", "2", "Be helpful.", {"display_name": "Test client"})
-        context.hubstaff = {"workflow": {"columns": []}}
+        context.hubstaff = None if general else {"workflow": {"columns": []}}
         context.ai_model = site_model
         with patch.dict(os.environ, {"OPENAI_API_KEY": "", "OPENROUTER_API_KEY": "sk-or-v1-test",
                                      "OPENROUTER_MODEL": model}), \
@@ -99,7 +106,7 @@ class ClientStreamTests(unittest.IsolatedAsyncioTestCase):
                     server = PortalChatKitServer(store)
                     stream = await server.process(json.dumps({
                         "type": "threads.create", "params": {"input": {
-                            "content": [{"type": "input_text", "text": "Who are you?"}],
+                            "content": [{"type": "input_text", "text": prompt}],
                             "attachments": [], "inference_options": {}}},
                     }).encode(), context)
                     wire = b"".join([chunk async for chunk in stream]).decode()
@@ -127,7 +134,9 @@ class ClientStreamTests(unittest.IsolatedAsyncioTestCase):
         body = json.loads(requests[0].content)
         self.assertEqual(body["model"], site_model or model)
         self.assertTrue(body["stream"])
-        self.assertTrue(body["tools"])
+        self.assertFalse(body.get("tools"))
+        if not general:
+            self.assertIn("Current verified, read-only Hubstaff snapshot", str(body["messages"]))
         if follow_up:
             history = json.loads(requests[-1].content)["messages"]
             self.assertTrue(any(message["role"] == "assistant" and "Hello from AOC." in str(message["content"])

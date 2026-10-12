@@ -11,7 +11,7 @@ from docx import Document
 from pydantic import ValidationError
 from builder_config import AssistantConfig
 from generation import DocumentSection, FILE_CARD, render_document, reserve_tool, save_artifact, DOCX_MIME
-from assistant import hubstaff_tools, make_agent, website_tools
+from assistant import hubstaff_tools, inline_hubstaff_snapshot, make_agent, website_tools
 from preview import PreviewRequest
 
 
@@ -48,6 +48,42 @@ class BuilderTests(unittest.TestCase):
         self.assertEqual(len(tools), 1)
         self.assertEqual(tools[0].name, "get_hubstaff_project_status")
         self.assertEqual(hubstaff_tools(SimpleNamespace(hubstaff=None)), [])
+
+    def test_independent_question_omits_work_tools_but_keeps_client_instructions(self):
+        config = AssistantConfig(documents=True, knowledge="Private client facts").model_dump()
+        context = SimpleNamespace(config=config, instructions="Global", client={"display_name": "Test"},
+                                  response_route="general")
+        agent = make_agent(context)
+        self.assertEqual(agent.tools, [])
+        self.assertIn("Approved client instructions", agent.instructions)
+        self.assertNotIn("Private client facts", agent.instructions)
+
+    def test_hubstaff_question_only_advertises_needed_tools(self):
+        config = AssistantConfig(documents=True, vectorStoreId="vs_client").model_dump()
+        context = SimpleNamespace(config=config, instructions="Global", client={"display_name": "Test"},
+                                  client_id="1", preview=False,
+                                  hubstaff={"workflow": {"columns": []}},
+                                  response_route="hubstaff", response_query="What tasks are in progress?")
+        with patch("assistant.supports_openai_hosted_tools", return_value=True):
+            agent = make_agent(context)
+        self.assertEqual([tool.name for tool in agent.tools], ["get_hubstaff_project_status"])
+        context.response_query = "Compare my Hubstaff tasks with last year's saved report"
+        with patch("assistant.supports_openai_hosted_tools", return_value=True):
+            agent = make_agent(context)
+        self.assertIn("search_client_library", [tool.name for tool in agent.tools])
+        self.assertTrue(any(getattr(tool, "vector_store_ids", None) == ["vs_client"]
+                            for tool in agent.tools))
+
+    def test_verified_hubstaff_data_is_lower_priority_and_omits_duplicate_tool(self):
+        context = SimpleNamespace(hubstaff={"project": {"name": "Client project"}},
+                                  hubstaff_inlined=False)
+        agent_input = [{"role": "user", "content": [{"type": "input_text", "text": "What tasks?"}]}]
+        self.assertTrue(inline_hubstaff_snapshot(agent_input, context))
+        context.hubstaff_inlined = True
+        self.assertEqual(agent_input[-2]["role"], "user")
+        self.assertIn("Client project", agent_input[-2]["content"][0]["text"])
+        self.assertEqual(agent_input[-1]["content"][0]["text"], "What tasks?")
+        self.assertEqual(hubstaff_tools(context), [])
 
     def test_website_tool_is_restricted_to_the_approved_client_domain(self):
         context = SimpleNamespace(client={"approved_website_url": "https://www.example.com/"})

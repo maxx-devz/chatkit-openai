@@ -33,6 +33,9 @@ class Context:
     ai_provider: object = field(default=None, repr=False)
     ai_client: object = field(default=None, repr=False)
     hosted_client: object = field(default=None, repr=False)
+    response_route: str = "work"
+    response_query: str = ""
+    hubstaff_inlined: bool = False
 
     @property
     def scope(self):
@@ -116,12 +119,19 @@ class PostgresStore(Store[Context]):
     async def save_item(self, thread_id, item, context):
         if item.thread_id != thread_id:
             raise NotFoundError("Conversation not found")
-        await self.load_thread(thread_id, context)
-        await context.db.execute("""
+        cursor = await context.db.execute("""
             INSERT INTO portal_chatkit_items (client_id, user_id, thread_id, id, data)
-            VALUES (%s, %s, %s, %s, %s)
+            SELECT %s, %s, %s, %s, %s
+            WHERE EXISTS (
+                SELECT 1 FROM portal_chatkit_threads
+                WHERE client_id=%s AND user_id=%s AND id=%s
+            )
             ON CONFLICT (client_id, user_id, thread_id, id) DO UPDATE SET data=EXCLUDED.data
-        """, (*context.scope, thread_id, item.id, Jsonb(item.model_dump(mode="json"))))
+            RETURNING id
+        """, (*context.scope, thread_id, item.id, Jsonb(item.model_dump(mode="json")),
+              *context.scope, thread_id))
+        if not await cursor.fetchone():
+            raise NotFoundError("Conversation not found")
 
     async def load_item(self, thread_id, item_id, context):
         cursor = await context.db.execute("""
