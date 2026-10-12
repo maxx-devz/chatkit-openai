@@ -1,7 +1,7 @@
 # Client ChatKit attachments
 
 The client ChatKit composer has a native attachment button. Files are uploaded
-to the portal, stored privately in the existing Neon database, and included in
+to the portal, stored privately in the existing PostgreSQL database, and included in
 the assistant's model input when the client sends a message. Uploading alone
 does not make an OpenAI request or consume a monthly chat attempt.
 

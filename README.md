@@ -4,7 +4,8 @@ The client portal uses OpenAI ChatKit for conversations and interactive file car
 A Python ChatKit server runs the assistant through the Agents SDK and a compatible
 Responses API. Chat replies can use OpenAI or OpenRouter without changing the UI.
 Next.js handles the portal, Better Auth login, administrator tools, and authenticated
-requests. Neon stores client settings, conversations, usage, and generated files.
+requests. PostgreSQL (currently hosted by Neon) stores client settings,
+conversations, usage, and generated files.
 
 **Start here: [Local setup and Vercel deployment](docs/CHATKIT_SETUP.md).**
 **Configure replies: [Assistant settings](docs/BUILDER_SETUP.md).**
@@ -13,6 +14,7 @@ requests. Neon stores client settings, conversations, usage, and generated files
 **Connect client work: [Hubstaff dashboard and assistant](docs/HUBSTAFF_SETUP.md).**
 **Restrict public web research: [Approved client websites](docs/WEBSITE_ACCESS_SETUP.md).**
 **Save cross-conversation files: [Persistent client library](docs/CLIENT_LIBRARY_SETUP.md).**
+**Keep the database portable: [PostgreSQL and possible Supabase migration](docs/DATABASE_PORTABILITY.md).**
 **Employee work dashboard: [Employee prototype setup and security](docs/EMPLOYEE_PORTAL.md).**
 
 The portal's AOC-GPT is an API assistant. Your team's existing custom GPT inside

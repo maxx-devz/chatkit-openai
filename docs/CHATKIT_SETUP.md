@@ -47,7 +47,8 @@ For a fresh checkout, copy `.env.example` to `.env.local` and fill the values.
 
 | Variable | Local value/purpose |
 | --- | --- |
-| `DATABASE_URL` | Existing Neon connection string |
+| `DATABASE_URL` | Existing PostgreSQL connection string |
+| `DATABASE_POOL_MAX` | Optional shared Node pool limit; defaults to `3` |
 | `BETTER_AUTH_SECRET` | Existing login secret, at least 32 characters |
 | `BETTER_AUTH_URL` | `http://127.0.0.1:3000` exactly |
 | `PROVIDER_SETTINGS_SECRET` | Stable random 32+ character secret; encrypts admin-managed provider keys |
@@ -98,8 +99,8 @@ from local/Vercel settings. The client always uses ChatKit.
 
 ## 3. Check database tables
 
-Migrations use the database in `.env.local`. Prefer a development Neon branch
-locally. Confirm which database you are targeting before running a migration.
+Migrations use the database in `.env.local`. Prefer a separate development
+database locally. Confirm which database you are targeting before running a migration.
 
 For an existing portal, add the ChatKit/settings tables:
 
@@ -175,7 +176,7 @@ and branch names; do not push an incomplete setup straight to production.
    Directory **chatkit_backend** with the **FastAPI** preset. Use the branch
    containing these changes for the initial backend deployment. The folder
    contains `app.py`, pinned requirements, `.python-version`, and `vercel.json`.
-3. Set the Python environment variables from the table below. Use the same Neon
+3. Set the Python environment variables from the table below. Use the same PostgreSQL
    database as the target frontend. Apply `chatkit:migrate`, `builder:migrate`,
    `uploads:migrate`, and `usage:migrate` to that database
    before connecting the frontend.
@@ -197,7 +198,7 @@ and branch names; do not push an incomplete setup straight to production.
 
 | Environment variable | Existing Next.js project | Python project |
 | --- | --- | --- |
-| `DATABASE_URL` | Existing Neon DB | Same DB |
+| `DATABASE_URL` | Existing PostgreSQL DB | Same DB |
 | `BETTER_AUTH_URL` | `https://quantum-project-xi.vercel.app` | Not needed |
 | `BETTER_AUTH_SECRET` | Keep existing production auth secret | Not needed |
 | `PROVIDER_SETTINGS_SECRET` | Stable secret for encrypted saved provider keys | Identical secret |
@@ -280,9 +281,9 @@ domain registration, or deployment health. Those need a real client test.
   confirm the domain is registered. A nonempty key alone does not prove validity.
 - **Assistant cannot connect:** verify Python `/health`, its logs, matching
   backend secrets, the HTTPS origin, and any deployment protection token.
-- **`ChatKit request failed: OperationalError` with a Neon pooled URL:** older
-  backends sent `statement_timeout` as a startup option, which Neon's pooler
-  rejects. Deploy the current Python backend; client chat and staff preview
+- **`ChatKit request failed: OperationalError` with a pooled URL:** older
+  backends sent `statement_timeout` as a startup option, which transaction poolers
+  reject. Deploy the current Python backend; client chat and staff preview
   use a shared connection helper with an 8-second connection timeout and a
   10-second statement timeout set inside each query's transaction. Keep the
   existing database URL. Other `OperationalError` causes still require checking

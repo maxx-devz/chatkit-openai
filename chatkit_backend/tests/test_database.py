@@ -20,6 +20,7 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(kwargs["autocommit"])
             self.assertIs(kwargs["row_factory"], dict_row)
             self.assertEqual(kwargs["connect_timeout"], 8)
+            self.assertIsNone(kwargs["prepare_threshold"])
             return sentinel.connection
 
         with patch.object(PortalConnection, "connect", side_effect=pooler):

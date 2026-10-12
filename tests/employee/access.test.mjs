@@ -10,6 +10,14 @@ let claimed = true;
 const db = { query: async (query, values) => {
   if (query.startsWith('SELECT to_regclass')) return { rows: [{ relation: 'portal_employees' }] };
   if (query.includes('FROM portal_employees e')) return { rows: employee ? [employee] : [] };
+  if (query.includes('JOIN portal_admins')) {
+    legacyQueries++;
+    return { rows: session.user.id === 'admin' ? [{ id: '30', role: 'aoc_admin', display_name: 'Fixture admin' }] : [] };
+  }
+  if (query.includes('WITH synced_user')) {
+    legacyQueries++;
+    return { rows: session.user.id === 'client' ? [{ id: '7', portal_user_id: '40', slug: 'fixture-client', role: 'client_admin', display_name: 'Fixture client' }] : [] };
+  }
   if (query.includes('SET next_request_at')) return { rowCount: claimed ? 1 : 0, rows: [] };
   if (query.includes('SELECT encrypted_refresh_token, access_expires_at')) return { rows: [] };
   if (query.includes('SET encrypted_access_token')) { savedCiphertext = values[3]; return { rowCount: 1 }; }
@@ -21,13 +29,6 @@ mock.module('../../lib/auth.js', { namedExports: {
   isPortalAuthConfigured: () => true, createPortalAuth: () => ({}),
 } });
 mock.module('pg', { defaultExport: { Pool: class { query(...args) { return db.query(...args); } } } });
-mock.module('@neondatabase/serverless', { namedExports: { neon: () => async (strings) => {
-  legacyQueries++;
-  const sql = strings.join('');
-  if (sql.includes('JOIN portal_admins')) return session.user.id === 'admin' ? [{ id: '30', role: 'aoc_admin', display_name: 'Fixture admin' }] : [];
-  if (sql.includes('WITH synced_user')) return session.user.id === 'client' ? [{ id: '7', portal_user_id: '40', slug: 'fixture-client', role: 'client_admin', display_name: 'Fixture client' }] : [];
-  return [];
-} } });
 process.env.DATABASE_URL = 'postgresql://fixture.invalid/unused';
 process.env.BETTER_AUTH_URL = 'https://portal.example';
 process.env.HUBSTAFF_TOKEN_ENCRYPTION_KEY = 'test-only-employee-key-more-than-32-characters';

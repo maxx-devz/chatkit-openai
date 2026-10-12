@@ -1,13 +1,12 @@
 import { Writable } from "node:stream";
 import { createInterface } from "node:readline/promises";
 
-import { neon } from "@neondatabase/serverless";
-
 import {
   closeAuthDatabase,
   createPortalAuth,
   isPortalAuthConfigured,
 } from "../lib/auth.js";
+import { databaseSql } from "../lib/postgres.js";
 
 function fail(message) {
   console.error(`\nAdministrator was not created: ${message}`);
@@ -87,7 +86,7 @@ async function main() {
     return;
   }
 
-  const sql = neon(process.env.DATABASE_URL);
+  const sql = databaseSql;
   const schema = await sql`
     SELECT
       to_regclass('public.portal_users') IS NOT NULL AS has_users,
@@ -95,7 +94,7 @@ async function main() {
   `;
 
   if (!schema[0]?.has_users || !schema[0]?.has_admins) {
-    fail("The admin schema is missing. Run database/admin-schema.sql in the Neon SQL Editor first.");
+    fail("The admin schema is missing. Run npm run admin:migrate first.");
     return;
   }
 
