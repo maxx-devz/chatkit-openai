@@ -8,7 +8,7 @@ import aocIcon from "@/aoc-icon.png";
 import aocLogo from "@/aoc-logo.png";
 import SignOutButton from "@/components/auth/sign-out-button";
 import AdminAssistant from "@/components/admin/admin-assistant";
-import EmployeeControls from "@/components/admin/employee-controls";
+import InternalUserControls from "@/components/admin/internal-user-controls";
 import PortalUsage from "@/components/admin/portal-usage";
 import ProviderSettings from "@/components/admin/provider-settings";
 import styles from "./admin-dashboard.module.css";
@@ -106,6 +106,10 @@ export default function AdminDashboard({ initialData }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [createError, setCreateError] = useState("");
+  const [makeConnection, setMakeConnection] = useState({
+    state: "idle",
+    message: "Not tested in this session.",
+  });
   const createDialogRef = useRef(null);
 
   useEffect(() => {
@@ -238,6 +242,33 @@ export default function AdminDashboard({ initialData }) {
     }
   }
 
+  async function testMakeConnection() {
+    if (busy) return;
+    setBusy("make-test");
+    setMakeConnection({ state: "testing", message: "Contacting Make..." });
+
+    try {
+      const response = await fetch("/api/admin/make/test", { method: "POST" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.connected !== true) {
+        throw new Error(payload?.error || "The Make connection test failed.");
+      }
+      setMakeConnection({
+        state: "success",
+        message: payload.message || "Make accepted the connection test.",
+        requestId: payload.requestId,
+        sentAt: payload.sentAt,
+      });
+    } catch (connectionError) {
+      setMakeConnection({
+        state: "error",
+        message: connectionError.message || "The Make connection test failed.",
+      });
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function createClient(event) {
     event.preventDefault();
     if (busy) return;
@@ -296,7 +327,7 @@ export default function AdminDashboard({ initialData }) {
           <a className={styles.activeNav} href="#overview"><Icon name="overview" />Overview</a>
           <a href="#portal-usage"><Icon name="activity" />AI usage</a>
           <a href="#clients"><Icon name="clients" />Client controls</a>
-          <a href="#employees"><Icon name="user" />Employee controls</a>
+          <a href="#internalUsers"><Icon name="user" />Internal user controls</a>
           <a href="#assistant"><Icon name="spark" />AI assistant</a>
           <Link href="/builder"><Icon name="spark" />Assistant settings</Link>
           <a href="#ai-controls"><Icon name="activity" />AI allowances</a>
@@ -322,7 +353,7 @@ export default function AdminDashboard({ initialData }) {
           <div>
             <p>AOC operations</p>
             <h1>Portal control center</h1>
-            <span>Manage client AI settings and position-based employee access.</span>
+            <span>Manage client AI settings and position-based internal user access.</span>
           </div>
           <div className={styles.topbarActions}>
             <span className={styles.secureBadge}><Icon name="shield" />Admin protected</span>
@@ -355,9 +386,9 @@ export default function AdminDashboard({ initialData }) {
             />
             <Metric
               icon="user"
-              label="Employee accounts"
-              value={number(initialData.employees?.length)}
-              detail={`${number(initialData.employees?.filter((employee) => employee.active).length)} portal enabled`}
+              label="Internal user accounts"
+              value={number(initialData.internalUsers?.length)}
+              detail={`${number(initialData.internalUsers?.filter((internalUser) => internalUser.active).length)} portal enabled`}
               tone="green"
             />
           </section>
@@ -594,6 +625,26 @@ export default function AdminDashboard({ initialData }) {
                         />
                         <small>Optional per-client fallback. A monthly hours budget configured in Hubstaff takes priority.</small>
                       </label>
+                      <div className={styles.makeConnection}>
+                        <div>
+                          <strong>Make automation</strong>
+                          <small>Send a server-side test event and confirm that the Make scenario executed.</small>
+                          <span
+                            className={styles[`makeConnection_${makeConnection.state}`]}
+                            role={makeConnection.state === "error" ? "alert" : "status"}
+                          >
+                            {makeConnection.message}
+                            {makeConnection.requestId ? ` Request ${makeConnection.requestId}.` : ""}
+                          </span>
+                        </div>
+                        <button
+                          disabled={Boolean(busy)}
+                          onClick={testMakeConnection}
+                          type="button"
+                        >
+                          {busy === "make-test" ? "Testing..." : "Test Make connection"}
+                        </button>
+                      </div>
                     </section>
 
                     <section className={`${styles.settingsCard} ${styles.wideCard}`}>
@@ -634,9 +685,9 @@ export default function AdminDashboard({ initialData }) {
             </section>
           </section>
 
-          <EmployeeControls
-            initialEmployees={initialData.employees || []}
-            schemaReady={initialData.employeeSchemaReady === true}
+          <InternalUserControls
+            initialInternalUsers={initialData.internalUsers || []}
+            schemaReady={initialData.internalUserSchemaReady === true}
           />
         </main>
       </div>

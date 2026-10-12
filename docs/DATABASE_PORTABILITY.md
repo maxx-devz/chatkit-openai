@@ -57,8 +57,8 @@ rollback and authorization plan.
    `NEXT_PUBLIC_*` variable.
 6. Recreate any required database roles and review Row Level Security explicitly;
    do not assume role or RLS state was transferred.
-7. Run every migration and `npm run setup:check -- --employee`, then test staff,
-   client, and employee login; conversations; uploads/downloads; library files;
+7. Run every migration and `npm run setup:check -- --internal-user`, then test staff,
+   client, and internal user login; conversations; uploads/downloads; library files;
    provider settings; Hubstaff token refresh; and usage accounting.
 8. Compare critical row counts and sequences, switch writes once, and retain a
    tested rollback window. Never allow both databases to accept production writes

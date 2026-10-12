@@ -1,6 +1,25 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  async redirects() {
+    return [
+      {
+        source: "/api/admin/employees",
+        destination: "/api/admin/internal-users",
+        permanent: false,
+      },
+      {
+        source: "/api/employee/:path*",
+        destination: "/api/internal/:path*",
+        permanent: false,
+      },
+      {
+        source: "/employee/:path*",
+        destination: "/internal/:path*",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     const headers = [
       { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
