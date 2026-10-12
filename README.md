@@ -15,7 +15,7 @@ conversations, usage, and generated files.
 **Restrict public web research: [Approved client websites](docs/WEBSITE_ACCESS_SETUP.md).**
 **Save cross-conversation files: [Persistent client library](docs/CLIENT_LIBRARY_SETUP.md).**
 **Keep the database portable: [PostgreSQL and possible Supabase migration](docs/DATABASE_PORTABILITY.md).**
-**Employee work dashboard: [Employee prototype setup and security](docs/EMPLOYEE_PORTAL.md).**
+**Internal user work dashboard: [Internal user prototype setup and security](docs/INTERNAL_PORTAL.md).**
 
 The portal's AOC-GPT is an API assistant. Your team's existing custom GPT inside
 ChatGPT Business does not automatically connect or synchronize with it. Transfer
@@ -69,10 +69,10 @@ to OpenRouter chat requests; switch chat back to OpenAI when that tool is requir
 - Staff-only settings at `/builder`: drafts, tests, publishing, versions,
   greeting, colors, and starter prompts.
 - Existing administrator dashboard and staff assistant at `/admin`.
-- Administrator Employee Controls for provisioning employee-only accounts,
+- Administrator Internal User Controls for provisioning internal-user-only accounts,
   assigning positions, enabling portal panels, and pausing access.
-- One Employee Portal with separate My Work, Team Workspace, and Settings
-  containers, each protected by the employee panel policy.
+- One Internal Portal with separate My Work, Team Workspace, and Settings
+  containers, each protected by the internal user panel policy.
 - Staff usage panel with client allowances and recorded client/admin/draft tokens.
 - Per-client Hubstaff project, task, and monthly time reads for the dashboard
   and read-only AOC-GPT answers.
@@ -90,12 +90,12 @@ Existing accounts, client records, conversations, and administrator tools are re
 | `npm run dev` | Start Next.js and local Python |
 | `npm run dev:web` | Start Next.js when Python is already running |
 | `npm run setup:check` | Check local configuration and database tables without displaying secrets |
-| `npm run setup:check -- --employee` | Also check the optional employee schema and encryption key |
-| `npm run employee:migrate` | Add/update employee access, position, panel policy, and encrypted connection storage |
-| `npm run employee:create -- USERNAME "DISPLAY NAME" APPROVED_HUBSTAFF_USER_ID` | Privately provision employee-only access; password is prompted |
-| `npm run test:employee` | Employee authorization, Hubstaff isolation, credential safety, and real Better Auth login tests |
-| `npm run test:employee:database` | Employee SQL checks in rolled-back temporary tables |
-| `npm run test:employee:ui` | Isolated desktop/mobile browser checks; requires installed Chrome |
+| `npm run setup:check -- --internal-user` | Also check the optional internal user schema and encryption key |
+| `npm run internal-user:migrate` | Add/update internal user access, position, panel policy, and encrypted connection storage |
+| `npm run internal-user:create -- USERNAME "DISPLAY NAME" APPROVED_HUBSTAFF_USER_ID` | Privately provision internal-user-only access; password is prompted |
+| `npm run test:internal-user` | Internal user authorization, Hubstaff isolation, credential safety, and real Better Auth login tests |
+| `npm run test:internal-user:database` | Internal user SQL checks in rolled-back temporary tables |
+| `npm run test:internal-user:ui` | Isolated desktop/mobile browser checks; requires installed Chrome |
 | `npm run lint` | Check JavaScript/React |
 | `npm test` | Run JavaScript security/configuration tests |
 | `npm run test:http` | Check local routes while both dev services are running |
