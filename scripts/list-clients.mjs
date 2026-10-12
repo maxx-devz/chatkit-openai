@@ -1,4 +1,4 @@
-import { neon } from "@neondatabase/serverless";
+import { closeDatabasePool, databaseSql } from "../lib/postgres.js";
 
 function fail(message) {
   console.error(`\nCould not list clients: ${message}`);
@@ -11,7 +11,7 @@ async function main() {
     return;
   }
 
-  const sql = neon(process.env.DATABASE_URL);
+  const sql = databaseSql;
   const rows = await sql`
     SELECT
       client.display_name,
@@ -61,4 +61,6 @@ try {
   await main();
 } catch (error) {
   fail(error?.message || "An unexpected database error occurred.");
+} finally {
+  await closeDatabasePool().catch(() => null);
 }

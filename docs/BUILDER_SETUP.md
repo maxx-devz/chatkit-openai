@@ -39,7 +39,7 @@ Both projects can deploy from the same GitHub repository.
 
 | Environment variable | Next.js project | Python project |
 | --- | --- | --- |
-| `DATABASE_URL` | Existing Neon database | Same database |
+| `DATABASE_URL` | Existing PostgreSQL database | Same database |
 | `BETTER_AUTH_URL` | Exact frontend origin | Not needed |
 | `BETTER_AUTH_SECRET` | Existing auth secret | Not needed |
 | `OPENAI_API_KEY` | OpenAI key or legacy location for an auto-detected OpenRouter key | Same value when used |
@@ -122,7 +122,7 @@ promotional image that follows our approved brand instructions."
   include failed API requests; chat's existing monthly allowance also applies.
 - Publishing approves the rules and tools. Outputs are downloadable immediately
   by their requesting user. There is no per-output staff approval queue.
-- Bounded file bytes are stored in Neon, with client/user ownership checks on
+- Bounded file bytes are stored in PostgreSQL, with client/user ownership checks on
   every download. This avoids ephemeral Vercel disk and public file URLs. For
   higher volumes, migrate bytes to private object storage and retain these checks.
 - Live files are removed when their ChatKit thread, client, or owning user is

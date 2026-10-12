@@ -38,7 +38,7 @@ and `tasks:read` scopes using Hubstaff's
 
 The value Hubstaff initially shows for a PAT is a refresh token. It is not a
 Bearer access token. The portal exchanges it for a roughly 24-hour access token,
-saves Hubstaff's rotated refresh token in Neon using AES-256-GCM encryption, and
+saves Hubstaff's rotated refresh token in PostgreSQL using AES-256-GCM encryption, and
 refreshes it automatically. A database transaction lock prevents two Vercel
 instances from rotating the same token at the same time.
 
@@ -64,7 +64,7 @@ left blank. A manually exchanged short-lived PAT access token also works in
 
 Put these values in `.env.local` for local development and in the existing
 Quantum Next.js Vercel project's environment variables for Production and any
-Preview environment you use. All deployments that share the same Neon database
+Preview environment you use. All deployments that share the same PostgreSQL database
 must use the same `HUBSTAFF_TOKEN_ENCRYPTION_KEY`. Do not change that key after
 the first exchange. Do not add any Hubstaff variable to the ChatKit Python
 project or prefix it with `NEXT_PUBLIC_`.
@@ -78,7 +78,7 @@ Hubstaff organization timezone. `UTC` is used when it is blank or invalid.
 
 ## 2. Update the database
 
-Run this once against the same Neon database used by the portal, before the
+Run this once against the same PostgreSQL database used by the portal, before the
 first PAT exchange:
 
 ```powershell
@@ -139,7 +139,7 @@ removes the portal's access.
 1. Add `HUBSTAFF_PAT_REFRESH_TOKEN`, `HUBSTAFF_TOKEN_ENCRYPTION_KEY`, and
    `HUBSTAFF_REPORT_TIME_ZONE` to the Quantum Next.js Vercel project. Leave
    `HUBSTAFF_ACCESS_TOKEN` blank for the member PAT setup.
-2. Run `npm run admin:migrate` against the production Neon database.
+2. Run `npm run admin:migrate` against the production PostgreSQL database.
 3. Deploy the Python ChatKit backend because it contains the new Hubstaff tool.
 4. Deploy the Quantum frontend because it contains the Hubstaff API proxy and UI.
 5. Sign in at `https://quantum-project-xi.vercel.app/` as the mapped client and

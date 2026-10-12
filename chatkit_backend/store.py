@@ -1,4 +1,4 @@
-"""Neon-backed ChatKit Store. All queries include the server-established scope."""
+"""PostgreSQL-backed ChatKit Store. All queries include the server-established scope."""
 from dataclasses import dataclass, field
 from uuid import uuid4
 

@@ -93,7 +93,7 @@ if (configured("DATABASE_URL")) {
     check(
       false,
       "Database connection",
-      `${detail}. Check DATABASE_URL, network access, and the Neon database status.`,
+      `${detail}. Check DATABASE_URL, network access, and the PostgreSQL provider status.`,
     );
   }
   finally { await db.end().catch(() => {}); }

@@ -40,7 +40,6 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.1.0",
     "@openai/chatkit-react": "1.6.1",
     "better-auth": "^1.7.2",
     "next": "^16.3.3",
