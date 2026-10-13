@@ -4,11 +4,6 @@ const nextConfig = {
   async redirects() {
     return [
       {
-        source: "/api/admin/employees",
-        destination: "/api/admin/internal-users",
-        permanent: false,
-      },
-      {
         source: "/api/employee/:path*",
         destination: "/api/internal/:path*",
         permanent: false,

@@ -88,7 +88,7 @@ function normalizeStoredPlan(value) {
   };
 }
 
-export default function InternalUserDashboard({ name, position, panelAccess = [], workspace = 'personal', connected, connectionMessage, children }) {
+export default function InternalUserDashboard({ name, position, panelAccess = [], workspace = 'personal', connected, connectionMessage, children, previewData = null }) {
   const panels = new Set(panelAccess);
   const isPersonal = workspace === 'personal';
   const isTeam = workspace === 'team';
@@ -97,12 +97,14 @@ export default function InternalUserDashboard({ name, position, panelAccess = []
   const canViewTasks = panels.has('my_tasks');
   const canViewActivity = panels.has('activity');
   const canViewTeam = panels.has('team_directory');
-  const canViewTeamTasks = panels.has('team_tasks');
   const canConnectHubstaff = panels.has('hubstaff');
   const shouldLoadDashboard = isSettings
     || (isPersonal && connected)
-    || (isTeam && (canViewTeam || canViewTeamTasks));
-  const { data, busy, error } = useInternalUserWorkspace(workspace, { enabled: shouldLoadDashboard });
+    || (isTeam && canViewTeam);
+  const liveWorkspace = useInternalUserWorkspace(workspace, { enabled: shouldLoadDashboard && !previewData });
+  const data = previewData || liveWorkspace.data;
+  const busy = previewData ? false : liveWorkspace.busy;
+  const error = previewData ? '' : liveWorkspace.error;
   const [search, setSearch] = useState('');
   const [project, setProject] = useState('all');
   const [status, setStatus] = useState('active');
@@ -123,6 +125,7 @@ export default function InternalUserDashboard({ name, position, panelAccess = []
   const planStorageKey = todayPlanStorageKey(name, now);
   const previousPlanStorageKey = todayPlanStorageKey(name, previousDay(now));
   useEffect(() => {
+    if (previewData) return undefined;
     const timer = window.setTimeout(() => {
       let storedPlan = normalizeStoredPlan(null);
       let previousTaskIds = [];
@@ -140,16 +143,16 @@ export default function InternalUserDashboard({ name, position, panelAccess = []
       setLoadedPlanKey(planStorageKey);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [planStorageKey, previousPlanStorageKey]);
+  }, [planStorageKey, previousPlanStorageKey, previewData]);
   useEffect(() => {
-    if (loadedPlanKey !== planStorageKey) return;
+    if (previewData || loadedPlanKey !== planStorageKey) return;
     try {
       window.localStorage.setItem(planStorageKey, JSON.stringify({
         taskIds: todayTaskIds, workingTaskId, completedTaskIds: completedTodayTaskIds, carryOverHandled,
       }));
     }
     catch { /* The daily plan still works for this page session when storage is unavailable. */ }
-  }, [carryOverHandled, completedTodayTaskIds, loadedPlanKey, planStorageKey, todayTaskIds, workingTaskId]);
+  }, [carryOverHandled, completedTodayTaskIds, loadedPlanKey, planStorageKey, previewData, todayTaskIds, workingTaskId]);
   const tasks = data?.tasks || [];
   const active = tasks.filter(task => !task.done);
   const filteredTasks = selectInternalUserTasks(tasks, { search, project, status, sort, direction: sortDirection }, now);
@@ -233,7 +236,7 @@ export default function InternalUserDashboard({ name, position, panelAccess = []
     ['overdue', 'Overdue', active.filter(task => dueState(task, now) === 'overdue').length],
   ];
   const workspaceCopy = isTeam
-    ? { title: 'Your team, in view.', detail: 'Review the people and team tools available to your position.' }
+    ? { title: 'Your team, in view.', detail: 'Find active colleagues and their positions.' }
     : isSettings
       ? { title: 'Connections & settings.', detail: 'Manage the services connected to your internal workspace.' }
       : { title: 'Your work, in focus.', detail: 'Review your own assignments, priorities, and recent activity.' };
@@ -390,7 +393,7 @@ export default function InternalUserDashboard({ name, position, panelAccess = []
             <ul>{completedTodayTasks.map(task => <li key={task.id}><span aria-hidden="true">✓</span><div><strong>{task.title}</strong><small>{task.projectName}</small></div>
               {activeTaskIds.has(task.id) && <button type="button" onClick={() => restoreTodayTask(task.id)}>Undo</button>}</li>)}</ul>
           </section>}
-          <div className={styles.todoFooter}><p className={styles.todoStorageNote}>Saved in this browser for today only.</p>
+          <div className={styles.todoFooter}><p className={styles.todoStorageNote}>{previewData ? 'Preview changes are not saved.' : 'Saved in this browser for today only.'}</p>
             {(todayTaskIds.length > 0 || completedTodayTaskIds.length > 0) && <button type="button" onClick={clearTodayPlan}>Clear plan</button>}</div>
         </section>}
       </aside>
@@ -407,7 +410,7 @@ export default function InternalUserDashboard({ name, position, panelAccess = []
         {children}
       </section>
     </div>}
-    {isTeam && (canViewTeam || canViewTeamTasks) && <div className={`${styles.bottomGrid} ${canViewTeam !== canViewTeamTasks ? styles.singleColumnGrid : ''}`}>
+    {isTeam && canViewTeam && <div className={`${styles.bottomGrid} ${styles.singleColumnGrid}`}>
       {canViewTeam && <section className={`${styles.panel} ${styles.anchorSection}`} id="team-directory">
         <div className={styles.sectionHeading}><div><h2>Team directory</h2><p>Active internal users and their current portal positions.</p></div>
           <span className={styles.readOnly}>{data?.teamMembers?.length || 0} active</span></div>
@@ -415,13 +418,7 @@ export default function InternalUserDashboard({ name, position, panelAccess = []
           : data?.teamMembers?.length ? <ul className={styles.teamMembers}>{data.teamMembers.map(member => <li key={member.id}>
             <span>{member.name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase()}</span>
             <div><strong>{member.name}</strong><small>{member.position}</small></div>
-            <b className={member.connected ? styles.teamConnected : styles.teamPending}>{member.connected ? 'Connected' : 'Setup needed'}</b>
           </li>)}</ul> : <p className={styles.emptySmall}>No active internal users are available.</p>}
-      </section>}
-      {canViewTeamTasks && <section className={`${styles.panel} ${styles.anchorSection}`} id="team-tasks">
-        <div className={styles.sectionHeading}><div><h2>Team tasks</h2><p>Organization-wide task status and assignment.</p></div><span className={styles.plannedBadge}>Planned</span></div>
-        <div className={styles.stagedPanel}><strong>Access is reserved for this position</strong>
-          <p>Team task reads and assignment actions will be enabled when an organization-level Hubstaff workflow is configured. Personal internal user tokens are never combined here.</p></div>
       </section>}
     </div>}
     {isPersonal && canViewActivity && <div className={styles.bottomGrid} id="activity">

@@ -28,6 +28,7 @@
     "setup:check": "node scripts/check-setup.mjs",
     "internal-user:migrate": "node --env-file=.env.local scripts/migrate-internal-user.mjs",
     "internal-user:create": "node --env-file=.env.local scripts/create-internal-user.mjs",
+    "internal-user:role": "node --env-file=.env.local scripts/set-internal-role.mjs",
     "test:internal-user": "node --conditions=react-server --experimental-test-module-mocks --import ./tests/internal-user/aliases.mjs --test tests/internal-user/*.test.mjs",
     "test:internal-user:database": "node --env-file=.env.local scripts/check-internal-user-database.mjs",
     "test:internal-user:ui": "playwright test --config tests/internal-user/playwright.config.mjs",

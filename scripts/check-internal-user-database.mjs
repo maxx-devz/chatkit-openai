@@ -80,6 +80,34 @@ try {
   await db.query(schema);
   await db.query(schema);
 
+  // A stranded empty legacy relation must not block the active mapping table.
+  await db.query('CREATE TEMP TABLE portal_employees (user_id BIGINT)');
+  await db.query(schema);
+  assert.equal((await db.query("SELECT to_regclass('portal_internal_user_roles') AS relation")).rows[0].relation !== null, true);
+  await db.query("INSERT INTO portal_internal_user_roles(user_id, role_key) VALUES (1, 'internal_admin')");
+  assert.equal((await db.query("SELECT role_key FROM portal_internal_user_roles WHERE user_id=1 AND role_key='internal_admin'")).rows.length, 1);
+  await db.query('SAVEPOINT role_revocation');
+  await db.query(`INSERT INTO portal_internal_user_roles(user_id, role_key)
+    VALUES (1, 'internal_access_manager'), (2, 'internal_access_manager')`);
+  const revocationTarget = await db.query(`SELECT e.is_active FROM portal_internal_users e
+    JOIN portal_internal_user_roles r ON r.user_id=e.user_id
+    WHERE e.user_id=$1 AND r.role_key='internal_access_manager' FOR UPDATE OF e`, [2]);
+  assert.equal(revocationTarget.rows[0].is_active, true);
+  const activeManagers = await db.query(`SELECT COUNT(*)::int AS count FROM portal_internal_user_roles r
+    JOIN portal_internal_users e ON e.user_id=r.user_id
+    WHERE r.role_key='internal_access_manager' AND e.is_active=TRUE`);
+  assert.equal(activeManagers.rows[0].count, 2);
+  await db.query("DELETE FROM portal_internal_user_roles WHERE user_id=2 AND role_key='internal_access_manager'");
+  await db.query(`INSERT INTO portal_internal_access_audit(actor_user_id,target_user_id,action)
+    VALUES(1,2,'role.revoke.internal_access_manager')`);
+  assert.equal((await db.query("SELECT COUNT(*)::int AS count FROM portal_internal_access_audit WHERE action='role.revoke.internal_access_manager'")).rows[0].count, 1);
+  await db.query('ROLLBACK TO SAVEPOINT role_revocation');
+  await db.query('SAVEPOINT populated_legacy');
+  await db.query('INSERT INTO portal_employees(user_id) VALUES (1)');
+  await assert.rejects(db.query(schema), error => /resolve the duplicate tables/.test(error.message));
+  await db.query('ROLLBACK TO SAVEPOINT populated_legacy');
+  await db.query('DROP TABLE portal_employees');
+
   assert.equal((await db.query("SELECT to_regclass('portal_employees') AS relation")).rows[0].relation, null);
   for (const name of [
     'portal_users',
@@ -116,7 +144,7 @@ try {
   await db.query(`
     UPDATE portal_internal_users
     SET position = 'project_manager',
-      panel_access = '["overview","my_tasks","activity","team_directory","team_tasks","hubstaff"]'::jsonb
+      panel_access = '["overview","my_tasks","activity","team_directory","hubstaff"]'::jsonb
     WHERE user_id = 2
   `);
   assert.equal((await findInternalUser(db, 'internal-user-b')).position, 'project_manager');

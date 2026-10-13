@@ -3,7 +3,11 @@ DO $$
 BEGIN
   IF to_regclass('portal_employees') IS NOT NULL
     AND to_regclass('portal_internal_users') IS NOT NULL THEN
-    RAISE EXCEPTION 'Both portal_employees and portal_internal_users exist; resolve the duplicate account mappings before migrating.';
+    -- Some installations retain an empty legacy table after the account rename.
+    -- Leave it untouched; never merge or discard actual legacy account rows.
+    IF EXISTS (SELECT 1 FROM portal_employees) THEN
+      RAISE EXCEPTION 'Both tables exist and portal_employees still contains account mappings; resolve the duplicate tables before migrating.';
+    END IF;
   ELSIF to_regclass('portal_employees') IS NOT NULL THEN
     ALTER TABLE portal_employees RENAME TO portal_internal_users;
   END IF;
@@ -107,3 +111,37 @@ BEGIN
       CHECK (jsonb_typeof(panel_access) = 'array');
   END IF;
 END $$;
+
+-- Role assignments are separate from account type, position, and visible panels.
+-- Backfill legacy project managers only when this table is created for the first time.
+DO $$
+BEGIN
+  IF to_regclass('portal_internal_user_roles') IS NULL THEN
+    CREATE TABLE portal_internal_user_roles (
+      user_id BIGINT NOT NULL REFERENCES portal_internal_users(user_id) ON DELETE CASCADE,
+      role_key TEXT NOT NULL CHECK (role_key IN ('project_management', 'leadership', 'hr', 'sales', 'support',
+        'marketing', 'seo_geo', 'cro', 'development', 'billing', 'internal_admin', 'internal_access_manager')),
+      granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, role_key)
+    );
+    INSERT INTO portal_internal_user_roles (user_id, role_key)
+    SELECT user_id, 'project_management' FROM portal_internal_users
+    WHERE position = 'project_manager';
+  END IF;
+END $$;
+
+-- Expand the role allow-list on databases where the table already exists.
+ALTER TABLE portal_internal_user_roles
+  DROP CONSTRAINT IF EXISTS portal_internal_user_roles_role_key_check;
+ALTER TABLE portal_internal_user_roles
+  ADD CONSTRAINT portal_internal_user_roles_role_key_check
+  CHECK (role_key IN ('project_management', 'leadership', 'hr', 'sales', 'support',
+    'marketing', 'seo_geo', 'cro', 'development', 'billing', 'internal_admin', 'internal_access_manager'));
+
+CREATE TABLE IF NOT EXISTS portal_internal_access_audit (
+  id BIGSERIAL PRIMARY KEY,
+  actor_user_id BIGINT REFERENCES portal_users(id) ON DELETE SET NULL,
+  target_user_id BIGINT REFERENCES portal_users(id) ON DELETE SET NULL,
+  action TEXT NOT NULL,
+  occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

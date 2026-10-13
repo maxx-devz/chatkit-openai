@@ -22,7 +22,7 @@ export default async function InternalUserLayout({ children }) {
 
   return <InternalUserWorkspaceProvider>
     <InternalUserShell name={profile.name} position={profile.position}
-      panelAccess={profile.panels} connected={profile.connected}>
+      panelAccess={profile.panels} permissions={profile.permissions} roles={profile.roles} connected={profile.connected}>
       {children}
     </InternalUserShell>
   </InternalUserWorkspaceProvider>;

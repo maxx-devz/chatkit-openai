@@ -27,10 +27,11 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 800, height: 900
     const internalUserNav = page.locator('nav[aria-label="Internal portal"]');
     if (viewport.width > 720) {
       await expect(internalUserNav).toBeVisible();
-      await expect(internalUserNav.getByRole('link')).toHaveText(['My Work', 'Settings']);
+      await expect(internalUserNav.getByRole('link')).toHaveText(['My Work', 'Team', 'Settings']);
       if (viewport.width <= 900) await expect(internalUserNav.getByText('My Work')).toBeHidden();
     } else {
       await expect(internalUserNav).toBeHidden();
+      await expect(page.getByRole('button', { name: 'Open menu' })).toBeVisible();
       await expect(page.getByRole('banner').getByText('My Work', { exact: true })).toBeVisible();
     }
     const assigned = page.getByRole('region', { name: 'My Assigned Tasks' });
@@ -98,26 +99,21 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 800, height: 900
   });
 }
 
-test('project manager policy adds team panels and a server-fed internal user directory', async ({ page }) => {
+test('basic Team directory is available without a management role or private status', async ({ page }) => {
   const data = { ...fixture(), teamMembers: [
     { id: '1', name: 'Fixture Internal User', position: 'Project Manager', connected: true },
     { id: '2', name: 'Taylor Team', position: 'Team Member', connected: false },
   ] };
   await page.route('**/api/internal/dashboard**', route => route.fulfill({ json: data }));
-  await page.goto('/internal?manager=true');
+  await page.goto('/team-basic');
   const internalUserNav = page.locator('nav[aria-label="Internal portal"]');
-  await expect(internalUserNav.getByRole('link')).toHaveText(['My Work', 'Team Workspace', 'Settings']);
-  await expect(page.getByRole('heading', { name: 'My Assigned Tasks' })).toBeVisible();
-  await internalUserNav.getByRole('link', { name: 'Team Workspace' }).click();
-  await expect(page).toHaveURL(/\/internal\/team$/);
+  await expect(internalUserNav.getByRole('link')).toHaveText(['My Work', 'Team', 'Settings']);
   await expect(page.getByRole('heading', { name: 'My Assigned Tasks' })).toHaveCount(0);
   const directory = page.locator('#team-directory');
   await expect(directory.getByRole('heading', { name: 'Team directory' })).toBeVisible();
   await expect(directory.getByText('Taylor Team')).toBeVisible();
-  await expect(directory.getByText('Setup needed')).toBeVisible();
-  const teamTasks = page.locator('#team-tasks');
-  await expect(teamTasks.getByRole('heading', { name: 'Team tasks' })).toBeVisible();
-  await expect(teamTasks.getByText('Planned', { exact: true })).toBeVisible();
+  await expect(directory.getByText('Setup needed')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Team tasks' })).toHaveCount(0);
 });
 
 test('workspace navigation reuses loaded data and keeps Hubstaff refresh in the shared header', async ({ page }) => {
@@ -135,7 +131,7 @@ test('workspace navigation reuses loaded data and keeps Hubstaff refresh in the 
   expect(requests.personal).toBe(1);
 
   const internalUserNav = page.locator('nav[aria-label="Internal portal"]');
-  await internalUserNav.getByRole('link', { name: 'Team Workspace' }).click();
+  await internalUserNav.getByRole('link', { name: 'Team' }).click();
   const directory = page.locator('#team-directory');
   await expect(directory.getByText('Fixture Internal User')).toBeVisible();
   await expect.poll(() => requests.team).toBe(1);
@@ -149,7 +145,7 @@ test('workspace navigation reuses loaded data and keeps Hubstaff refresh in the 
   await expect(page.getByRole('heading', { name: 'Fix PDP layout' })).toBeVisible();
   expect(requests.personal).toBe(2);
 
-  await internalUserNav.getByRole('link', { name: 'Team Workspace' }).click();
+  await internalUserNav.getByRole('link', { name: 'Team' }).click();
   await expect(directory.getByText('Fixture Internal User')).toBeVisible();
   await page.waitForTimeout(100);
   expect(requests.team).toBe(1);
@@ -330,4 +326,106 @@ test('token entry is a native password POST with no browser storage or URL token
   await expect(input).toHaveValue('');
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain(synthetic);
   expect(await page.content()).not.toContain(synthetic);
+});
+
+test('Internal Settings can toggle Team and shows planned permissions without exposing the protected role', async ({ page }) => {
+  await page.goto('/role-settings');
+  await expect(page.getByRole('heading', { name: 'My Workspace & permissions' })).toBeVisible();
+  await expect(page.getByText('internal_admin')).toHaveCount(0);
+  await expect(page.getByText('Your account status and roles remain protected.')).toBeVisible();
+  await page.getByRole('button', { name: /Taylor Team/ }).click();
+  const teamDirectoryPanel = page.getByRole('checkbox', { name: /Team directory/ });
+  await expect(teamDirectoryPanel).not.toBeChecked();
+  await expect(teamDirectoryPanel).toBeEnabled();
+  await teamDirectoryPanel.click();
+  await expect(teamDirectoryPanel).toBeChecked();
+  await teamDirectoryPanel.click();
+  await expect(teamDirectoryPanel).not.toBeChecked();
+  const roleCard = page.locator('section').filter({ has: page.getByRole('heading', { name: 'My Workspace & permissions' }) }).last();
+  const hr = roleCard.getByRole('checkbox', { name: /HR · Planned/ });
+  await expect(hr).not.toBeChecked();
+  await expect(roleCard.getByText('people.leave.read')).toBeVisible();
+  await expect(roleCard.locator('code').filter({ hasText: 'people.leave.read' })).toHaveCount(0);
+  await page.route('**/api/internal/internal-users', async route => {
+    expect(route.request().method()).toBe('PUT');
+    expect(route.request().postDataJSON()).toEqual({ id: '2', role: 'hr', assigned: true });
+    await route.fulfill({ json: { saved: true, internalUser: {
+      id: '2', roles: ['project_management', 'hr'],
+    } } });
+  });
+  await hr.click();
+  await expect(hr).toBeChecked();
+  await expect(roleCard.locator('code').filter({ hasText: 'people.leave.read' })).toHaveCount(0);
+  await expect(page.getByText('Role granted to Taylor Team.')).toBeVisible();
+});
+
+test('Internal Settings saves an enabled Team panel for an ordinary internal user', async ({ page }) => {
+  await page.goto('/role-settings');
+  await page.getByRole('button', { name: /Taylor Team/ }).click();
+  const teamDirectoryPanel = page.getByRole('checkbox', { name: /Team directory/ });
+  await expect(teamDirectoryPanel).not.toBeChecked();
+  await teamDirectoryPanel.click();
+  await page.route('**/api/internal/internal-users', async route => {
+    expect(route.request().method()).toBe('PATCH');
+    const submitted = route.request().postDataJSON();
+    expect(submitted.id).toBe('2');
+    expect(submitted.panelAccess).toContain('team_directory');
+    await route.fulfill({ json: { internalUser: {
+      id: '2', username: 'fixture.target', name: 'Taylor Team', position: 'team_member',
+      positionLabel: 'Team Member', panelAccess: submitted.panelAccess,
+      roles: ['project_management'], active: true, hubstaffUserId: '202', connected: false,
+      createdAt: '2026-01-01T00:00:00Z',
+    } } });
+  });
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByText('Internal user controls saved successfully.')).toBeVisible();
+  await expect(teamDirectoryPanel).toBeChecked();
+});
+
+test('assigned functional roles link directly from the desktop sidebar', async ({ page }) => {
+  await page.goto('/role-panels');
+  await expect(page).toHaveURL(/\/role-panels\/hr$/);
+  const nav = page.getByRole('navigation', { name: 'Internal portal' });
+  await expect(nav.getByText('My Workspace')).toBeVisible();
+  await expect(nav.getByRole('link')).toHaveCount(2);
+  await expect(nav.getByRole('link', { name: 'HR' })).toBeVisible();
+  await expect(nav.getByRole('link', { name: 'Sales' })).toBeVisible();
+  await expect(nav.getByRole('link', { name: 'Billing' })).toHaveCount(0);
+  await expect(nav.getByRole('link', { name: 'Role Panels' })).toHaveCount(0);
+  await nav.getByRole('link', { name: 'Sales' }).click();
+  await expect(page).toHaveURL(/\/role-panels\/sales$/);
+  await expect(page.getByRole('heading', { name: 'Sales', exact: true })).toBeVisible();
+});
+
+test('mobile hamburger opens the same role sidebar and closes after navigation', async ({ page }) => {
+  const dashboardRequests = [];
+  page.on('request', request => {
+    if (request.url().includes('/api/internal/dashboard')) dashboardRequests.push(request.url());
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/role-panels');
+  await expect(page).toHaveURL(/\/role-panels\/hr$/);
+  await expect(page.getByRole('heading', { name: 'HR', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Billing' })).toHaveCount(0);
+  const menuButton = page.getByRole('button', { name: 'Open menu' });
+  await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('navigation', { name: 'Internal portal' })).toBeHidden();
+  await menuButton.click();
+  const drawer = page.getByRole('dialog', { name: 'Internal portal navigation' });
+  await expect(drawer).toBeVisible();
+  await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+  await expect(drawer.getByRole('link', { name: 'HR' })).toBeVisible();
+  await expect(drawer.getByRole('link', { name: 'Sales' })).toBeVisible();
+  await expect(drawer.getByRole('link', { name: 'Billing' })).toHaveCount(0);
+  await drawer.getByRole('link', { name: 'Sales' }).click();
+  await expect(page).toHaveURL(/\/role-panels\/sales$/);
+  await expect(drawer).toHaveCount(0);
+  await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('heading', { name: 'Planned areas' })).toBeVisible();
+  await expect(page.getByText('No live business data or actions are available here yet.')).toBeVisible();
+  await menuButton.click();
+  await page.keyboard.press('Escape');
+  await expect(drawer).toHaveCount(0);
+  await expect(menuButton).toBeFocused();
+  expect(dashboardRequests).toEqual([]);
 });
