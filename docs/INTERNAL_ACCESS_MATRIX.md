@@ -77,7 +77,7 @@ The old administrator controls and `/api/admin/internal-users` have been removed
 
 ## Navigation and enforcement
 
-The [Phase 0 panel access checklist](INTERNAL_PANEL_ACCESS_CHECKLIST.md) records each live page/API allowance, denied case, data boundary, and remaining non-production verification.
+The [Navigation Page and Panel Matrix](PORTAL_NAVIGATION_PAGE_PANEL_MATRIX.md) maps live navigation, panels, and actions alongside the planned role workspaces. The [Phase 0 panel access checklist](INTERNAL_PANEL_ACCESS_CHECKLIST.md) records each live page/API allowance, denied case, data boundary, and remaining non-production verification.
 
 | Route | Required access |
 | --- | --- |
@@ -87,7 +87,7 @@ The [Phase 0 panel access checklist](INTERNAL_PANEL_ACCESS_CHECKLIST.md) records
 | `/internal/internal-settings` | `internal_users.read` through Internal Admin or Internal Access Manager; both manage accounts and non-Internal-Admin roles |
 | `/internal/roles/{role}` | Assigned business functional role opens its static Phase 0 panel directly from the sidebar; Internal Admin may view all; no new data permission or API grant. `/internal/roles` redirects to the first available role. |
 
-When enabled, the Team directory returns basic name and position fields to active internal users. Connection status remains confined to Internal Settings for account managers. Managed-team tasks and time remain disabled until authoritative team relationships and provider access are available.
+When enabled, the Team directory returns basic name and position fields to active internal users. The [proposed Team availability policy](PORTAL_NAVIGATION_PAGE_PANEL_MATRIX.md#proposed-team-availability-policy) would add a neutral indicator only after its source, audience, and field permission are approved. Connection status remains confined to Internal Settings for account managers. Managed-team tasks and time remain disabled until authoritative team relationships and provider access are available.
 
 For local UI checks, `?debug_panel=<panel_id>` can preview an allow-listed panel with sample data while signed in as an active internal user. This works only in development, does not call the live dashboard API, and does not change any server permission or record scope. It is not an access-control override.
 

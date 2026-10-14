@@ -1,6 +1,6 @@
 # Phase 0 Internal Portal panel access checklist
 
-This checklist covers **live Phase 0 access**, not future business dashboards. A visible panel never grants data permission by itself. The server checks the active internal-user account, assigned panel, effective permission, and record/field policy before returning data. Team is enabled by both position presets, but can be toggled off per account. Use ordinary page URLs for manual checks; `debug_panel` is a local sample-data preview and is **not** an authorization test.
+This checklist covers **live Phase 0 access**, not future business dashboards. The [Navigation Page and Panel Matrix](PORTAL_NAVIGATION_PAGE_PANEL_MATRIX.md) also maps proposed workspaces and future fields. A visible panel never grants data permission by itself. The server checks the active internal-user account, assigned panel, effective permission, and record/field policy before returning data. Team is enabled by both position presets, but can be toggled off per account. Use ordinary page URLs for manual checks; `debug_panel` is a local sample-data preview and is **not** an authorization test.
 
 | Panel | Page / API | Allowed account | Denied or limited case | Live data boundary |
 | --- | --- | --- | --- | --- |
