@@ -27,6 +27,7 @@
     "admin:create": "node --env-file=.env.local scripts/create-admin.mjs",
     "setup:check": "node scripts/check-setup.mjs",
     "internal-user:migrate": "node --env-file=.env.local scripts/migrate-internal-user.mjs",
+    "integration-audit:migrate": "node --env-file=.env.local scripts/migrate-integration-audit.mjs",
     "internal-user:create": "node --env-file=.env.local scripts/create-internal-user.mjs",
     "internal-user:role": "node --env-file=.env.local scripts/set-internal-role.mjs",
     "test:internal-user": "node --conditions=react-server --experimental-test-module-mocks --import ./tests/internal-user/aliases.mjs --test tests/internal-user/*.test.mjs",

@@ -1,11 +1,15 @@
 .shell { min-height: 100vh; display: grid; grid-template-columns: 244px minmax(0, 1fr); background: var(--canvas); }
-.portalSidebar { position: sticky; top: 0; display: flex; height: 100vh; min-height: 640px; flex-direction: column; padding: 24px 16px 18px; overflow: hidden; background: radial-gradient(circle at -10% 105%, rgba(68, 170, 255, .2), transparent 36%), linear-gradient(165deg, #0a467e 0%, #075596 44%, #073b76 100%); color: white; }
+.portalSidebar { position: sticky; top: 0; display: flex; height: 100dvh; min-height: 0; flex-direction: column; padding: 24px 16px 18px; overflow: hidden; background: radial-gradient(circle at -10% 105%, rgba(68, 170, 255, .2), transparent 36%), linear-gradient(165deg, #0a467e 0%, #075596 44%, #073b76 100%); color: white; }
 .portalSidebar::after { position: absolute; right: -125px; bottom: -155px; width: 300px; height: 300px; border: 1px solid rgba(177, 220, 255, .12); border-radius: 50%; box-shadow: 0 0 0 42px rgba(177, 220, 255, .035), 0 0 0 84px rgba(177, 220, 255, .025); content: ""; pointer-events: none; }
 .brand, .internalUserNav, .sidebarStatus, .sidebarIdentity { position: relative; z-index: 1; }
 .brand { display: flex; min-height: 72px; align-items: flex-start; padding: 4px 8px 20px; border-bottom: 1px solid rgba(255, 255, 255, .13); flex-direction: column; gap: 7px; }
 .brand img { width: 188px; height: auto; }
 .brand span { padding-left: 46px; color: rgba(225, 241, 255, .76); font-size: 9px; font-weight: 750; letter-spacing: .22em; text-transform: uppercase; }
-.internalUserNav { display: flex; min-height: 0; margin-top: 20px; flex-direction: column; gap: 5px; overflow-y: auto; overflow-x: hidden; }
+.internalUserNav { display: flex; flex: 1 1 auto; min-height: 0; margin-top: 20px; padding-right: 5px; padding-bottom: 10px; flex-direction: column; gap: 5px; overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; scroll-padding-block: 10px; scrollbar-width: thin; scrollbar-color: rgba(222, 241, 255, .34) transparent; }
+.internalUserNav::-webkit-scrollbar { width: 5px; }
+.internalUserNav::-webkit-scrollbar-track { background: transparent; }
+.internalUserNav::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(222, 241, 255, .34); }
+.internalUserNav::-webkit-scrollbar-thumb:hover { background: rgba(222, 241, 255, .56); }
 .roleNavHeading { margin: 15px 12px 4px; color: rgba(225, 241, 255, .65); font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .roleMonogram { display: grid; width: 20px; height: 20px; flex: 0 0 20px; place-items: center; border: 1px solid rgba(235, 246, 255, .5); border-radius: 5px; font-size: 9px; font-weight: 800; }
 .internalUserNav a { display: flex; min-height: 43px; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 9px; color: rgba(235, 246, 255, .82); text-decoration: none; font-size: 12px; font-weight: 620; transition: background 120ms ease, color 120ms ease, transform 120ms ease; }
@@ -13,7 +17,7 @@
 .internalUserNav a:focus-visible { outline: 3px solid rgba(104, 194, 255, .65); outline-offset: 2px; }
 .internalUserNav .activeNav { background: rgba(120, 190, 255, .19); box-shadow: inset 3px 0 #75c5ff; color: white; }
 .internalUserNav svg { width: 20px; height: 20px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.75; }
-.sidebarStatus { margin-top: auto; padding: 13px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 12px; background: rgba(255, 255, 255, .055); }
+.sidebarStatus { margin-top: 12px; padding: 13px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 12px; background: rgba(255, 255, 255, .055); }
 .sidebarStatus span { display: flex; align-items: center; gap: 7px; color: #dff7ff; font-size: 10px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
 .sidebarStatus i { width: 7px; height: 7px; border-radius: 50%; background: #57d5a9; box-shadow: 0 0 0 4px rgba(87, 213, 169, .12); }
 .sidebarStatus p { margin: 8px 0 0; color: rgba(216, 237, 253, .61); font-size: 11px; line-height: 1.55; }
@@ -70,10 +74,25 @@
 .grid { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(280px, 1fr); gap: 24px; align-items: start; }
 .singleColumnGrid { grid-template-columns: minmax(0, 1fr); }
 .settingsPanel { max-width: 760px; }
+.passwordForm { display: grid; gap: 8px; margin-top: 18px; max-width: 430px; }
+.passwordForm label { color: var(--ink); font-size: 12px; font-weight: 700; }
+.passwordForm input { width: 100%; min-height: 40px; padding: 9px 11px; border: 1px solid #d5e0e9; border-radius: 8px; background: #fbfdff; color: var(--ink); font: inherit; }
+.passwordForm input:focus { outline: 2px solid #7fbae2; outline-offset: 1px; }
+.passwordForm input[aria-invalid="true"] { border-color: #c4584e; }
+.passwordForm small { margin-bottom: 6px; }
+.passwordForm button { justify-self: start; min-height: 39px; margin-top: 8px; padding: 9px 14px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 700; cursor: pointer; }
+.passwordForm button:disabled { opacity: 0.6; cursor: wait; }
+.passwordError { color: #a5433b !important; }
+.passwordStatus { color: #237454; }
 .connectionReady,
 .connectionPending { padding: 6px 8px; border-radius: 999px; background: #e9f8f1; color: #25835f; font-size: 9px; font-weight: 800; text-transform: uppercase; }
 .connectionPending { background: #f2f3f5; color: #7b8796; }
 .panel { min-width: 0; background: white; padding: 24px; border: 1px solid var(--line); border-radius: 14px; overflow-wrap: anywhere; }
+.auditGrid { display: grid; gap: 18px; }
+.auditScroll { overflow-x: auto; }
+.auditTable { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
+.auditTable th, .auditTable td { padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.auditTable th { color: var(--muted); font-weight: 700; }
 .panel h2 { font-size: 18px; margin: 0 0 8px; letter-spacing: -.3px; }
 .panel p, .panel small { font-size: 13px; }
 .panel small { color: var(--muted); line-height: 1.6; }

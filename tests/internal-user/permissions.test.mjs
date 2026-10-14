@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { effectiveInternalUserPanels, hasInternalPermission, INTERNAL_ADMIN_PANELS, INTERNAL_ASSIGNABLE_ROLES,
-  internalPermissionScope, internalUserPermissions, visibleInternalRoleLabels } from '../../lib/internal-permissions.js';
+  canManageInternalRole, internalPermissionScope, internalUserPermissions, visibleInternalRoleLabels } from '../../lib/internal-permissions.js';
 import { INTERNAL_USER_PANELS } from '../../lib/internal-user-positions.js';
 
 test('baseline includes personal permissions and the basic Team directory', () => {
@@ -27,10 +27,28 @@ test('functional roles add explicit grants and unknown future roles fail closed'
   assert.equal(internalPermissionScope('internal_users.roles.manage'), 'Internal accounts');
 });
 
-test('internal admin includes every access-manager grant and sees all current panels', () => {
+test('an assigned business role gains its implemented permissions without a second approval', () => {
+  const futureRoles = { hr: ['people.leave.read', 'people.availability.read'] };
+  const permissions = internalUserPermissions(['hr'], futureRoles);
+  assert.equal(permissions.includes('people.leave.read'), true);
+  assert.equal(permissions.includes('people.availability.read'), true);
+  assert.equal(internalUserPermissions(['sales'], futureRoles).includes('people.leave.read'), false);
+  assert.equal(canManageInternalRole(['internal_access_manager'], 'hr'), true);
+  assert.equal(canManageInternalRole(['internal_admin'], 'hr'), true);
+  assert.equal(canManageInternalRole([], 'hr'), false);
+  assert.equal(canManageInternalRole(['internal_access_manager'], 'unknown_role'), false);
+  assert.equal(canManageInternalRole(['internal_access_manager'], 'internal_access_manager'), false);
+  assert.equal(canManageInternalRole(['internal_access_manager'], 'internal_access_manager', 'revoke'), false);
+  assert.equal(canManageInternalRole(['internal_admin'], 'internal_access_manager'), true);
+  assert.equal(canManageInternalRole(['internal_admin'], 'internal_access_manager', 'revoke'), true);
+});
+
+test('internal admin adds audit-read access to every access-manager grant and sees all current panels', () => {
   const permissions = internalUserPermissions(['internal_admin']);
   const managerPermissions = internalUserPermissions(['internal_access_manager']);
-  assert.deepEqual(permissions, managerPermissions);
+  assert.deepEqual(permissions.filter(permission => permission !== 'platform.audit.read'), managerPermissions);
+  assert.equal(permissions.includes('platform.audit.read'), true);
+  assert.equal(managerPermissions.includes('platform.audit.read'), false);
   assert.equal(permissions.includes('internal_users.roles.manage'), true);
   assert.equal(permissions.includes('people.directory.read'), true);
   assert.equal(permissions.includes('internal_users.read'), true);

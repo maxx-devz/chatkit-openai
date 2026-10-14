@@ -4,7 +4,7 @@
 | --- | --- |
 | Status | Draft for review |
 | Decision stage | Proposed |
-| Last updated | 2026-10-12 |
+| Last updated | 2026-10-14 |
 | Proposed technical owner | Roeland |
 | Business approvers | Steve and AOC Leadership |
 | Security and data approvers | Pending assignment by domain |
@@ -115,7 +115,9 @@ Portal-native configuration, permissions, checkpoints, synchronization runs, and
 | Portal roles and permissions | Portal PostgreSQL | Evaluate on every protected request | Authorized portal administrators only | Proposed |
 | Client portal accounts and memberships | Portal PostgreSQL | Continue current client access model | Authorized portal administrators only | Existing |
 | Internal user directory, department, role, and capability | Human Resources Drive masters | Synchronize approved fields into permissioned internal user profiles | Edit in the approved HR source initially | Proposed; field approval pending |
-| Approved absences, schedules, and leave balances | Pending HR decision | Normalize approved dates and visibility fields for calendar views | Read-only initially | Pending |
+| Leave and time-off requests | Hubstaff, where leave is approved; portal reads the Time Off Requests API | Derive approved dates and minimum permitted availability fields; do not expose raw request details in the Team directory | Read-only initially | Source confirmed; local cross-member read passed; deployed access and HR field approval pending |
+| Expected work schedules | Hubstaff Attendance Schedules API is a candidate; HR must confirm whether AOC maintains complete schedules there | Derive shift status only from a verified schedule source; no raw schedules in the shared Team directory | Read-only initially | Local API access confirmed; 2 of 2 active portal mappings in `.env.local` matched schedules; full roster and source authority pending |
+| Other absences and leave balances | Pending HR decision | Normalize only approved dates and visibility fields for future calendar or self-service views | Read-only initially | Pending |
 | Time entries and activity | Hubstaff Time | Normalize time records and approved aggregates | Read-only | Proposed |
 | Projects and tasks | Hubstaff Tasks | Mirror approved project, task, assignee, status, and due-date fields | Read-only initially | Proposed |
 | Companies, contacts, deals, and CRM activity | HubSpot | Normalize approved CRM objects and source IDs | Read-only initially; controlled writes in Phase 4 | Proposed |
@@ -205,12 +207,11 @@ Phase 0 must approve an entity relationship model for:
 - Drive source documents and source classifications;
 - integrations, checkpoints, synchronization runs, and audit events.
 
-The first shared integration migration is expected to introduce tables equivalent to:
+The initial `portal_integration_runs` operational table is now defined by the separate [integration audit migration](INTEGRATION_AUDIT.md). The remaining shared integration design is expected to introduce tables equivalent to:
 
 - `portal_data_sources`;
 - `portal_integrations`;
 - `portal_sync_checkpoints`;
-- `portal_integration_runs`;
 - `portal_audit_events`.
 
 The exact names and relationships require ERD review. Schema changes must remain standard PostgreSQL and must be committed as repeatable migrations.
@@ -230,7 +231,7 @@ Connectors must:
 - define how source deletions, archived records, and revoked access are represented;
 - expose freshness and failure state to authorized administrators.
 
-The portal must not infer approved leave from missing time entries. Approved absence and schedule data must come from a confirmed HR or provider source.
+The portal must not infer approved leave or an off-shift state from missing time entries. Hubstaff is the confirmed approval source for leave, and its time-off requests are the portal feed. Hubstaff attendance schedules are a candidate for expected shifts, subject to confirming AOC's schedule coverage and authority; other absences and leave balances still need confirmed sources.
 
 ## Credential and secret rules
 
@@ -289,7 +290,7 @@ Phase 0 requires the following additions before broader Phase 1 integration work
 - an approved identity and authorization matrix;
 - the internal portal ERD;
 - a data-source and integration ownership register;
-- shared integration, checkpoint, run-history, and audit migrations;
+- shared integration and checkpoint migrations, fuller action-audit coverage, and connector adoption of the implemented run-history lifecycle;
 - a common connector contract and safe error model;
 - access-verification checks for each P0 provider;
 - documented synchronization targets, retention rules, and incident ownership.
@@ -304,7 +305,7 @@ Phase 0 requires the following additions before broader Phase 1 integration work
 
 | ID | Decision | Proposed owner | Resolution required | Status |
 | --- | --- | --- | --- | --- |
-| D-02 | Confirm the authoritative source for approved absences, schedules, partial days, and leave balances | HR/Admin and Leadership | Before the Phase 1 staff calendar | Pending |
+| D-02 | Validate Hubstaff time-off requests as the leave feed and decide whether Hubstaff attendance schedules are the authoritative expected-shift source; confirm other absences and balances | HR/Admin, Leadership, and Hubstaff owner | Verify deployed organization-wide leave and schedule access, recheck mappings as the portal roster expands beyond the two active accounts in `.env.local`, and validate approval/status and partial-day mapping, time zones, freshness, HR field policy, and remaining sources before the Team work status or Phase 1 staff calendar is released | Hubstaff confirmed as leave approval source; local cross-member leave and schedule reads passed; both current active portal mappings matched schedules; full roster and source authority pending |
 | D-03 | Confirm whether employee evaluations are in scope; if approved, identify their source, visible fields, retention, and manager scope | HR/Admin and Leadership | Before the HR module | Pending |
 | D-04 | Confirm Hubstaff Time and Tasks scopes, limits, organization-wide authorization, webhooks, and future write support | Roeland and Hubstaff owner | Before Phase 1 connector implementation | Pending |
 | D-05 | Confirm HubSpot authentication, objects, properties, scopes, ownership, and webhook coverage | Roeland and Sales/HubSpot owner | Before Phase 1 connector implementation | Pending |
@@ -355,5 +356,10 @@ Using both direct connectors and Make provides flexibility, but it creates dupli
 
 | Date | Change | Author |
 | --- | --- | --- |
+| 2026-10-14 | Matched both active internal portal Hubstaff IDs in the `.env.local` database to organization members with schedules; 15 other scheduled members have no active portal account there | Codex |
+| 2026-10-14 | Recorded the expectation that scheduled Hubstaff members cover Team; portal account matching remains pending | Codex, based on user confirmation |
+| 2026-10-14 | Confirmed local attendance-schedule API access: 18 records for 17 of 31 Hubstaff members in a 15-day window; source authority and coverage remain open | Codex |
+| 2026-10-14 | Drafted On Shift, Off Shift, Away, and Unknown for Team; shift labels require a verified schedule source and HR approval before release | Codex, based on user confirmation |
+| 2026-10-14 | Recorded Hubstaff as the leave-approval source and its Time Off Requests API as the portal feed; API coverage and field access remain pending | Codex, based on user confirmation |
 | 2026-10-12 | Approved the current database-backed Better Auth accounts for login and moved Google SSO to a future optional integration | Codex |
 | 2026-10-12 | Initial draft based on the current portal architecture and Phase 0 integration plan | Codex |

@@ -27,9 +27,13 @@ test('basic Team access needs both the assigned panel and baseline permission, n
   assert.equal(canAccessInternalWorkspace(profile(['team_tasks']), 'team'), false);
 });
 
-test('personal Hubstaff and Internal Settings have independent gates', () => {
+test('personal Settings needs Account Settings or Hubstaff, while Internal Settings remains role-gated', () => {
   assert.equal(canAccessInternalWorkspace(profile(['hubstaff']), 'settings'), true);
+  assert.equal(canAccessInternalWorkspace(profile(['account_settings']), 'settings'), true);
   assert.equal(canAccessInternalWorkspace(profile([]), 'settings'), false);
+  assert.equal(canAccessInternalPanel(profile([]), 'account_settings'), false);
+  assert.equal(canAccessInternalPanel(profile(['account_settings']), 'account_settings'), true);
+  assert.equal(canAccessInternalPanel({ panels: ['account_settings'], permissions: [] }, 'account_settings'), false);
   assert.equal(canAccessInternalWorkspace({ panels: ['hubstaff'], permissions: [] }, 'settings'), false);
   assert.equal(canAccessInternalWorkspace(profile([], ['internal_access_manager']), 'internalSettings'), true);
   assert.equal(canAccessInternalWorkspace(profile([], ['internal_admin']), 'internalSettings'), true);

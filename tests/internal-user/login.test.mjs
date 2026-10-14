@@ -30,5 +30,19 @@ test('actual Better Auth username/password login and sessions work for client, a
     assert.equal(session.user.id, created.user.id);
     assert.equal(session.user.username, username);
     assert.equal(JSON.stringify(session).includes(password), false);
+    if (role === 'internal-user') {
+      const newPassword = 'FixtureChanged123!';
+      const changed = await login.api.changePassword({ body: {
+        currentPassword: password, newPassword, revokeOtherSessions: true,
+      }, headers: new Headers({ cookie }), asResponse: true });
+      assert.equal(changed.status, 200);
+      const rotatedCookie = changed.headers.getSetCookie().map(value => value.split(';')[0]).join('; ');
+      assert.ok(rotatedCookie);
+      assert.equal(await login.api.getSession({ headers: new Headers({ cookie }) }), null);
+      assert.equal((await login.api.getSession({ headers: new Headers({ cookie: rotatedCookie }) })).user.id,
+        created.user.id);
+      assert.notEqual((await login.api.signInUsername({ body: { username, password }, asResponse: true })).status, 200);
+      assert.equal((await login.api.signInUsername({ body: { username, password: newPassword }, asResponse: true })).status, 200);
+    }
   }
 });

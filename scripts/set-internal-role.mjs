@@ -34,10 +34,14 @@ if (!valid) {
       ? await client.query(`INSERT INTO portal_internal_user_roles(user_id,role_key) VALUES($1,$2)
         ON CONFLICT DO NOTHING RETURNING user_id`, [userId, role])
       : await client.query(`DELETE FROM portal_internal_user_roles WHERE user_id=$1 AND role_key=$2 RETURNING user_id`, [userId, role]);
-    if (changed.rowCount) await client.query(`INSERT INTO portal_internal_access_audit(target_user_id,action)
-      VALUES($1,$2)`, [userId, `role.${action}.${role}`]);
+    if (changed.rowCount) {
+      await client.query(`INSERT INTO portal_internal_access_audit(target_user_id,action)
+        VALUES($1,$2)`, [userId, `role.${action}.${role}`]);
+    }
     await client.query('COMMIT');
-    console.log(changed.rowCount ? `Role ${action} completed for ${username}.` : 'Role assignment already matched the requested state.');
+    console.log(changed.rowCount
+      ? `Role ${action} completed for ${username}.`
+      : 'Role assignment already matched the requested state.');
   } catch (error) {
     if (client) await client.query('ROLLBACK').catch(() => {});
     console.error(error.message || 'Role assignment failed. Run the internal user migration and check the account.');

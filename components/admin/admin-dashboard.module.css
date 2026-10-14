@@ -535,6 +535,25 @@
 
 .error { border-color: #f0c8c4; background: #fff5f4; color: #a43e36; }
 
+.roleToast {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 40;
+  max-width: min(360px, calc(100vw - 32px));
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid #bce8d7;
+  border-left: 4px solid #28a77d;
+  border-radius: 10px;
+  background: #effaf6;
+  box-shadow: 0 12px 30px rgba(24, 58, 96, 0.18);
+  color: #26765d;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
 .settingsNotice {
   margin: 12px 20px 0;
   padding: 9px 11px;
@@ -855,6 +874,20 @@
 .dialogIntro { margin: 13px 0 17px; padding: 11px 12px; border: 1px solid #dceaf3; border-radius: 9px; background: #f5fafe; color: #667b90; font-size: 11px; line-height: 1.6; }
 .dialogGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .dialogWide { grid-column: 1 / -1; }
+.passwordField { display: grid; gap: 5px; }
+.passwordField small { color: #667b90; font-size: 11px; font-weight: 500; line-height: 1.5; }
+.passwordField .passwordFieldError { color: #a5433b; font-weight: 700; }
+.dialogGrid .passwordField input[aria-invalid="true"] { border-color: #c4584e; }
+.passwordResetCard { margin: 0 16px 20px; }
+.resetPasswordButton { margin-top: 14px; padding: 9px 13px; border: 1px solid #d5e0e9; border-radius: 8px; background: #fff; color: #254761; font-size: 11px; font-weight: 730; cursor: pointer; }
+.memberSource { display: flex; align-items: center; gap: 5px; margin: 3px 0 -5px; color: #5d7186; font-size: 11px; font-weight: 730; }
+.memberSource span::after { content: " ·"; }
+.memberSource strong { color: #0a70ad; font-weight: 800; }
+.dialogGrid .memberFilter { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid #dceaf3; border-radius: 9px; background: #f5fafe; cursor: pointer; }
+.dialogGrid .memberFilter input { width: 17px; height: 17px; min-height: 17px; margin: 0; accent-color: #0a70ad; flex: 0 0 auto; }
+.memberFilter span { display: grid; gap: 3px; }
+.memberFilter strong { color: #254761; font-size: 11px; }
+.memberFilter small { color: #667b90; font-size: 10px; font-weight: 500; }
 .dialogError { margin: 12px 0 0; padding: 9px 10px; border: 1px solid #efc8c3; border-radius: 8px; background: #fff5f4; color: #a5433b; font-size: 11px; }
 .createDialog footer { display: flex; justify-content: flex-end; gap: 9px; margin-top: 18px; padding-top: 15px; border-top: 1px solid #e8edf2; }
 .createDialog footer button { min-height: 37px; padding: 8px 13px; border: 1px solid #d5e0e9; border-radius: 8px; background: #fff; color: #607287; font-size: 11px; font-weight: 720; }

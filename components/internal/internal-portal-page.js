@@ -20,10 +20,11 @@ function firstAvailableWorkspace(profile) {
 
 export default async function InternalUserPortalPage({ workspace, searchParams }) {
   let profile;
+  let authUser;
   let requestHeaders;
   try {
     requestHeaders = await headers();
-    ({ profile } = await resolveInternalUserContext(requestHeaders));
+    ({ profile, authUser } = await resolveInternalUserContext(requestHeaders));
   }
   catch (error) {
     if (error?.publicDetails?.status === 401) redirect('/login');
@@ -67,7 +68,7 @@ export default async function InternalUserPortalPage({ workspace, searchParams }
     ? connectionMessages[connectionCode]
     : '';
 
-  return <InternalUserDashboard name={profile.name} position={profile.position}
+  return <InternalUserDashboard name={profile.name} username={authUser.username || ''} position={profile.position}
       panelAccess={profile.panels} workspace={workspace}
       connected={profile.connected} connectionMessage={message}>
     {workspace === 'settings' && profile.panels.includes('hubstaff')
