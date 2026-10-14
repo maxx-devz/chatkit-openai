@@ -8,7 +8,6 @@ import aocIcon from "@/aoc-icon.png";
 import aocLogo from "@/aoc-logo.png";
 import SignOutButton from "@/components/auth/sign-out-button";
 import AdminAssistant from "@/components/admin/admin-assistant";
-import InternalUserControls from "@/components/admin/internal-user-controls";
 import PortalUsage from "@/components/admin/portal-usage";
 import ProviderSettings from "@/components/admin/provider-settings";
 import styles from "./admin-dashboard.module.css";
@@ -327,7 +326,6 @@ export default function AdminDashboard({ initialData }) {
           <a className={styles.activeNav} href="#overview"><Icon name="overview" />Overview</a>
           <a href="#portal-usage"><Icon name="activity" />AI usage</a>
           <a href="#clients"><Icon name="clients" />Client controls</a>
-          <a href="#internalUsers"><Icon name="user" />Internal user controls</a>
           <a href="#assistant"><Icon name="spark" />AI assistant</a>
           <Link href="/builder"><Icon name="spark" />Assistant settings</Link>
           <a href="#ai-controls"><Icon name="activity" />AI allowances</a>
@@ -383,13 +381,6 @@ export default function AdminDashboard({ initialData }) {
               value={number(summary.requestsUsed)}
               detail={`${number(summary.allowance)} combined allowance`}
               tone="violet"
-            />
-            <Metric
-              icon="user"
-              label="Internal user accounts"
-              value={number(initialData.internalUsers?.length)}
-              detail={`${number(initialData.internalUsers?.filter((internalUser) => internalUser.active).length)} portal enabled`}
-              tone="green"
             />
           </section>
 
@@ -685,10 +676,6 @@ export default function AdminDashboard({ initialData }) {
             </section>
           </section>
 
-          <InternalUserControls
-            initialInternalUsers={initialData.internalUsers || []}
-            schemaReady={initialData.internalUserSchemaReady === true}
-          />
         </main>
       </div>
 

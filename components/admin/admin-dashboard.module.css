@@ -535,6 +535,16 @@
 
 .error { border-color: #f0c8c4; background: #fff5f4; color: #a43e36; }
 
+.settingsNotice {
+  margin: 12px 20px 0;
+  padding: 9px 11px;
+  border: 1px solid #d8e8f4;
+  border-radius: 9px;
+  background: #f5faff;
+  color: #3c607d;
+  font-size: 11px;
+}
+
 .usageHero {
   display: grid;
   align-items: center;
@@ -623,6 +633,37 @@
 .settingsCard header h3 { color: #21364e; font-size: 14px; }
 .settingsCard header p { margin-top: 3px; color: #8693a4; font-size: 10px; }
 
+.roleActionCard { margin: 0 20px 15px; }
+
+.roleList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.roleOption { display: flex; align-items: flex-start; gap: 9px; padding: 10px; border: 1px solid #e0e8f0; border-radius: 9px; background: #fbfdff; cursor: pointer; }
+.roleOption:has(input:checked) { border-color: #9bcbea; background: #f1f9fe; }
+.roleOption:has(input:disabled) { cursor: default; }
+.roleOption input { margin-top: 2px; accent-color: #0878c9; }
+.roleOption span { min-width: 0; }
+.roleOption strong, .roleOption small { display: block; }
+.roleOption strong { color: #30465c; font-size: 11px; }
+.roleOption small { margin-top: 4px; overflow-wrap: anywhere; color: #8291a3; font-size: 10px; line-height: 1.45; }
+.permissionSummary { margin-top: 16px; padding-top: 14px; border-top: 1px solid #e5ebf1; }
+.permissionSummary > strong { color: #213a52; font-size: 12px; }
+.permissionSummary p { margin: 5px 0 10px; color: #8291a3; font-size: 10px; line-height: 1.5; }
+.permissionSummary ul { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.permissionSummary li { padding: 5px 7px; border-radius: 6px; background: #edf5fb; color: #325b77; font-size: 10px; }
+.permissionSummary li small { display: block; margin-top: 3px; color: #718ca4; font-size: 9px; }
+
+.revokeRoleButton {
+  min-height: 36px;
+  padding: 8px 13px;
+  border: 1px solid #d99595;
+  border-radius: 9px;
+  background: #fff5f4;
+  color: #9d3434;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.revokeRoleButton:disabled { opacity: 0.55; cursor: not-allowed; }
+
 .fieldGrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 11px; }
 .fieldGrid label,
 .nameField,
@@ -688,6 +729,7 @@
 .toggleRow input:checked + i { background: #19a77a; }
 .toggleRow input:checked + i::after { transform: translateX(15px); }
 .toggleRow input:focus-visible + i { outline: 3px solid rgba(44, 154, 222, 0.24); outline-offset: 2px; }
+.lockedToggle { cursor: not-allowed; opacity: 0.7; }
 .nameField { margin-top: 12px; }
 .wideCard { grid-column: 1 / -1; }
 .wideCard .vectorField { margin-top: 12px; }
@@ -838,6 +880,7 @@
   .adminIdentity { display: flex; justify-content: center; }
   .workspace { grid-template-columns: 220px minmax(0, 1fr); }
   .settingsGrid { grid-template-columns: minmax(0, 1fr); }
+  .roleList { grid-template-columns: minmax(0, 1fr); }
   .internalUserSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .wideCard { grid-column: auto; }
   .accountStats { grid-template-columns: repeat(2, minmax(0, 1fr)); }

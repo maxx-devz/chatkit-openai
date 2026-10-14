@@ -1,6 +1,6 @@
 export const testToken = 'fixture-personal-access-token-never-real';
 export const internalUserA = { user_id: '1', hubstaff_user_id: '101', account_type: 'internal_user', position: 'team_member',
-  panel_access: ['overview', 'my_tasks', 'activity', 'hubstaff'], is_active: true,
+  panel_access: ['overview', 'my_tasks', 'activity', 'team_directory', 'hubstaff'], is_active: true,
   connection_version: '0', display_name: 'Fixture Internal User A' };
 export const internalUserB = { ...internalUserA, user_id: '2', hubstaff_user_id: '202', display_name: 'Fixture Internal User B' };
 export function task(overrides = {}) {

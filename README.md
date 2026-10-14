@@ -69,9 +69,10 @@ to OpenRouter chat requests; switch chat back to OpenAI when that tool is requir
 - Staff-only settings at `/builder`: drafts, tests, publishing, versions,
   greeting, colors, and starter prompts.
 - Existing administrator dashboard and staff assistant at `/admin`.
-- Administrator Internal User Controls for provisioning internal-user-only accounts,
-  assigning positions, enabling portal panels, and pausing access.
-- One Internal Portal with separate My Work, Team Workspace, and Settings
+- Internal Settings for authorized Internal Access Managers and Internal Admins to provision
+  internal-user-only accounts, assign positions, panels, and non-Internal-Admin roles, and pause
+  eligible accounts. The Internal Admin role remains owner-controlled through the terminal.
+- One Internal Portal with separate My Work, shared Team directory, and Settings
   containers, each protected by the internal user panel policy.
 - Staff usage panel with client allowances and recorded client/admin/draft tokens.
 - Per-client Hubstaff project, task, and monthly time reads for the dashboard

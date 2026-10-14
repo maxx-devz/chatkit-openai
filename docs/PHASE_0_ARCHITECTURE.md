@@ -181,6 +181,8 @@ Authentication proves who the user is. Authorization determines what that user m
 
 The current client, administrator, and internal user account boundaries remain in place while the internal role model is designed. Internal user position and UI panel access do not by themselves authorize sensitive data. The Phase 0 authorization matrix must define domain and field permissions for Leadership, HR/Admin, PM, Sales, Marketing, Development, Billing, internal users, and client users.
 
+The [Internal Portal Role and Permission Matrix](INTERNAL_ACCESS_MATRIX.md) records the proposed four-layer model and internal-user grants. Its planned business permissions remain unavailable until their scopes, fields, and sources are approved and implemented. Client account permissions require a separate matrix.
+
 Sensitive access follows these rules:
 
 - deny access by default;

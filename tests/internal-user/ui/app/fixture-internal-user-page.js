@@ -8,16 +8,17 @@ export default async function FixtureInternalUserPage({ searchParams, workspace 
   const connected = params?.connected !== 'false';
   const isManager = manager || params?.manager === 'true';
   const position = isManager ? 'Project Manager' : 'Team Member';
-  const panels = isManager
-    ? ['overview', 'my_tasks', 'activity', 'team_directory', 'team_tasks', 'hubstaff']
-    : ['overview', 'my_tasks', 'activity', 'hubstaff'];
+  const panels = ['overview', 'my_tasks', 'activity', 'team_directory', 'hubstaff'];
+  const permissions = ['work.overview.read', 'work.tasks.read', 'work.activity.read',
+    'hubstaff.connection.read', 'people.directory.read'];
   const dashboard = <InternalUserDashboard name="Fixture Internal User" position={position} panelAccess={panels}
       workspace={workspace} connected={connected}>
     {workspace === 'settings' ? <HubstaffConnection connected={connected} /> : null}
   </InternalUserDashboard>;
   if (embedded) return dashboard;
   return <InternalUserWorkspaceProvider>
-    <InternalUserShell name="Fixture Internal User" position={position} panelAccess={panels} connected={connected}>
+    <InternalUserShell name="Fixture Internal User" position={position} panelAccess={panels}
+      permissions={permissions} connected={connected}>
       {dashboard}
     </InternalUserShell>
   </InternalUserWorkspaceProvider>;

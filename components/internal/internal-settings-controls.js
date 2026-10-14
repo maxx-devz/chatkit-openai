@@ -8,7 +8,10 @@ import {
   INTERNAL_USER_WORKSPACES,
   internalUserPosition,
 } from "@/lib/internal-user-positions";
-import styles from "./admin-dashboard.module.css";
+import { effectiveInternalUserPanels, INTERNAL_ASSIGNABLE_ROLES, INTERNAL_ROLE_PERMISSIONS,
+  internalPermissionScope, internalUserPermissions, visibleInternalRoleLabels } from "@/lib/internal-permissions";
+import { internalSettingsViewPolicy } from "@/lib/internal-settings-policy";
+import styles from "../admin/admin-dashboard.module.css";
 
 const ICONS = {
   plus: "M12 5v14M5 12h14",
@@ -51,7 +54,8 @@ function settingsFromInternalUser(internalUser) {
   } : null;
 }
 
-export default function InternalUserControls({ initialInternalUsers = [], schemaReady = false }) {
+export default function InternalUserControls({ initialInternalUsers = [], schemaReady = false, readOnly = false,
+  canManageOwnAccount = false, canManageRoles = false, viewerId = '' }) {
   const [internalUsers, setInternalUsers] = useState(initialInternalUsers);
   const [selectedId, setSelectedId] = useState(initialInternalUsers[0]?.id || "");
   const [query, setQuery] = useState("");
@@ -65,6 +69,10 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
   const selectedInternalUser = internalUsers.find((internalUser) => internalUser.id === selectedId)
     || internalUsers[0]
     || null;
+  const viewPolicy = internalSettingsViewPolicy({ viewerId, internalUser: selectedInternalUser,
+    internalUsers, readOnly, canManageOwnAccount });
+  const canEditRoles = canManageRoles && !readOnly && !viewPolicy.isSelf;
+  const effectivePermissions = internalUserPermissions(selectedInternalUser?.roles);
   const filteredInternalUsers = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return internalUsers.filter((internalUser) => !needle
@@ -74,6 +82,7 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
   }, [internalUsers, query]);
 
   function selectInternalUser(internalUser) {
+    if (busy) return;
     setSelectedId(internalUser.id);
     setDraft(settingsFromInternalUser(internalUser));
     setStatus("");
@@ -117,12 +126,12 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
 
   async function saveInternalUser(event) {
     event.preventDefault();
-    if (!draft || busy) return;
+    if (!draft || busy || !viewPolicy.canEdit) return;
     setBusy("save");
     setStatus("");
     setError("");
     try {
-      const response = await fetch("/api/admin/internal-users", {
+      const response = await fetch("/api/internal/internal-users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(draft),
@@ -142,13 +151,13 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
 
   async function createInternalUser(event) {
     event.preventDefault();
-    if (busy) return;
+    if (busy || readOnly) return;
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     setBusy("create");
     setCreateError("");
     try {
-      const response = await fetch("/api/admin/internal-users", {
+      const response = await fetch("/api/internal/internal-users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -177,11 +186,41 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
     }
   }
 
+  async function updateRole(role, assigned) {
+    if (!selectedInternalUser || !canEditRoles || busy) return;
+    if (role === 'internal_access_manager' && !assigned && viewPolicy.isLastActiveManager) return;
+    if (assigned && !selectedInternalUser.active) return;
+    const targetId = selectedInternalUser.id;
+    const targetName = selectedInternalUser.name;
+    if (role === 'internal_access_manager' && !window.confirm(`${assigned ? 'Grant' : 'Revoke'} Internal Access Manager ${assigned ? 'to' : 'from'} ${targetName}? This changes account-management access immediately. Other unsaved account edits will not be saved by this action.`)) return;
+    setBusy('role');
+    setStatus('');
+    setError('');
+    try {
+      const response = await fetch('/api/internal/internal-users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: targetId, role, assigned }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.internalUser || payload.internalUser.id !== targetId) {
+        throw new Error(payload?.error || 'The role assignment could not be changed.');
+      }
+      setInternalUsers(current => current.map(user => user.id === targetId
+        ? { ...user, roles: payload.internalUser.roles } : user));
+      setStatus(`Role ${assigned ? 'granted to' : 'revoked from'} ${targetName}. Any other account edits remain unsaved.`);
+    } catch (roleError) {
+      setError(roleError.message || 'The role assignment could not be changed.');
+    } finally {
+      setBusy('');
+    }
+  }
+
   if (!schemaReady) {
     return <section className={`${styles.workspace} ${styles.schemaWorkspace}`} id="internalUsers">
       <div className={styles.noClient}>
         <h2>Internal User Controls need a database update</h2>
-        <p>Run <code>npm run internal-user:migrate</code> to add position and panel-access settings. Existing client and internal user records are preserved.</p>
+        <p>Run <code>npm run internal-user:migrate</code> to add role assignments and audit records. Existing accounts are preserved.</p>
       </div>
     </section>;
   }
@@ -191,9 +230,9 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
       <aside className={styles.clientDirectory}>
         <div className={styles.directoryHeading}>
           <div><p>Accounts</p><h2>Internal users</h2></div>
-          <button type="button" onClick={() => { setCreateError(""); createDialogRef.current?.showModal(); }}>
+          {!readOnly && <button type="button" onClick={() => { setCreateError(""); createDialogRef.current?.showModal(); }}>
             <Icon name="plus" /> Add internal user
-          </button>
+          </button>}
         </div>
         <label className={styles.clientSearch}>
           <Icon name="search" />
@@ -204,7 +243,7 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
         <div className={styles.clientList}>
           {filteredInternalUsers.map((internalUser) => <button
             className={internalUser.id === selectedInternalUser?.id ? styles.selectedClient : ""}
-            key={internalUser.id} type="button" onClick={() => selectInternalUser(internalUser)}>
+            key={internalUser.id} type="button" disabled={Boolean(busy)} onClick={() => selectInternalUser(internalUser)}>
             <span className={styles.clientAvatar}>{initials(internalUser.name)}</span>
             <span className={styles.clientCopy}><strong>{internalUser.name}</strong>
               <small>{internalUser.positionLabel} · @{internalUser.username || "internal-user"}</small></span>
@@ -217,6 +256,7 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
       </aside>
 
       <section className={styles.controlPanel}>
+        {readOnly && <p role="status">Read-only access. An account-management permission is required to create or change accounts.</p>}
         {selectedInternalUser && draft ? <form onSubmit={saveInternalUser}>
           <header className={styles.clientHeader}>
             <div className={styles.clientTitle}><span>{initials(selectedInternalUser.name)}</span><div>
@@ -225,56 +265,89 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
             </div></div>
             <div className={styles.headerActions}>
               <span className={draft.active ? styles.enabled : styles.disabled}><i /> {draft.active ? "Portal active" : "Portal paused"}</span>
-              <button disabled={Boolean(busy)} type="submit">{busy === "save" ? "Saving..." : "Save changes"}</button>
+              {viewPolicy.canEdit && <button disabled={Boolean(busy)} type="submit">{busy === "save" ? "Saving..." : "Save changes"}</button>}
             </div>
           </header>
+          {viewPolicy.isSelf && <p className={styles.settingsNotice}>{viewPolicy.canEdit
+            ? 'You can update your own account details here. Your account status and roles remain protected.'
+            : 'Your own account can be viewed here, but it cannot be changed in Internal Settings.'}</p>}
           {status ? <p className={styles.success} role="status">{status}</p> : null}
           {error ? <p className={styles.error} role="alert">{error}</p> : null}
 
           <div className={styles.internalUserSummary}>
             <div><span>Position</span><strong>{internalUserPosition(draft.position).label}</strong></div>
-            <div><span>Visible panels</span><strong>{draft.panelAccess.length}</strong></div>
+            <div><span>My Workspace</span><strong>{visibleInternalRoleLabels(selectedInternalUser.roles).join(', ') || '—'}</strong></div>
+            <div><span>Visible panels</span><strong>{effectiveInternalUserPanels(draft.panelAccess, selectedInternalUser.roles).length}</strong></div>
             <div><span>Hubstaff</span><strong>{selectedInternalUser.connected ? "Connected" : "Not connected"}</strong></div>
             <div><span>Last sync</span><strong>{dateLabel(selectedInternalUser.lastSyncedAt)}</strong></div>
           </div>
 
+          <section className={`${styles.settingsCard} ${styles.roleActionCard}`}>
+            <header><span><Icon name="shield" /></span><div><h3>My Workspace & permissions</h3>
+              <p>Roles are assigned separately from position and panels. Changes here take effect immediately and are audited.</p></div></header>
+            <div className={styles.roleList}>{INTERNAL_ASSIGNABLE_ROLES.map(role => {
+              const assigned = selectedInternalUser.roles.includes(role.id);
+              const lastManager = role.id === 'internal_access_manager' && assigned && viewPolicy.isLastActiveManager;
+              const disabled = !canEditRoles || Boolean(busy) || lastManager || (!assigned && !selectedInternalUser.active);
+              return <label key={role.id} className={styles.roleOption}>
+                <input type="checkbox" checked={assigned} disabled={disabled}
+                  onChange={event => updateRole(role.id, event.target.checked)} />
+                <span><strong>{role.label}{role.planned ? ' · Planned' : ''}</strong>
+                  <small>{role.planned
+                    ? 'Assignable in Phase 0; no live data permissions yet.'
+                    : `Live permissions: ${INTERNAL_ROLE_PERMISSIONS[role.id].join(', ')}`}</small>
+                  {role.plannedPermissions.length > 0 && <small>Future, inactive: {role.plannedPermissions.join(', ')}</small>}
+                </span>
+              </label>;
+            })}</div>
+            <p className={styles.controlHint}>Your own roles and the protected system role cannot be changed here. The last active Access Manager cannot be revoked.</p>
+            <div className={styles.permissionSummary}><strong>Effective live permissions for this account</strong>
+              <p>Derived from assigned roles plus self-service access. Personal tasks and Hubstaff data remain self-only; visible panels do not grant data access.</p>
+              <ul>{effectivePermissions.map(permission => <li key={permission}><code>{permission}</code>
+                <small>{internalPermissionScope(permission)}</small></li>)}</ul>
+            </div>
+          </section>
+
           <div className={styles.settingsGrid}>
             <section className={styles.settingsCard}>
-              <header><span><Icon name="user" /></span><div><h3>Position & identity</h3><p>Position presets provide a starting access policy.</p></div></header>
+              <header><span><Icon name="user" /></span><div><h3>Position & identity</h3><p>Position presets set visible panels, not My Workspace assignments or data permissions.</p></div></header>
               <div className={styles.fieldGrid}>
-                <label><span>Display name</span><input maxLength="120" value={draft.name}
+                <label><span>Display name</span><input maxLength="120" value={draft.name} disabled={!viewPolicy.canEdit}
                   onChange={(event) => updateDraft("name", event.target.value)} /></label>
-                <label><span>Internal user position</span><select value={draft.position}
+                <label><span>Internal user position</span><select value={draft.position} disabled={!viewPolicy.canEdit}
                   onChange={(event) => updatePosition(event.target.value)}>
                   {INTERNAL_USER_POSITIONS.map((positionOption) => <option key={positionOption.id} value={positionOption.id}>{positionOption.label}</option>)}
-                </select><small>Changing the position applies that position&apos;s default panel access. You can customize it below.</small></label>
+                </select><small>Changing the position applies default panels. It does not grant or revoke a My Workspace role.</small></label>
               </div>
             </section>
 
             <section className={styles.settingsCard}>
               <header><span><Icon name="shield" /></span><div><h3>Access & availability</h3><p>Pause access without deleting the account.</p></div></header>
-              <label className={styles.toggleRow}><span><strong>Internal portal</strong>
+              <label className={`${styles.toggleRow} ${!viewPolicy.canChangeStatus ? styles.lockedToggle : ''}`}><span><strong>Internal portal</strong>
                 <small>Allow this internal user to sign in and load assigned panels.</small></span>
-                <input type="checkbox" checked={draft.active}
+                <input type="checkbox" checked={draft.active} disabled={!viewPolicy.canChangeStatus}
                   onChange={(event) => updateDraft("active", event.target.checked)} /><i /></label>
+              {viewPolicy.statusLockedByRole && !viewPolicy.isSelf &&
+                <p className={styles.controlHint}>This account cannot be paused while it holds a protected role. Revoke that role through the approved process first.</p>}
               <p className={styles.controlHint}>Pausing access clears saved internal user Hubstaff credentials and invalidates in-flight synchronization.</p>
             </section>
 
             <section className={styles.settingsCard}>
               <header><span><Icon name="connection" /></span><div><h3>Hubstaff identity</h3><p>The approved user mapping is never selected by the browser session.</p></div></header>
               <div className={styles.fieldGrid}><label><span>Approved Hubstaff user ID</span>
-                <input inputMode="numeric" pattern="[1-9][0-9]*" value={draft.hubstaffUserId}
+                <input inputMode="numeric" pattern="[1-9][0-9]*" value={draft.hubstaffUserId} disabled={!viewPolicy.canEdit}
                   onChange={(event) => updateDraft("hubstaffUserId", event.target.value)} />
                 <small>Changing this ID clears the saved connection and requires the internal user to reconnect.</small></label></div>
             </section>
 
             <section className={`${styles.settingsCard} ${styles.wideCard}`}>
-              <header><span><Icon name="shield" /></span><div><h3>Internal portal panels</h3><p>Choose exactly which navigation panels this internal user can see.</p></div></header>
+              <header><span><Icon name="shield" /></span><div><h3>Internal portal panels</h3><p>Choose visible panels for this account. Team is enabled by default and can be turned off.</p></div></header>
               <div className={styles.workspaceAccessList}>{INTERNAL_USER_WORKSPACES.map((workspaceOption) => <section key={workspaceOption.id} className={styles.workspaceAccessGroup}>
                 <div><strong>{workspaceOption.label}</strong><small>{workspaceOption.description}</small></div>
                 <div className={styles.panelAccessGrid}>{INTERNAL_USER_PANELS.filter((panel) => panel.workspace === workspaceOption.id)
                   .map((panel) => <label key={panel.id} className={styles.panelAccessOption}>
                     <input type="checkbox" checked={draft.panelAccess.includes(panel.id)}
+                      disabled={!viewPolicy.canEdit}
                       onChange={(event) => togglePanel(panel.id, event.target.checked)} />
                     <span><strong>{panel.label}{panel.planned ? " · Planned" : ""}</strong><small>{panel.description}</small></span>
                   </label>)}</div>
@@ -282,14 +355,14 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
             </section>
           </div>
         </form> : <div className={styles.noClient}>
-          <h2>Create your first internal user account</h2>
-          <p>Provision a separate internal user login, approved Hubstaff identity, position, and portal access policy.</p>
-          <button type="button" onClick={() => createDialogRef.current?.showModal()}>Add internal user</button>
+          <h2>No internal users to display</h2>
+          {!readOnly && <><p>Provision a separate internal user login, approved Hubstaff identity, position, and portal access policy.</p>
+          <button type="button" onClick={() => createDialogRef.current?.showModal()}>Add internal user</button></>}
         </div>}
       </section>
     </section>
 
-    <dialog className={styles.createDialog} ref={createDialogRef}>
+    {!readOnly && <dialog className={styles.createDialog} ref={createDialogRef}>
       <form onSubmit={createInternalUser}>
         <header><div><p>Private provisioning</p><h2>Create an internal user account</h2></div>
           <button type="button" aria-label="Close" onClick={() => createDialogRef.current?.close()}>×</button></header>
@@ -307,6 +380,6 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
         <footer><button type="button" onClick={() => createDialogRef.current?.close()}>Cancel</button>
           <button disabled={busy === "create"} type="submit">{busy === "create" ? "Creating internal user..." : "Create internal user"}</button></footer>
       </form>
-    </dialog>
+    </dialog>}
   </>;
 }
