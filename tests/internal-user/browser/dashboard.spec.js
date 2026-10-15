@@ -332,10 +332,16 @@ test('Internal Settings can toggle Team and shows planned permissions without ex
   await page.goto('/role-settings');
   await expect(page.getByRole('heading', { name: 'My Workspace & permissions' })).toBeVisible();
   await expect(page.getByText('internal_admin')).toHaveCount(0);
-  await expect(page.getByText('Your account status and roles remain protected.')).toBeVisible();
+  await expect(page.getByText('Your account status remains protected.')).toBeVisible();
   await page.getByRole('button', { name: /Taylor Team/ }).click();
   const teamDirectoryPanel = page.getByRole('checkbox', { name: /Team directory/ });
   await expect(teamDirectoryPanel).not.toBeChecked();
+  const accountSettingsPanel = page.getByRole('checkbox', { name: /Account settings/ });
+  await expect(accountSettingsPanel).toBeChecked();
+  await accountSettingsPanel.click();
+  await expect(accountSettingsPanel).not.toBeChecked();
+  await accountSettingsPanel.click();
+  await expect(accountSettingsPanel).toBeChecked();
   await expect(teamDirectoryPanel).toBeEnabled();
   await teamDirectoryPanel.click();
   await expect(teamDirectoryPanel).toBeChecked();
@@ -343,20 +349,77 @@ test('Internal Settings can toggle Team and shows planned permissions without ex
   await expect(teamDirectoryPanel).not.toBeChecked();
   const roleCard = page.locator('section').filter({ has: page.getByRole('heading', { name: 'My Workspace & permissions' }) }).last();
   const hr = roleCard.getByRole('checkbox', { name: /HR · Planned/ });
+  const accessManager = roleCard.getByRole('checkbox', { name: /Internal Access Manager/ });
+  await expect(roleCard).not.toContainText('Internal Admin');
   await expect(hr).not.toBeChecked();
+  await expect(accessManager).toBeEnabled();
   await expect(roleCard.getByText('people.leave.read')).toBeVisible();
   await expect(roleCard.locator('code').filter({ hasText: 'people.leave.read' })).toHaveCount(0);
+  const roleCardTop = await roleCard.evaluate(element => element.getBoundingClientRect().top + window.scrollY);
+  const assignments = [];
   await page.route('**/api/internal/internal-users', async route => {
     expect(route.request().method()).toBe('PUT');
-    expect(route.request().postDataJSON()).toEqual({ id: '2', role: 'hr', assigned: true });
+    const assignment = route.request().postDataJSON();
+    expect(assignment).toEqual({ id: '2', role: 'hr', assigned: assignments.length === 0 });
+    assignments.push(assignment);
     await route.fulfill({ json: { saved: true, internalUser: {
-      id: '2', roles: ['project_management', 'hr'],
+      id: '2', roles: assignment.assigned ? ['project_management', 'hr'] : ['project_management'],
     } } });
   });
   await hr.click();
   await expect(hr).toBeChecked();
   await expect(roleCard.locator('code').filter({ hasText: 'people.leave.read' })).toHaveCount(0);
-  await expect(page.getByText('Role granted to Taylor Team.')).toBeVisible();
+  const roleToast = page.getByRole('status').filter({ hasText: 'Role granted to Taylor Team.' });
+  await expect(roleToast).toBeVisible();
+  await expect(roleToast).toHaveCSS('position', 'fixed');
+  expect(await roleCard.evaluate(element => element.getBoundingClientRect().top + window.scrollY)).toBe(roleCardTop);
+  await hr.click();
+  await expect(hr).not.toBeChecked();
+  await expect(page.getByRole('status').filter({ hasText: 'Role revoked from Taylor Team.' })).toBeVisible();
+  expect(await roleCard.evaluate(element => element.getBoundingClientRect().top + window.scrollY)).toBe(roleCardTop);
+  await expect(page.getByText('Any other account edits remain unsaved.')).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: 'Role revoked from Taylor Team.' })).toHaveCount(0, { timeout: 6000 });
+});
+
+test('Internal Admin can grant Internal Access Manager to another account', async ({ page }) => {
+  await page.goto('/role-settings');
+  await page.getByRole('button', { name: /Taylor Team/ }).click();
+  const roleCard = page.locator('section').filter({ has: page.getByRole('heading', { name: 'My Workspace & permissions' }) }).last();
+  const manager = roleCard.getByRole('checkbox', { name: /Internal Access Manager/ });
+  await expect(manager).toBeEnabled();
+  await expect(manager).not.toBeChecked();
+  page.on('dialog', dialog => dialog.accept());
+  await page.route('**/api/internal/internal-users', async route => {
+    expect(route.request().method()).toBe('PUT');
+    expect(route.request().postDataJSON()).toEqual({ id: '2', role: 'internal_access_manager', assigned: true });
+    await route.fulfill({ json: { internalUser: {
+      id: '2', roles: ['project_management', 'internal_access_manager'],
+    } } });
+  });
+  await manager.click();
+  await expect(manager).toBeChecked();
+  await expect(page.getByRole('status').filter({ hasText: 'Role granted to Taylor Team.' })).toBeVisible();
+});
+
+test('Access Manager may change own business role but not own protected role in Internal Settings', async ({ page }) => {
+  await page.goto('/role-settings?viewer=manager');
+  const roleCard = page.locator('section').filter({ has: page.getByRole('heading', { name: 'My Workspace & permissions' }) }).last();
+  const manager = roleCard.getByRole('checkbox', { name: /Internal Access Manager/ });
+  const hr = roleCard.getByRole('checkbox', { name: /HR · Planned/ });
+  await expect(manager).toBeChecked();
+  await expect(manager).toBeDisabled();
+  await expect(hr).toBeEnabled();
+  await expect(page.getByText('You can manage your own business roles here, but not your account details or protected role.')).toBeVisible();
+  await page.route('**/api/internal/internal-users', async route => {
+    expect(route.request().method()).toBe('PUT');
+    expect(route.request().postDataJSON()).toEqual({ id: '1', role: 'hr', assigned: true });
+    await route.fulfill({ json: { internalUser: { id: '1', roles: ['internal_access_manager', 'hr'] } } });
+  });
+  await hr.click();
+  await expect(hr).toBeChecked();
+  await page.getByRole('button', { name: /Taylor Team/ }).click();
+  await expect(manager).toBeDisabled();
+  await expect(hr).toBeEnabled();
 });
 
 test('Internal Settings saves an enabled Team panel for an ordinary internal user', async ({ page }) => {
@@ -380,6 +443,152 @@ test('Internal Settings saves an enabled Team panel for an ordinary internal use
   await page.getByRole('button', { name: 'Save changes' }).click();
   await expect(page.getByText('Internal user controls saved successfully.')).toBeVisible();
   await expect(teamDirectoryPanel).toBeChecked();
+});
+
+test('Internal Settings creates an account using an available Hubstaff member', async ({ page }) => {
+  await page.route('**/api/internal/hubstaff-members', route => route.fulfill({ json: {
+    members: [{ id: '303', name: 'Avery Available' }, { id: '404', name: 'Taylor Available' }],
+  } }));
+  await page.goto('/role-settings');
+  await page.getByRole('button', { name: 'Add internal user' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('status').filter({ hasText: 'AOC members' })).toContainText('2 available');
+  await expect(dialog.getByRole('combobox', { name: 'Hubstaff member' })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: 'Create internal user' })).toBeDisabled();
+  await expect(dialog.getByRole('searchbox')).toHaveCount(0);
+  await expect(dialog.getByRole('option', { name: 'Taylor Available (ID 404)' })).toHaveCount(1);
+  await dialog.getByRole('combobox', { name: 'Hubstaff member' }).selectOption('303');
+  await dialog.getByRole('textbox', { name: 'Internal user name' }).fill('Avery Available');
+  await dialog.getByRole('textbox', { name: 'Username' }).fill('avery.available');
+  await expect(dialog.getByText(/Use 12–128 characters and at least three/)).toBeVisible();
+  await dialog.getByLabel('Temporary password').fill('justlowercaseletters');
+  await dialog.getByLabel('Temporary password').blur();
+  await expect(dialog.getByRole('alert')).toHaveText('Use at least three of: lowercase letters, uppercase letters, numbers, and symbols.');
+  await expect(dialog.getByLabel('Temporary password')).toHaveAttribute('aria-invalid', 'true');
+  await dialog.getByLabel('Temporary password').fill('FixturePassword123!');
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+  await expect(dialog.getByLabel('Temporary password')).toHaveAttribute('aria-invalid', 'false');
+  await page.route('**/api/internal/internal-users', async route => {
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().postDataJSON().hubstaffUserId).toBe('303');
+    await route.fulfill({ json: { internalUser: {
+      id: '3', username: 'avery.available', name: 'Avery Available', position: 'team_member',
+      positionLabel: 'Team Member', panelAccess: ['overview'], roles: [], active: true,
+      hubstaffUserId: '303', connected: false, createdAt: '2026-01-01T00:00:00Z',
+    } } });
+  });
+  await dialog.getByRole('button', { name: 'Create internal user' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText('Avery Available was created and can sign in now.')).toBeVisible();
+});
+
+test('Internal Settings AOC Members toggle permits an unmapped organization member', async ({ page }) => {
+  await page.route('**/api/internal/hubstaff-members*', route => {
+    const allOrganization = new URL(route.request().url()).searchParams.get('aoc_only') === 'false';
+    return route.fulfill({ json: { members: allOrganization
+      ? [{ id: '303', name: 'Avery AOC' }, { id: '505', name: 'Jordan Organization' }]
+      : [{ id: '303', name: 'Avery AOC' }] } });
+  });
+  await page.goto('/role-settings');
+  await page.getByRole('button', { name: 'Add internal user' }).click();
+  const dialog = page.getByRole('dialog');
+  const aocToggle = dialog.getByRole('switch', { name: /AOC Members/ });
+  await expect(aocToggle).toBeChecked();
+  await expect(dialog.getByRole('option', { name: 'Jordan Organization (ID 505)' })).toHaveCount(0);
+  await aocToggle.uncheck();
+  await expect(dialog.getByRole('status').filter({ hasText: 'Organization members' })).toContainText('2 available');
+  await dialog.getByRole('combobox', { name: 'Hubstaff member' }).selectOption('505');
+  await dialog.getByRole('textbox', { name: 'Internal user name' }).fill('Jordan Organization');
+  await dialog.getByRole('textbox', { name: 'Username' }).fill('jordan.organization');
+  await dialog.getByLabel('Temporary password').fill('FixturePassword123!');
+  await page.route('**/api/internal/internal-users', async route => {
+    const submitted = route.request().postDataJSON();
+    expect(submitted.hubstaffUserId).toBe('505');
+    await route.fulfill({ json: { internalUser: {
+      id: '5', username: 'jordan.organization', name: 'Jordan Organization', position: 'team_member',
+      positionLabel: 'Team Member', panelAccess: ['overview'], roles: [], active: true,
+      hubstaffUserId: '505', connected: false, createdAt: '2026-01-01T00:00:00Z',
+    } } });
+  });
+  await dialog.getByRole('button', { name: 'Create internal user' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText('Jordan Organization was created and can sign in now.')).toBeVisible();
+});
+
+test('Internal Settings shows a server password rejection beside the password field', async ({ page }) => {
+  await page.route('**/api/internal/hubstaff-members', route => route.fulfill({ json: {
+    members: [{ id: '303', name: 'Avery Available' }],
+  } }));
+  await page.route('**/api/internal/internal-users', route => route.fulfill({ status: 400, json: {
+    code: 'invalid_password', error: 'Passwords must not contain the account username.',
+  } }));
+  await page.goto('/role-settings');
+  await page.getByRole('button', { name: 'Add internal user' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('textbox', { name: 'Internal user name' }).fill('Avery Available');
+  await dialog.getByRole('textbox', { name: 'Username' }).fill('avery.available');
+  await dialog.getByLabel('Temporary password').fill('FixturePassword123!');
+  await dialog.getByRole('combobox', { name: 'Hubstaff member' }).selectOption('303');
+  await dialog.getByRole('button', { name: 'Create internal user' }).click();
+  await expect(dialog.getByRole('alert')).toHaveText('Passwords must not contain the account username.');
+  await expect(dialog.getByLabel('Temporary password')).toBeFocused();
+  await expect(dialog.getByLabel('Temporary password')).toHaveAttribute('aria-invalid', 'true');
+});
+
+test('personal Settings can change the password without a Hubstaff panel', async ({ page }) => {
+  await page.goto('/internal/settings?no_hubstaff=true');
+  await expect(page.getByRole('heading', { name: 'Account security' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Hubstaff connection' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible();
+  const form = page.locator('#account-security form');
+  await form.getByLabel('Current password').fill('FixtureOld123!');
+  await form.getByLabel('New password', { exact: true }).fill('onlylowercaseletters');
+  await form.getByLabel('Confirm new password').fill('onlylowercaseletters');
+  await form.getByRole('button', { name: 'Update password' }).click();
+  await expect(form.getByRole('alert')).toHaveText('Use at least three of: lowercase letters, uppercase letters, numbers, and symbols.');
+  await form.getByLabel('New password', { exact: true }).fill('FixtureNew123!');
+  await form.getByLabel('Confirm new password').fill('FixtureNew123!');
+  await page.route('**/api/internal/password', async route => {
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().postDataJSON()).toEqual({
+      currentPassword: 'FixtureOld123!', newPassword: 'FixtureNew123!',
+    });
+    await route.fulfill({ json: { changed: true } });
+  });
+  await form.getByRole('button', { name: 'Update password' }).click();
+  await expect(page.getByRole('status')).toContainText('other sessions have been signed out');
+  await expect(form.getByLabel('Current password')).toHaveValue('');
+});
+
+test('Account Settings panel can be disabled independently of Hubstaff', async ({ page }) => {
+  await page.goto('/internal/settings?no_account_settings=true');
+  await expect(page.getByRole('heading', { name: 'Hubstaff connection' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Account security' })).toHaveCount(0);
+});
+
+test('Internal Settings resets another user password with manager reauthentication', async ({ page }) => {
+  await page.goto('/role-settings');
+  await page.getByRole('button', { name: /Taylor Team/ }).click();
+  await page.getByRole('button', { name: 'Reset password' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Reset password for Taylor Team' });
+  await dialog.getByLabel('Your current password').fill('FixtureManager123!');
+  await dialog.getByLabel('New password for this user').fill('onlylowercaseletters');
+  await dialog.getByLabel('Confirm new password').fill('onlylowercaseletters');
+  await dialog.getByRole('button', { name: 'Reset password' }).click();
+  await expect(dialog.getByRole('alert')).toHaveText('Use at least three of: lowercase letters, uppercase letters, numbers, and symbols.');
+  await dialog.getByLabel('New password for this user').fill('FixtureReset123!');
+  await dialog.getByLabel('Confirm new password').fill('FixtureReset123!');
+  await page.route('**/api/internal/password', async route => {
+    expect(route.request().method()).toBe('PUT');
+    expect(route.request().postDataJSON()).toEqual({ id: '2', currentPassword: 'FixtureManager123!',
+      newPassword: 'FixtureReset123!' });
+    await route.fulfill({ json: { reset: true } });
+  });
+  await dialog.getByRole('button', { name: 'Reset password' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('status')).toContainText('Taylor Team\'s password was reset');
+  await page.getByRole('button', { name: /Fixture Admin/ }).click();
+  await expect(page.getByRole('button', { name: 'Reset password' })).toHaveCount(0);
 });
 
 test('assigned functional roles link directly from the desktop sidebar', async ({ page }) => {
@@ -428,4 +637,31 @@ test('mobile hamburger opens the same role sidebar and closes after navigation',
   await expect(drawer).toHaveCount(0);
   await expect(menuButton).toBeFocused();
   expect(dashboardRequests).toEqual([]);
+});
+
+test('short sidebar keeps identity visible and scrolls only the navigation on desktop and mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 350 });
+  await page.goto('/role-panels');
+  let nav = page.getByRole('navigation', { name: 'Internal portal' });
+  const desktop = await nav.evaluate(element => ({
+    clientHeight: element.clientHeight, scrollHeight: element.scrollHeight,
+    overflowY: getComputedStyle(element).overflowY,
+  }));
+  expect(desktop.scrollHeight).toBeGreaterThan(desktop.clientHeight);
+  expect(desktop.overflowY).toBe('auto');
+  await nav.evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await expect(page.locator('aside#internal-sidebar').getByText('Fixture Internal User')).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 350 });
+  await page.getByRole('button', { name: 'Open menu' }).click();
+  const drawer = page.getByRole('dialog', { name: 'Internal portal navigation' });
+  nav = drawer.getByRole('navigation', { name: 'Internal portal' });
+  const mobile = await nav.evaluate(element => ({
+    clientHeight: element.clientHeight, scrollHeight: element.scrollHeight,
+    overflowY: getComputedStyle(element).overflowY,
+  }));
+  expect(mobile.scrollHeight).toBeGreaterThan(mobile.clientHeight);
+  expect(mobile.overflowY).toBe('auto');
+  await nav.evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await expect(drawer.getByText('Fixture Internal User')).toBeVisible();
 });

@@ -12,13 +12,15 @@ let targetInternalUser = null;
 let targetRoles = [];
 let activeManagerCount = 2;
 const roleAudit = [];
+const integrationRuns = [];
 const profileUpdates = [];
 const db = { query: async (query, values) => {
   if (['BEGIN', 'COMMIT', 'ROLLBACK', 'LOCK TABLE portal_internal_user_roles IN SHARE ROW EXCLUSIVE MODE'].includes(query)) {
     return { rows: [] };
   }
   if (query.includes("r.role_key IN ('internal_access_manager','internal_admin')")) {
-    return { rows: roles.some(role => ['internal_access_manager', 'internal_admin'].includes(role)) ? [{ one: 1 }] : [] };
+    return { rows: roles.filter(role => ['internal_access_manager', 'internal_admin'].includes(role))
+      .map(role_key => ({ role_key })) };
   }
   if (query.startsWith('SELECT is_active FROM portal_internal_users WHERE user_id=')) {
     return { rows: targetInternalUser ? [{ is_active: targetInternalUser.is_active }] : [] };
@@ -28,19 +30,42 @@ const db = { query: async (query, values) => {
   }
   if (query.startsWith('DELETE FROM portal_internal_user_roles')) {
     const role = values[1] || 'internal_access_manager';
-    const assigned = targetRoles.includes(role);
-    targetRoles = targetRoles.filter(candidate => candidate !== role);
+    const selectedRoles = values[0] === '1' ? roles : targetRoles;
+    const assigned = selectedRoles.includes(role);
+    if (values[0] === '1') roles = roles.filter(candidate => candidate !== role);
+    else targetRoles = targetRoles.filter(candidate => candidate !== role);
     return { rowCount: Number(assigned), rows: assigned ? [{ user_id: values[0] }] : [] };
   }
   if (query.startsWith('INSERT INTO portal_internal_user_roles')) {
-    const assigned = targetRoles.includes(values[1]);
-    if (!assigned) targetRoles = [...targetRoles, values[1]];
+    const selectedRoles = values[0] === '1' ? roles : targetRoles;
+    const assigned = selectedRoles.includes(values[1]);
+    if (!assigned && values[0] === '1') roles = [...roles, values[1]];
+    else if (!assigned) targetRoles = [...targetRoles, values[1]];
     return { rowCount: Number(!assigned), rows: assigned ? [] : [{ user_id: values[0] }] };
   }
   if (query.startsWith('INSERT INTO portal_internal_access_audit')) {
     roleAudit.push(values);
     return { rowCount: 1, rows: [] };
   }
+  if (query.startsWith('INSERT INTO portal_integration_runs')) {
+    const id = integrationRuns.length + 1;
+    integrationRuns.push({ id, source: values[0], operation: values[1], actor_user_id: values[2],
+      environment: values[3], trigger_type: values[4], request_id: values[5], status: 'running' });
+    return { rowCount: 1, rows: [{ id }] };
+  }
+  if (query.startsWith('UPDATE portal_integration_runs')) {
+    const run = integrationRuns.find(item => item.id === values[0] && item.status === 'running');
+    if (run) Object.assign(run, { status: values[1], records_processed: values[2], retry_count: values[3],
+      source_timestamp: values[4], error_code: values[5], records_read: values[6],
+      records_written: values[7], records_skipped: values[8], records_failed: values[9],
+      retry_state: values[10], started_at: new Date(), finished_at: new Date() });
+    return { rowCount: Number(Boolean(run)), rows: [] };
+  }
+  if (query.includes("to_regclass('portal_integration_runs') AS runs")) {
+    return { rows: [{ runs: 'portal_integration_runs', access_audit: 'portal_internal_access_audit' }] };
+  }
+  if (query.includes('FROM portal_integration_runs ORDER BY')) return { rows: integrationRuns };
+  if (query.includes('FROM portal_internal_access_audit ORDER BY')) return { rows: [] };
   if (query.includes('WITH changed_internalUser AS')) {
     profileUpdates.push(values);
     internalUser = { ...internalUser, position: values[0], panel_access: JSON.parse(values[1]),
@@ -50,6 +75,7 @@ const db = { query: async (query, values) => {
   if (query.includes("to_regclass('portal_internal_users') AS users")) return { rows: [{ users: 'portal_internal_users',
     roles: 'portal_internal_user_roles', audit: 'portal_internal_access_audit' }] };
   if (query.startsWith('SELECT to_regclass')) return { rows: [{ relation: 'portal_internal_users' }] };
+  if (query.includes('SELECT 1 FROM portal_internal_users WHERE hubstaff_user_id')) return { rows: [] };
   if (query.includes('FROM portal_internal_users e JOIN portal_users u')) {
     return { rows: internalUser ? [{ ...internalUser, connected: Boolean(internalUser.encrypted_access_token) },
       ...(targetInternalUser ? [{ ...targetInternalUser,
@@ -96,8 +122,10 @@ const { resolveAdminContext } = await import('../../lib/admin-data.js');
 const { resolveInternalUserContext } = await import('../../lib/internal-user-data.js');
 const { encryptInternalUserToken } = await import('../../lib/internal-user-repository.js');
 const { GET: internalUserDashboard } = await import('../../app/api/internal/dashboard/route.js');
+const { GET: platformAudit } = await import('../../app/api/internal/audit/route.js');
 const { GET: internalUsersGet, POST: internalUsersPost, PATCH: internalUsersPatch, PUT: internalUsersPut,
 } = await import('../../app/api/internal/internal-users/route.js');
+const { GET: availableHubstaffMembers } = await import('../../app/api/internal/hubstaff-members/route.js');
 const { POST: connect } = await import('../../app/api/internal/connection/route.js');
 const { POST: chatkit } = await import('../../app/api/chatkit/route.js');
 const { GET: clientHubstaff } = await import('../../app/api/hubstaff/route.js');
@@ -144,7 +172,7 @@ test('active internal user endpoint returns no legacy state and refuses every br
   const context = await resolveInternalUserContext(headers);
   assert.equal(context.profile.name, internalUserA.display_name);
   assert.equal(context.profile.position, 'Team Member');
-  assert.deepEqual(context.profile.panels, ['overview', 'my_tasks', 'activity', 'team_directory', 'hubstaff']);
+  assert.deepEqual(context.profile.panels, ['overview', 'my_tasks', 'activity', 'team_directory', 'account_settings', 'hubstaff']);
   const response = await internalUserDashboard(request('/api/internal/dashboard'));
   assert.deepEqual((await response.json()).tasks, []);
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
@@ -234,15 +262,21 @@ test('each live personal panel filters dashboard data independently', async () =
   assert.equal((await internalUserDashboard(request('/api/internal/dashboard?workspace=personal'))).status, 403);
 });
 
-test('Hubstaff settings need its panel; a planned role cannot open Internal Settings', async () => {
+test('personal Settings requires an enabled panel; a planned role cannot open Internal Settings', async () => {
   session = { user: { id: 'internal-user-a', name: 'InternalUser A' } };
   internalUser = { ...internalUserA, panel_access: ['overview'] };
   roles = ['sales'];
   assert.equal((await internalUserDashboard(request('/api/internal/dashboard?workspace=settings'))).status, 403);
   assert.equal((await internalUsersGet(request('/api/internal/internal-users'))).status, 403);
   roles = [];
+  internalUser = { ...internalUserA, panel_access: ['account_settings'] };
+  const accountOnly = await internalUserDashboard(request('/api/internal/dashboard?workspace=settings'));
+  assert.equal(accountOnly.status, 200);
+  assert.equal(Object.hasOwn(await accountOnly.json(), 'connection'), false);
   internalUser = { ...internalUserA, panel_access: ['hubstaff'] };
-  assert.equal((await internalUserDashboard(request('/api/internal/dashboard?workspace=settings'))).status, 200);
+  const hubstaffOnly = await internalUserDashboard(request('/api/internal/dashboard?workspace=settings'));
+  assert.equal(hubstaffOnly.status, 200);
+  assert.equal(Object.hasOwn(await hubstaffOnly.json(), 'connection'), true);
 });
 
 test('non-manager cannot read or create internal user accounts through the new API', async () => {
@@ -250,6 +284,7 @@ test('non-manager cannot read or create internal user accounts through the new A
   roles = ['project_management'];
   session = { user: { id: 'internal-user-a', name: 'Manager' } };
   assert.equal((await internalUsersGet(request('/api/internal/internal-users'))).status, 403);
+  assert.equal((await availableHubstaffMembers(request('/api/internal/hubstaff-members'))).status, 403);
   const create = new Request('https://portal.example/api/internal/internal-users', {
     method: 'POST', headers: { origin: 'https://portal.example', 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'Not authorized' }),
@@ -263,13 +298,82 @@ test('non-manager cannot read or create internal user accounts through the new A
   roles = [];
 });
 
+test('account managers default to AOC members, can list other unmapped organization members, and cannot submit outsiders', async () => {
+  internalUser = { ...internalUserA };
+  targetInternalUser = { ...internalUserB, is_active: false };
+  roles = ['internal_access_manager'];
+  session = { user: { id: 'internal-user-a', name: 'Manager' } };
+  const previousToken = process.env.HUBSTAFF_ACCESS_TOKEN;
+  const previousTeamId = process.env.HUBSTAFF_INTERNAL_TEAM_ID;
+  const previousFetch = globalThis.fetch;
+  process.env.HUBSTAFF_ACCESS_TOKEN = 'hsoat_fixture_token';
+  process.env.HUBSTAFF_INTERNAL_TEAM_ID = '77';
+  globalThis.fetch = async url => {
+    if (url.pathname === '/v2/organizations') {
+      return Response.json({ organizations: [{ id: 9 }], pagination: {} });
+    }
+    if (url.pathname === '/v2/organizations/9/teams') {
+      return Response.json({ teams: [{ id: 77, name: 'AOC members' }], pagination: {} });
+    }
+    if (url.pathname === '/v2/teams/77/members') {
+      return Response.json({ team_members: [
+        { user_id: 101 }, { user_id: 202 }, { user_id: 303 }, { user_id: 404 },
+      ], pagination: {} });
+    }
+    if (url.pathname === '/v2/organizations/9/members') {
+      return Response.json({ members: [
+        { user_id: 101, membership_status: 'active' },
+        { user_id: 202, membership_status: 'active' },
+        { user_id: 303, membership_status: 'active' },
+        { user_id: 404, membership_status: 'inactive' },
+        { user_id: 505, membership_status: 'active' },
+      ], users: [
+        { id: 101, name: 'Already mapped', status: 'active' },
+        { id: 202, name: 'Inactive portal account mapping', status: 'active' },
+        { id: 303, name: 'Available Member', status: 'active', email: 'private@example.invalid' },
+        { id: 404, name: 'Inactive Member', status: 'active' },
+        { id: 505, name: 'Outside AOC team', status: 'active' },
+      ], pagination: {} });
+    }
+    throw new Error('Unexpected Hubstaff route');
+  };
+  try {
+    const response = await availableHubstaffMembers(request('/api/internal/hubstaff-members'));
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'private, no-store');
+    assert.deepEqual(await response.json(), { members: [{ id: '303', name: 'Available Member' }] });
+    const allResponse = await availableHubstaffMembers(request('/api/internal/hubstaff-members?aoc_only=false'));
+    assert.equal(allResponse.status, 200);
+    assert.deepEqual(await allResponse.json(), { members: [
+      { id: '303', name: 'Available Member' }, { id: '505', name: 'Outside AOC team' },
+    ] });
+    assert.equal((await availableHubstaffMembers(request('/api/internal/hubstaff-members?aoc_only=all'))).status, 400);
+    const outsider = new Request('https://portal.example/api/internal/internal-users', {
+      method: 'POST', headers: { origin: 'https://portal.example', 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Outside Organization', username: 'outside.org',
+        password: 'FixturePassword123!', position: 'team_member', hubstaffUserId: '606' }),
+    });
+    const rejected = await internalUsersPost(outsider);
+    assert.equal(rejected.status, 409);
+    assert.equal((await rejected.json()).code, 'hubstaff_member_unavailable');
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousToken === undefined) delete process.env.HUBSTAFF_ACCESS_TOKEN;
+    else process.env.HUBSTAFF_ACCESS_TOKEN = previousToken;
+    if (previousTeamId === undefined) delete process.env.HUBSTAFF_INTERNAL_TEAM_ID;
+    else process.env.HUBSTAFF_INTERNAL_TEAM_ID = previousTeamId;
+    roles = [];
+    targetInternalUser = null;
+  }
+});
+
 test('internal admin sees all current panels and cannot smuggle roles through account payloads', async () => {
   internalUser = { ...internalUserA, position: 'team_member', panel_access: ['overview'] };
   roles = ['internal_admin'];
   session = { user: { id: 'internal-user-a', name: 'Internal Admin' } };
   const context = await resolveInternalUserContext(headers);
   assert.deepEqual(context.profile.panels,
-    ['overview', 'my_tasks', 'activity', 'team_directory', 'hubstaff']);
+    ['overview', 'my_tasks', 'activity', 'team_directory', 'account_settings', 'hubstaff']);
   assert.equal((await internalUserDashboard(request('/api/internal/dashboard?workspace=team'))).status, 200);
   assert.equal((await internalUserDashboard(request('/api/internal/dashboard?workspace=settings'))).status, 200);
   const list = await internalUsersGet(request('/api/internal/internal-users'));
@@ -290,7 +394,7 @@ test('internal admin sees all current panels and cannot smuggle roles through ac
   roles = [];
 });
 
-test('access managers can assign implemented and planned roles but never the protected role or their own', async () => {
+test('access managers manage business roles while only internal admin may grant or revoke access managers', async () => {
   internalUser = { ...internalUserA };
   targetInternalUser = { ...internalUserB };
   targetRoles = [];
@@ -307,7 +411,17 @@ test('access managers can assign implemented and planned roles but never the pro
   assert.equal(roleAudit.length, beforeAudit + 1);
   assert.deepEqual(roleAudit.at(-1), ['1', '2', 'role.grant.hr']);
   assert.equal((await internalUsersPut(put('2', 'internal_admin', true))).status, 400);
-  assert.equal((await internalUsersPut(put('1', 'project_management', true))).status, 403);
+  assert.equal((await internalUsersPut(put('2', 'internal_access_manager', true))).status, 403);
+  const ownRole = await internalUsersPut(put('1', 'project_management', true));
+  assert.equal(ownRole.status, 200);
+  assert.equal((await ownRole.json()).internalUser.roles.includes('project_management'), true);
+  assert.deepEqual(roleAudit.at(-1), ['1', '1', 'role.grant.project_management']);
+  assert.equal((await internalUsersPut(put('1', 'project_management', false))).status, 200);
+  assert.deepEqual(roleAudit.at(-1), ['1', '1', 'role.revoke.project_management']);
+  const auditedChanges = roleAudit.length;
+  assert.equal((await internalUsersPut(put('1', 'internal_access_manager', true))).status, 403);
+  assert.equal((await internalUsersPut(put('1', 'internal_access_manager', false))).status, 403);
+  assert.equal(roleAudit.length, auditedChanges);
   const injected = new Request('https://portal.example/api/internal/internal-users', {
     method: 'PUT', headers: { origin: 'https://portal.example', 'content-type': 'application/json' },
     body: JSON.stringify({ id: '2', role: 'sales', assigned: true, permissions: ['people.leave.read'] }),
@@ -318,14 +432,23 @@ test('access managers can assign implemented and planned roles but never the pro
     body: JSON.stringify({ id: '2', role: 'sales', assigned: true }),
   });
   assert.equal((await internalUsersPut(untrusted)).status, 403);
-  const manager = await internalUsersPut(put('2', 'internal_access_manager', true));
-  assert.equal(manager.status, 200);
-  assert.equal((await manager.json()).internalUser.roles.includes('internal_access_manager'), true);
+  targetRoles = ['internal_access_manager'];
+  activeManagerCount = 1;
+  assert.equal((await internalUsersPut(put('2', 'internal_access_manager', false))).status, 403);
+  activeManagerCount = 2;
+  assert.equal((await internalUsersPut(put('2', 'internal_access_manager', false))).status, 403);
+  roles = ['internal_admin'];
+  assert.equal((await internalUsersPut(put('1', 'sales', true))).status, 403);
+  assert.equal((await internalUsersPut(put('1', 'internal_access_manager', true))).status, 403);
+  targetRoles = [];
+  const adminGrant = await internalUsersPut(put('2', 'internal_access_manager', true));
+  assert.equal(adminGrant.status, 200);
+  assert.equal((await adminGrant.json()).internalUser.roles.includes('internal_access_manager'), true);
+  assert.deepEqual(roleAudit.at(-1), ['1', '2', 'role.grant.internal_access_manager']);
   activeManagerCount = 1;
   assert.equal((await internalUsersPut(put('2', 'internal_access_manager', false))).status, 409);
   activeManagerCount = 2;
   assert.equal((await internalUsersPut(put('2', 'internal_access_manager', false))).status, 200);
-  roles = ['internal_admin'];
   assert.equal((await internalUsersPut(put('2', 'sales', true))).status, 200);
   assert.equal((await internalUsersPut(put('2', 'sales', false))).status, 200);
   targetInternalUser = { ...internalUserB, is_active: false };
@@ -385,6 +508,41 @@ test('overview-only panel receives task summaries, not hidden task details', asy
   assert.equal(Object.hasOwn(payload.tasks[0], 'description'), false);
   assert.equal(Object.hasOwn(payload.tasks[0], 'href'), false);
   assert.equal(Boolean(payload.workSummary), true);
+  assert.equal(integrationRuns.at(-1).source, 'hubstaff');
+  assert.equal(integrationRuns.at(-1).operation, 'internal_dashboard');
+  assert.equal(integrationRuns.at(-1).status, 'succeeded');
+  assert.ok(integrationRuns.at(-1).records_processed > 0);
+});
+
+test('audit log is denied to ordinary and access-manager users, and readable by internal admin', async () => {
+  internalUser = { ...internalUserA };
+  session = { user: { id: 'internal-user-a', name: 'InternalUser A' } };
+  roles = [];
+  assert.equal((await platformAudit(request('/api/internal/audit'))).status, 403);
+  roles = ['internal_access_manager'];
+  assert.equal((await platformAudit(request('/api/internal/audit'))).status, 403);
+  roles = ['internal_admin'];
+  const response = await platformAudit(request('/api/internal/audit'));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  assert.equal((await response.json()).integrationRuns.at(-1).source, 'hubstaff');
+  roles = [];
+});
+
+test('failed Hubstaff loads record a safe error code without provider details', async () => {
+  const user = { ...internalUserA, panel_access: ['overview'] };
+  internalUser = { ...user, encrypted_access_token: encryptInternalUserToken(testToken, user,
+    process.env.HUBSTAFF_TOKEN_ENCRYPTION_KEY) };
+  roles = [];
+  session = { user: { id: 'internal-user-a', name: 'InternalUser A' } };
+  globalThis.fetch = async () => { throw new Error('secret=must-never-be-logged'); };
+  const response = await internalUserDashboard(request('/api/internal/dashboard'));
+  assert.ok(response.status >= 400);
+  const run = integrationRuns.at(-1);
+  assert.equal(run.status, 'failed');
+  assert.equal(run.error_code, 'hubstaff_unavailable');
+  assert.equal(JSON.stringify(run).includes('must-never-be-logged'), false);
+  globalThis.fetch = originalFetch;
 });
 
 test('an internal user without the Hubstaff panel cannot submit a connection token directly', async () => {

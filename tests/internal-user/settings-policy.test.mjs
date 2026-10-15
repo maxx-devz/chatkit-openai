@@ -44,3 +44,14 @@ test('last active manager is identified; ordinary users can be paused', () => {
     internalUsers: managers, readOnly: true, canManageOwnAccount: true });
   assert.equal(readOnly.canEdit, false);
 });
+
+test('password reset is for other accounts, with privileged targets limited to internal admin', () => {
+  const options = { viewerId: '1', canResetPasswords: true };
+  assert.equal(internalSettingsViewPolicy({ ...options, internalUser: user('1') }).canResetPassword, false);
+  assert.equal(internalSettingsViewPolicy({ ...options, internalUser: user('2') }).canResetPassword, true);
+  assert.equal(internalSettingsViewPolicy({ ...options, internalUser: user('2', ['internal_access_manager']) }).canResetPassword, false);
+  assert.equal(internalSettingsViewPolicy({ ...options, internalUser: user('2', ['internal_admin']) }).canResetPassword, false);
+  assert.equal(internalSettingsViewPolicy({ ...options, internalUser: user('2', ['internal_admin']),
+    isInternalAdmin: true }).canResetPassword, true);
+  assert.equal(internalSettingsViewPolicy({ ...options, internalUser: user('2'), readOnly: true }).canResetPassword, false);
+});

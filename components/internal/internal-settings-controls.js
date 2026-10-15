@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   INTERNAL_USER_PANELS,
@@ -8,9 +8,11 @@ import {
   INTERNAL_USER_WORKSPACES,
   internalUserPosition,
 } from "@/lib/internal-user-positions";
-import { effectiveInternalUserPanels, INTERNAL_ASSIGNABLE_ROLES, INTERNAL_ROLE_PERMISSIONS,
+import { canManageInternalRole, effectiveInternalUserPanels, INTERNAL_ASSIGNABLE_ROLES, INTERNAL_ROLE_PERMISSIONS,
   internalPermissionScope, internalUserPermissions, visibleInternalRoleLabels } from "@/lib/internal-permissions";
 import { internalSettingsViewPolicy } from "@/lib/internal-settings-policy";
+import { passwordValidationMessage } from "@/lib/input-validation";
+import InternalPasswordReset from './internal-password-reset';
 import styles from "../admin/admin-dashboard.module.css";
 
 const ICONS = {
@@ -55,23 +57,40 @@ function settingsFromInternalUser(internalUser) {
 }
 
 export default function InternalUserControls({ initialInternalUsers = [], schemaReady = false, readOnly = false,
-  canManageOwnAccount = false, canManageRoles = false, viewerId = '' }) {
+  canManageOwnAccount = false, canManageRoles = false, canResetPasswords = false,
+  isInternalAdmin = false, viewerId = '' }) {
   const [internalUsers, setInternalUsers] = useState(initialInternalUsers);
   const [selectedId, setSelectedId] = useState(initialInternalUsers[0]?.id || "");
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState(settingsFromInternalUser(initialInternalUsers[0]));
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [roleAnnouncement, setRoleAnnouncement] = useState("");
   const [busy, setBusy] = useState("");
   const [createError, setCreateError] = useState("");
+  const [createPasswordError, setCreatePasswordError] = useState("");
+  const [createPasswordTouched, setCreatePasswordTouched] = useState(false);
+
+  const [hubstaffMembers, setHubstaffMembers] = useState([]);
+  const [hubstaffMembersStatus, setHubstaffMembersStatus] = useState('idle');
+  const [hubstaffMembersError, setHubstaffMembersError] = useState('');
+  const [selectedHubstaffMemberId, setSelectedHubstaffMemberId] = useState('');
+  const [aocMembersOnly, setAocMembersOnly] = useState(true);
+  const memberRequestRef = useRef(0);
   const createDialogRef = useRef(null);
+
+  useEffect(() => {
+    if (!roleAnnouncement) return;
+    const timeout = window.setTimeout(() => setRoleAnnouncement(""), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [roleAnnouncement]);
 
   const selectedInternalUser = internalUsers.find((internalUser) => internalUser.id === selectedId)
     || internalUsers[0]
     || null;
   const viewPolicy = internalSettingsViewPolicy({ viewerId, internalUser: selectedInternalUser,
-    internalUsers, readOnly, canManageOwnAccount });
-  const canEditRoles = canManageRoles && !readOnly && !viewPolicy.isSelf;
+    internalUsers, readOnly, canManageOwnAccount, canResetPasswords, isInternalAdmin });
+  const canEditRoles = canManageRoles && !readOnly && (!viewPolicy.isSelf || !isInternalAdmin);
   const effectivePermissions = internalUserPermissions(selectedInternalUser?.roles);
   const filteredInternalUsers = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -80,6 +99,39 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
       || internalUser.username.toLowerCase().includes(needle)
       || internalUser.positionLabel.toLowerCase().includes(needle));
   }, [internalUsers, query]);
+  async function loadHubstaffMembers(aocOnly = true) {
+    const requestId = ++memberRequestRef.current;
+    setHubstaffMembers([]);
+    setHubstaffMembersStatus('loading');
+    setHubstaffMembersError('');
+    try {
+      const path = aocOnly ? '/api/internal/hubstaff-members'
+        : '/api/internal/hubstaff-members?aoc_only=false';
+      const response = await fetch(path, { cache: 'no-store' });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !Array.isArray(payload?.members)) {
+        throw new Error(payload?.error || 'Hubstaff members could not be loaded.');
+      }
+      if (memberRequestRef.current !== requestId) return;
+      setHubstaffMembers(payload.members);
+      setHubstaffMembersStatus('ready');
+    } catch (loadError) {
+      if (memberRequestRef.current !== requestId) return;
+      setHubstaffMembers([]);
+      setHubstaffMembersStatus('error');
+      setHubstaffMembersError(loadError.message || 'Hubstaff members could not be loaded.');
+    }
+  }
+
+  function openCreateDialog() {
+    setCreateError('');
+    setCreatePasswordError('');
+    setCreatePasswordTouched(false);
+    setSelectedHubstaffMemberId('');
+    setAocMembersOnly(true);
+    createDialogRef.current?.showModal();
+    void loadHubstaffMembers(true);
+  }
 
   function selectInternalUser(internalUser) {
     if (busy) return;
@@ -87,6 +139,7 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
     setDraft(settingsFromInternalUser(internalUser));
     setStatus("");
     setError("");
+    setRoleAnnouncement("");
   }
 
   function replaceInternalUser(internalUser) {
@@ -151,9 +204,16 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
 
   async function createInternalUser(event) {
     event.preventDefault();
-    if (busy || readOnly) return;
+    if (busy || readOnly || hubstaffMembersStatus !== 'ready' || !selectedHubstaffMemberId) return;
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
+    const passwordError = passwordValidationMessage(form.get("password"), form.get("username"));
+    setCreatePasswordTouched(true);
+    setCreatePasswordError(passwordError);
+    if (passwordError) {
+      formElement.elements.namedItem("password")?.focus();
+      return;
+    }
     setBusy("create");
     setCreateError("");
     try {
@@ -170,7 +230,9 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.internalUser) {
-        throw new Error(payload?.error || "The internal user account could not be created.");
+        const creationError = new Error(payload?.error || "The internal user account could not be created.");
+        creationError.code = payload?.code;
+        throw creationError;
       }
       setInternalUsers((current) => [...current, payload.internalUser]
         .sort((first, second) => first.name.localeCompare(second.name)));
@@ -178,9 +240,18 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
       setDraft(settingsFromInternalUser(payload.internalUser));
       setStatus(`${payload.internalUser.name} was created and can sign in now.`);
       formElement.reset();
+      setCreatePasswordError('');
+      setCreatePasswordTouched(false);
+      setSelectedHubstaffMemberId('');
+      setAocMembersOnly(true);
       createDialogRef.current?.close();
     } catch (creationError) {
-      setCreateError(creationError.message || "The internal user account could not be created.");
+      if (creationError.code === 'invalid_password') {
+        setCreatePasswordError(creationError.message);
+        formElement.elements.namedItem("password")?.focus();
+      } else {
+        setCreateError(creationError.message || "The internal user account could not be created.");
+      }
     } finally {
       setBusy("");
     }
@@ -196,6 +267,7 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
     setBusy('role');
     setStatus('');
     setError('');
+    setRoleAnnouncement('');
     try {
       const response = await fetch('/api/internal/internal-users', {
         method: 'PUT',
@@ -208,7 +280,7 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
       }
       setInternalUsers(current => current.map(user => user.id === targetId
         ? { ...user, roles: payload.internalUser.roles } : user));
-      setStatus(`Role ${assigned ? 'granted to' : 'revoked from'} ${targetName}. Any other account edits remain unsaved.`);
+      setRoleAnnouncement(`Role ${assigned ? 'granted to' : 'revoked from'} ${targetName}.`);
     } catch (roleError) {
       setError(roleError.message || 'The role assignment could not be changed.');
     } finally {
@@ -230,7 +302,7 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
       <aside className={styles.clientDirectory}>
         <div className={styles.directoryHeading}>
           <div><p>Accounts</p><h2>Internal users</h2></div>
-          {!readOnly && <button type="button" onClick={() => { setCreateError(""); createDialogRef.current?.showModal(); }}>
+          {!readOnly && <button type="button" onClick={openCreateDialog}>
             <Icon name="plus" /> Add internal user
           </button>}
         </div>
@@ -257,7 +329,7 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
 
       <section className={styles.controlPanel}>
         {readOnly && <p role="status">Read-only access. An account-management permission is required to create or change accounts.</p>}
-        {selectedInternalUser && draft ? <form onSubmit={saveInternalUser}>
+        {selectedInternalUser && draft ? <><form onSubmit={saveInternalUser}>
           <header className={styles.clientHeader}>
             <div className={styles.clientTitle}><span>{initials(selectedInternalUser.name)}</span><div>
               <p>Internal workspace</p><h2>{selectedInternalUser.name}</h2>
@@ -269,8 +341,10 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
             </div>
           </header>
           {viewPolicy.isSelf && <p className={styles.settingsNotice}>{viewPolicy.canEdit
-            ? 'You can update your own account details here. Your account status and roles remain protected.'
-            : 'Your own account can be viewed here, but it cannot be changed in Internal Settings.'}</p>}
+            ? 'You can update your own account details here. Your account status remains protected.'
+            : canEditRoles
+              ? 'You can manage your own business roles here, but not your account details or protected role.'
+              : 'Your own account can be viewed here, but it cannot be changed in Internal Settings.'}</p>}
           {status ? <p className={styles.success} role="status">{status}</p> : null}
           {error ? <p className={styles.error} role="alert">{error}</p> : null}
 
@@ -284,23 +358,32 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
 
           <section className={`${styles.settingsCard} ${styles.roleActionCard}`}>
             <header><span><Icon name="shield" /></span><div><h3>My Workspace & permissions</h3>
-              <p>Roles are assigned separately from position and panels. Changes here take effect immediately and are audited.</p></div></header>
+              <p>Role changes save immediately and are audited. Other account edits still need Save changes.</p></div></header>
             <div className={styles.roleList}>{INTERNAL_ASSIGNABLE_ROLES.map(role => {
               const assigned = selectedInternalUser.roles.includes(role.id);
+              const hasLivePermissions = INTERNAL_ROLE_PERMISSIONS[role.id].length > 0;
+              const inactivePermissions = role.plannedPermissions.filter(permission =>
+                !INTERNAL_ROLE_PERMISSIONS[role.id].includes(permission));
               const lastManager = role.id === 'internal_access_manager' && assigned && viewPolicy.isLastActiveManager;
-              const disabled = !canEditRoles || Boolean(busy) || lastManager || (!assigned && !selectedInternalUser.active);
+              const disabled = !canEditRoles || Boolean(busy) || lastManager
+                || !canManageInternalRole(isInternalAdmin ? ['internal_admin'] : ['internal_access_manager'], role.id,
+                  assigned ? 'revoke' : 'grant')
+                || (!assigned && !selectedInternalUser.active);
               return <label key={role.id} className={styles.roleOption}>
                 <input type="checkbox" checked={assigned} disabled={disabled}
                   onChange={event => updateRole(role.id, event.target.checked)} />
-                <span><strong>{role.label}{role.planned ? ' · Planned' : ''}</strong>
-                  <small>{role.planned
-                    ? 'Assignable in Phase 0; no live data permissions yet.'
-                    : `Live permissions: ${INTERNAL_ROLE_PERMISSIONS[role.id].join(', ')}`}</small>
-                  {role.plannedPermissions.length > 0 && <small>Future, inactive: {role.plannedPermissions.join(', ')}</small>}
+                <span><strong>{role.label}{role.planned && !hasLivePermissions ? ' · Planned' : ''}</strong>
+                  <small>{role.id === 'internal_access_manager'
+                    ? 'Protected role. It can be granted via the owner-controlled terminal command.'
+                    : hasLivePermissions
+                    ? `Live permissions: ${INTERNAL_ROLE_PERMISSIONS[role.id].join(', ')}`
+                    : role.planned ? 'Assignable in Phase 0; no live data permissions yet.'
+                      : `Live permissions: ${INTERNAL_ROLE_PERMISSIONS[role.id].join(', ')}`}</small>
+                  {inactivePermissions.length > 0 && <small>Future, inactive: {inactivePermissions.join(', ')}</small>}
                 </span>
               </label>;
             })}</div>
-            <p className={styles.controlHint}>Your own roles and the protected system role cannot be changed here. The last active Access Manager cannot be revoked.</p>
+            <p className={styles.controlHint}>Access Managers may change their own business roles. Assigned business roles grant their implemented permissions. Protected role changes are audited, and the last active Access Manager cannot be revoked. System-role provisioning remains terminal-only.</p>
             <div className={styles.permissionSummary}><strong>Effective live permissions for this account</strong>
               <p>Derived from assigned roles plus self-service access. Personal tasks and Hubstaff data remain self-only; visible panels do not grant data access.</p>
               <ul>{effectivePermissions.map(permission => <li key={permission}><code>{permission}</code>
@@ -354,13 +437,23 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
               </section>)}</div>
             </section>
           </div>
-        </form> : <div className={styles.noClient}>
+        </form>
+          {viewPolicy.canResetPassword && <section className={`${styles.settingsCard} ${styles.passwordResetCard}`}>
+            <header><span><Icon name="shield" /></span><div><h3>Password reset</h3>
+              <p>Set a new password for {selectedInternalUser.name}. This ends their existing portal sessions.</p></div></header>
+            <InternalPasswordReset target={selectedInternalUser} onReset={setStatus} />
+          </section>}
+          {canResetPasswords && !viewPolicy.canResetPassword && !viewPolicy.isSelf && !isInternalAdmin
+            && <p className={styles.controlHint}>This protected account cannot be reset with your access.</p>}
+        </> : <div className={styles.noClient}>
           <h2>No internal users to display</h2>
           {!readOnly && <><p>Provision a separate internal user login, approved Hubstaff identity, position, and portal access policy.</p>
-          <button type="button" onClick={() => createDialogRef.current?.showModal()}>Add internal user</button></>}
+          <button type="button" onClick={openCreateDialog}>Add internal user</button></>}
         </div>}
       </section>
     </section>
+
+    {roleAnnouncement && <p className={styles.roleToast} role="status">{roleAnnouncement}</p>}
 
     {!readOnly && <dialog className={styles.createDialog} ref={createDialogRef}>
       <form onSubmit={createInternalUser}>
@@ -370,15 +463,67 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
         <div className={styles.dialogGrid}>
           <label><span>Internal user name</span><input name="name" maxLength="120" required placeholder="Alex Morgan" /></label>
           <label><span>Username</span><input name="username" minLength="3" maxLength="50" required pattern="[a-z0-9][a-z0-9._-]{2,49}" placeholder="alex.morgan" /></label>
-          <label className={styles.dialogWide}><span>Temporary password</span><input name="password" type="password" minLength="12" maxLength="128" required autoComplete="new-password" placeholder="At least 12 characters" /></label>
+          <div className={`${styles.dialogWide} ${styles.passwordField}`}>
+            <label htmlFor="internal-create-password"><span>Temporary password</span><input
+              id="internal-create-password" name="password" type="password" maxLength="128" required
+              autoComplete="new-password" placeholder="At least 12 characters"
+              aria-invalid={Boolean(createPasswordError)}
+              aria-describedby={`internal-create-password-help${createPasswordError ? ' internal-create-password-error' : ''}`}
+              onBlur={(event) => {
+                setCreatePasswordTouched(true);
+                setCreatePasswordError(passwordValidationMessage(event.target.value,
+                  event.target.form?.elements.namedItem("username")?.value));
+              }}
+              onChange={(event) => {
+                if (createPasswordTouched) setCreatePasswordError(passwordValidationMessage(event.target.value,
+                  event.target.form?.elements.namedItem("username")?.value));
+              }}
+            /></label>
+            <small id="internal-create-password-help">Use 12–128 characters and at least three of lowercase letters, uppercase letters, numbers, and symbols. Do not include the username.</small>
+            {createPasswordError ? <small id="internal-create-password-error" className={styles.passwordFieldError}
+              role="alert">{createPasswordError}</small> : null}
+          </div>
           <label><span>Internal user position</span><select name="position" defaultValue="team_member">
             {INTERNAL_USER_POSITIONS.map((positionOption) => <option key={positionOption.id} value={positionOption.id}>{positionOption.label}</option>)}
           </select></label>
-          <label><span>Approved Hubstaff user ID</span><input name="hubstaffUserId" inputMode="numeric" pattern="[1-9][0-9]*" required placeholder="123456" /></label>
+          <label className={`${styles.dialogWide} ${styles.memberFilter}`}>
+            <input type="checkbox" role="switch" checked={aocMembersOnly}
+              onChange={(event) => {
+                const onlyAoc = event.target.checked;
+                setAocMembersOnly(onlyAoc);
+                setSelectedHubstaffMemberId('');
+                void loadHubstaffMembers(onlyAoc);
+              }} />
+            <span><strong>AOC Members</strong><small>On: AOC team only. Off: all active members in our Hubstaff organization.</small></span>
+          </label>
+          {hubstaffMembersStatus === 'ready' && <p className={`${styles.dialogWide} ${styles.memberSource}`} role="status">
+            <span>{aocMembersOnly ? 'AOC members' : 'Organization members'}</span>
+            <strong>{hubstaffMembers.length} available</strong>
+          </p>}
+          <label className={styles.dialogWide}><span>Hubstaff member</span>
+            <select name="hubstaffUserId" required value={selectedHubstaffMemberId}
+              disabled={hubstaffMembersStatus !== 'ready' || !hubstaffMembers.length}
+              onChange={(event) => setSelectedHubstaffMemberId(event.target.value)}>
+              <option value="">{aocMembersOnly ? 'Select an available AOC member' : 'Select an available organization member'}</option>
+              {hubstaffMembers.map((member) => <option key={member.id} value={member.id}>
+                {member.name} (ID {member.id})
+              </option>)}
+            </select><small>{aocMembersOnly
+              ? 'Only active AOC team members not mapped to another portal account are shown.'
+              : 'Only active Hubstaff organization members not mapped to another portal account are shown.'}</small></label>
         </div>
+        {hubstaffMembersStatus === 'loading' ? <p role="status">Loading Hubstaff members...</p> : null}
+        {hubstaffMembersStatus === 'ready' && !hubstaffMembers.length
+          ? <p role="status">{aocMembersOnly
+            ? 'No unmapped AOC members are available.'
+            : 'No unmapped organization members are available.'}</p> : null}
+        {hubstaffMembersStatus === 'error' ? <p className={styles.dialogError} role="alert">
+          {hubstaffMembersError} <button type="button" onClick={() => { void loadHubstaffMembers(aocMembersOnly); }}>Retry</button>
+        </p> : null}
         {createError ? <p className={styles.dialogError} role="alert">{createError}</p> : null}
         <footer><button type="button" onClick={() => createDialogRef.current?.close()}>Cancel</button>
-          <button disabled={busy === "create"} type="submit">{busy === "create" ? "Creating internal user..." : "Create internal user"}</button></footer>
+          <button disabled={busy === "create" || hubstaffMembersStatus !== 'ready' || !selectedHubstaffMemberId}
+            type="submit">{busy === "create" ? "Creating internal user..." : "Create internal user"}</button></footer>
       </form>
     </dialog>}
   </>;

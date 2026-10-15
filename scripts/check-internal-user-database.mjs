@@ -86,6 +86,10 @@ try {
   assert.equal((await db.query("SELECT to_regclass('portal_internal_user_roles') AS relation")).rows[0].relation !== null, true);
   await db.query("INSERT INTO portal_internal_user_roles(user_id, role_key) VALUES (1, 'internal_admin')");
   assert.equal((await db.query("SELECT role_key FROM portal_internal_user_roles WHERE user_id=1 AND role_key='internal_admin'")).rows.length, 1);
+  await db.query("INSERT INTO portal_internal_user_roles(user_id, role_key) VALUES (2, 'hr')");
+  await db.query(schema);
+  assert.equal((await db.query("SELECT role_key FROM portal_internal_user_roles WHERE user_id=2 AND role_key='hr'")).rows.length,
+    1, 'Rerunning the migration preserves business role assignments');
   await db.query('SAVEPOINT role_revocation');
   await db.query(`INSERT INTO portal_internal_user_roles(user_id, role_key)
     VALUES (1, 'internal_access_manager'), (2, 'internal_access_manager')`);
@@ -138,7 +142,11 @@ try {
   const b = await findInternalUser(db, 'internal-user-b');
   assert.equal(a.account_type, 'internal_user');
   assert.equal(a.position, 'team_member');
-  assert.deepEqual(a.panel_access, ['overview', 'my_tasks', 'activity', 'hubstaff']);
+  assert.deepEqual(a.panel_access, ['overview', 'my_tasks', 'activity', 'hubstaff', 'account_settings']);
+  await db.query("UPDATE portal_internal_users SET panel_access=panel_access - 'account_settings' WHERE user_id=2");
+  await db.query(schema);
+  assert.equal((await findInternalUser(db, 'internal-user-b')).panel_access.includes('account_settings'), false,
+    'Rerunning the migration must preserve a later Account Settings toggle-off');
   assert.equal(a.encrypted_refresh_token, 'preserved-refresh-ciphertext');
   assert.equal(decryptInternalUserToken(a, secret), token);
   await db.query(`

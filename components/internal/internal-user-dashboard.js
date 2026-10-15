@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useInternalUserWorkspace } from './internal-workspace-provider';
+import InternalPasswordSettings from './internal-password-settings';
 import { dueState, selectInternalUserTasks } from '@/lib/internal-user-view';
 import styles from './internal-user-dashboard.module.css';
 
@@ -88,7 +89,7 @@ function normalizeStoredPlan(value) {
   };
 }
 
-export default function InternalUserDashboard({ name, position, panelAccess = [], workspace = 'personal', connected, connectionMessage, children, previewData = null }) {
+export default function InternalUserDashboard({ name, username = '', position, panelAccess = [], workspace = 'personal', connected, connectionMessage, children, previewData = null }) {
   const panels = new Set(panelAccess);
   const isPersonal = workspace === 'personal';
   const isTeam = workspace === 'team';
@@ -97,8 +98,9 @@ export default function InternalUserDashboard({ name, position, panelAccess = []
   const canViewTasks = panels.has('my_tasks');
   const canViewActivity = panels.has('activity');
   const canViewTeam = panels.has('team_directory');
+  const canAccountSettings = panels.has('account_settings');
   const canConnectHubstaff = panels.has('hubstaff');
-  const shouldLoadDashboard = isSettings
+  const shouldLoadDashboard = (isSettings && canConnectHubstaff)
     || (isPersonal && connected)
     || (isTeam && canViewTeam);
   const liveWorkspace = useInternalUserWorkspace(workspace, { enabled: shouldLoadDashboard && !previewData });
@@ -238,7 +240,7 @@ export default function InternalUserDashboard({ name, position, panelAccess = []
   const workspaceCopy = isTeam
     ? { title: 'Your team, in view.', detail: 'Find active colleagues and their positions.' }
     : isSettings
-      ? { title: 'Connections & settings.', detail: 'Manage the services connected to your internal workspace.' }
+      ? { title: 'Account & settings.', detail: 'Manage your password and connected services.' }
       : { title: 'Your work, in focus.', detail: 'Review your own assignments, priorities, and recent activity.' };
 
   return <main className={styles.main}>
@@ -398,6 +400,7 @@ export default function InternalUserDashboard({ name, position, panelAccess = []
         </section>}
       </aside>
     </div>}
+    {isSettings && canAccountSettings && !previewData && <InternalPasswordSettings username={username} />}
     {isSettings && canConnectHubstaff && <div className={`${styles.grid} ${styles.singleColumnGrid}`}>
       <section className={`${styles.panel} ${styles.settingsPanel}`} id="hubstaff-connection">
         <div className={styles.sectionHeading}><div><h2>Hubstaff connection</h2><p>Connect the approved personal account used for your work data.</p></div>

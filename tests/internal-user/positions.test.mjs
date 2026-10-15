@@ -12,10 +12,10 @@ import {
 test('internal user positions provide stable default panel policies', () => {
   assert.equal(internalUserPosition('team_member').label, 'Team Member');
   assert.deepEqual(internalUserPanelAccess(undefined, 'team_member'), [
-    'overview', 'my_tasks', 'activity', 'team_directory', 'hubstaff',
+    'overview', 'my_tasks', 'activity', 'team_directory', 'account_settings', 'hubstaff',
   ]);
   assert.deepEqual(internalUserPanelAccess(undefined, 'project_manager'), [
-    'overview', 'my_tasks', 'activity', 'team_directory', 'hubstaff',
+    'overview', 'my_tasks', 'activity', 'team_directory', 'account_settings', 'hubstaff',
   ]);
   assert.equal(isInternalUserPosition('project_manager'), true);
   assert.equal(isInternalUserPosition('invented_position'), false);

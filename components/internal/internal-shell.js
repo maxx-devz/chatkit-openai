@@ -31,6 +31,7 @@ function initials(name) {
 }
 
 function workspaceFromPath(pathname, rolePanelBasePath) {
+  if (pathname?.startsWith('/internal/audit')) return 'audit';
   if (pathname?.startsWith('/internal/internal-settings')) return 'internalSettings';
   if (pathname?.startsWith(rolePanelBasePath)) return 'roles';
   if (pathname?.startsWith('/internal/team')) return 'team';
@@ -53,6 +54,7 @@ export default function InternalUserShell({ children, name, position, panelAcces
   const canOpenSettings = canAccessInternalWorkspace(profile, 'settings');
   const rolePanels = availableInternalRolePanels(profile);
   const canManageInternalUsers = canAccessInternalWorkspace(profile, 'internalSettings');
+  const canReadAudit = permissions.includes('platform.audit.read');
   const activeRolePanel = rolePanels.find(panel => pathname === `${rolePanelBasePath}/${panel.id}`);
   const refreshing = entries.personal?.busy === true;
   const workspaceTitles = {
@@ -61,6 +63,7 @@ export default function InternalUserShell({ children, name, position, panelAcces
     roles: activeRolePanel?.label || 'Role Panel',
     settings: 'Settings',
     internalSettings: 'Internal Settings',
+    audit: 'Audit Log',
   };
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -133,6 +136,9 @@ export default function InternalUserShell({ children, name, position, panelAcces
         {canManageInternalUsers && <Link className={workspace === 'internalSettings' ? styles.activeNav : ''} href="/internal/internal-settings"
           aria-label="Internal Settings" onClick={() => setMenuOpen(false)}>
           <InternalUserIcon name="shield" /><span>Internal Settings</span></Link>}
+        {canReadAudit && <Link className={workspace === 'audit' ? styles.activeNav : ''} href="/internal/audit"
+          aria-label="Audit Log" onClick={() => setMenuOpen(false)}>
+          <InternalUserIcon name="activity" /><span>Audit Log</span></Link>}
       </nav>
       <div className={styles.sidebarStatus}>
         <span><i /> Role-based access</span>

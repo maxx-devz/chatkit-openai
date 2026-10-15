@@ -22,6 +22,7 @@ export default async function InternalSettingsPage() {
         : 'View internal accounts, positions, panels, and approved Hubstaff mappings.'}</p></div></section>
     <InternalSettingsControls initialInternalUsers={data.internalUsers} schemaReady={data.schemaReady}
       readOnly={!data.canManage} canManageOwnAccount={data.canManageOwnAccount}
-      canManageRoles={data.canManageRoles} viewerId={data.viewerId} />
+      canManageRoles={data.canManageRoles} canResetPasswords={data.canResetPasswords}
+      isInternalAdmin={data.isInternalAdmin} viewerId={data.viewerId} />
   </main>;
 }

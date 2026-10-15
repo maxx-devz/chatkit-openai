@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS portal_internal_users (
   user_id BIGINT PRIMARY KEY REFERENCES portal_users(id) ON DELETE CASCADE,
   account_type TEXT NOT NULL DEFAULT 'internal_user',
   position TEXT NOT NULL DEFAULT 'team_member',
-  panel_access JSONB NOT NULL DEFAULT '["overview","my_tasks","activity","hubstaff"]'::jsonb,
+  panel_access JSONB NOT NULL DEFAULT '["overview","my_tasks","activity","team_directory","account_settings","hubstaff"]'::jsonb,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   hubstaff_user_id BIGINT NOT NULL UNIQUE CHECK (hubstaff_user_id > 0),
   encrypted_access_token TEXT,
@@ -84,7 +84,28 @@ ALTER TABLE portal_internal_users ADD COLUMN IF NOT EXISTS encrypted_refresh_tok
 ALTER TABLE portal_internal_users ADD COLUMN IF NOT EXISTS access_expires_at TIMESTAMPTZ;
 ALTER TABLE portal_internal_users ADD COLUMN IF NOT EXISTS position TEXT NOT NULL DEFAULT 'team_member';
 ALTER TABLE portal_internal_users ADD COLUMN IF NOT EXISTS panel_access JSONB NOT NULL
-  DEFAULT '["overview","my_tasks","activity","hubstaff"]'::jsonb;
+  DEFAULT '["overview","my_tasks","activity","team_directory","account_settings","hubstaff"]'::jsonb;
+
+-- Apply the new Account Settings panel once to existing explicit panel lists.
+-- The marker preserves later per-account toggles when this idempotent schema is rerun.
+CREATE TABLE IF NOT EXISTS portal_internal_schema_migrations (
+  migration_key TEXT PRIMARY KEY,
+  applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM portal_internal_schema_migrations
+    WHERE migration_key = 'account_settings_panel_default_v1') THEN
+    UPDATE portal_internal_users
+    SET panel_access = panel_access || '["account_settings"]'::jsonb,
+        updated_at = NOW()
+    WHERE NOT panel_access ? 'account_settings';
+    INSERT INTO portal_internal_schema_migrations (migration_key)
+    VALUES ('account_settings_panel_default_v1');
+  END IF;
+END $$;
+ALTER TABLE portal_internal_users ALTER COLUMN panel_access SET DEFAULT
+  '["overview","my_tasks","activity","team_directory","account_settings","hubstaff"]'::jsonb;
 
 -- This field identifies the account category; business roles remain separate.
 ALTER TABLE portal_internal_users DROP CONSTRAINT IF EXISTS portal_employees_role_check;
