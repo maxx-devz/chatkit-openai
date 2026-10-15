@@ -41,7 +41,7 @@ export default async function InternalUserPortalPage({ workspace, searchParams }
         <strong>Development preview: {previewPanel.label}</strong>
         <p>Sample data only. Your account permissions are unchanged; live APIs remain protected.</p>
         <nav aria-label="Preview another panel">
-          {INTERNAL_USER_PANELS.map(panel => {
+          {INTERNAL_USER_PANELS.filter(panel => INTERNAL_USER_WORKSPACES.some(item => item.id === panel.workspace)).map(panel => {
             const path = INTERNAL_USER_WORKSPACES.find(item => item.id === panel.workspace)?.path;
             return <Link key={panel.id} href={`${path}?debug_panel=${panel.id}`}>{panel.label}</Link>;
           })}

@@ -34,7 +34,7 @@ export function InternalUserWorkspaceProvider({ children }) {
 
     const promise = (async () => {
       try {
-        const response = await fetch(`/api/internal/dashboard?workspace=${encodeURIComponent(workspace)}`, {
+        const response = await fetch(`/api/internal/dashboard?workspace=${encodeURIComponent(workspace)}${force ? '&refresh=1' : ''}`, {
           cache: 'no-store',
           signal: controller.signal,
         });

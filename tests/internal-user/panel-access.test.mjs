@@ -3,6 +3,7 @@ import test from 'node:test';
 import { canAccessInternalPanel, canAccessInternalWorkspace } from '../../lib/internal-panel-access.js';
 import { INTERNAL_ASSIGNABLE_ROLES, internalUserPermissions } from '../../lib/internal-permissions.js';
 import { availableInternalRolePanels, canViewInternalRolePanel, INTERNAL_ROLE_PANELS } from '../../lib/internal-role-panels.js';
+import { INTERNAL_SETTINGS_NAV, visibleInternalSubnav } from '../../lib/internal-navigation.js';
 
 const profile = (panels, roles = []) => ({ panels, permissions: internalUserPermissions(roles) });
 
@@ -41,12 +42,13 @@ test('personal Settings needs Account Settings or Hubstaff, while Internal Setti
   assert.equal(canAccessInternalWorkspace(profile(['overview']), 'unknown'), false);
 });
 
-test('each business role opens only its Phase 0 placeholder; admin can view all', () => {
+test('business roles open their workspace; admin can view panels and read live HR data', () => {
   assert.deepEqual(INTERNAL_ROLE_PANELS.map(panel => panel.id),
     INTERNAL_ASSIGNABLE_ROLES.filter(role => role.id !== 'internal_access_manager').map(role => role.id));
-  const hr = { ...profile([]), roles: ['hr'] };
+  const hr = { ...profile(['hr_leave_calendar'], ['hr']), roles: ['hr'] };
   assert.deepEqual(availableInternalRolePanels(hr).map(panel => panel.id), ['hr']);
   assert.equal(canAccessInternalWorkspace(hr, 'roles'), true);
+  assert.equal(canViewInternalRolePanel({ ...profile([], ['hr']), roles: ['hr'] }, 'hr'), false);
   assert.equal(canViewInternalRolePanel(hr, 'hr'), true);
   assert.equal(canViewInternalRolePanel(hr, 'sales'), false);
   assert.equal(canViewInternalRolePanel(hr, 'internal_access_manager'), false);
@@ -54,11 +56,29 @@ test('each business role opens only its Phase 0 placeholder; admin can view all'
   assert.equal(canViewInternalRolePanel(hr, 'made_up_role'), false);
   assert.equal(canAccessInternalPanel(hr, 'team_directory'), false);
   assert.equal(canAccessInternalWorkspace(hr, 'team'), false);
-  assert.equal(internalUserPermissions(['hr']).includes('people.leave.read'), false);
+  assert.equal(internalUserPermissions(['hr']).includes('people.leave.read'), true);
 
   const admin = { ...profile([]), roles: ['internal_admin'] };
   assert.deepEqual(availableInternalRolePanels(admin).map(panel => panel.id), INTERNAL_ROLE_PANELS.map(panel => panel.id));
+  assert.equal(canViewInternalRolePanel(admin, 'hr'), true);
+  assert.equal(internalUserPermissions(['internal_admin']).includes('people.leave.read'), true);
   assert.equal(canViewInternalRolePanel(admin, 'billing'), true);
   assert.equal(canViewInternalRolePanel(admin, 'internal_admin'), false);
   assert.equal(canAccessInternalWorkspace({ ...profile([]), roles: [] }, 'roles'), false);
+});
+
+test('sidebar children require permission and enabled panels before appearing', () => {
+  assert.deepEqual(visibleInternalSubnav(profile([], ['internal_access_manager']))
+    .map(item => item.id), INTERNAL_SETTINGS_NAV.map(item => item.id));
+  assert.deepEqual(visibleInternalSubnav(profile([], ['hr'])), []);
+  const panelChildren = [
+    { id: 'account', requiredPanel: 'account_settings' },
+    { id: 'hubstaff', requiredPanel: 'hubstaff' },
+  ];
+  assert.deepEqual(visibleInternalSubnav(profile(['account_settings']), panelChildren)
+    .map(item => item.id), ['account']);
+  assert.deepEqual(visibleInternalSubnav(profile(['hubstaff']), panelChildren)
+    .map(item => item.id), ['hubstaff']);
+  assert.deepEqual(visibleInternalSubnav({ panels: ['hubstaff'], permissions: [] }, panelChildren), []);
+  assert.deepEqual(visibleInternalSubnav(profile(['hubstaff']), [{ id: 'unguarded' }]), []);
 });

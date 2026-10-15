@@ -94,15 +94,20 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 800, height: 900
     const completedTask = assigned.getByRole('listitem').filter({ hasText: 'Accessibility QA' });
     await expect(completedTask.getByRole('heading', { name: 'Accessibility QA' })).toBeVisible();
     await expect(completedTask.getByText('No due date', { exact: true })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /Refresh Hubstaff data/ })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Refresh My Work data' })).toBeEnabled();
     expect(pageErrors).toEqual([]);
   });
 }
 
-test('basic Team directory is available without a management role or private status', async ({ page }) => {
-  const data = { ...fixture(), teamMembers: [
-    { id: '1', name: 'Fixture Internal User', position: 'Project Manager', connected: true },
-    { id: '2', name: 'Taylor Team', position: 'Team Member', connected: false },
+test('Team directory shows only derived work status without private leave details', async ({ page }) => {
+  const data = { ...fixture(), freshness: {
+    teamDirectory: { source: 'cache', refreshedAt: '2026-10-15T08:00:00Z' },
+    teamStatus: { source: 'hubstaff', refreshedAt: '2026-10-15T08:01:00Z' },
+  }, teamMembers: [
+    { id: 'team-member-1', name: 'Fixture Internal User', position: 'Project Manager',
+      portalAccountMapped: true, workStatus: 'On Shift', connected: true },
+    { id: 'team-member-2', name: 'Taylor Team', position: null,
+      portalAccountMapped: false, workStatus: 'Away', connected: false },
   ] };
   await page.route('**/api/internal/dashboard**', route => route.fulfill({ json: data }));
   await page.goto('/team-basic');
@@ -112,8 +117,28 @@ test('basic Team directory is available without a management role or private sta
   const directory = page.locator('#team-directory');
   await expect(directory.getByRole('heading', { name: 'Team directory' })).toBeVisible();
   await expect(directory.getByText('Taylor Team')).toBeVisible();
+  await expect(directory.getByText('Portal account', { exact: true })).toHaveCount(1);
+  await expect(directory.getByText('No portal position')).toBeVisible();
+  await expect(directory.getByText('On Shift')).toBeVisible();
+  await expect(directory.getByText('Away')).toBeVisible();
+  await expect(directory).toContainText('Directory: Saved copy');
+  await expect(directory).toContainText('Status: Fetched from Hubstaff');
+  await expect(directory.getByText('Leave reason')).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(directory.getByText('Away')).toBeVisible();
   await expect(directory.getByText('Setup needed')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Team tasks' })).toHaveCount(0);
+});
+
+test('My Work shows a quiet saved-copy note when its response came from PostgreSQL', async ({ page }, testInfo) => {
+  await page.route('**/api/internal/dashboard**', route => route.fulfill({ json: {
+    ...fixture(), freshness: { personalWork: { source: 'cache', refreshedAt: '2026-10-15T08:00:00Z' } },
+  } }));
+  await page.goto('/');
+  const note = page.getByText('Saved copy', { exact: true });
+  await expect(note).toBeVisible();
+  await expect(note).toHaveCSS('font-size', '10px');
+  await page.screenshot({ path: testInfo.outputPath('my-work-source-note.png') });
 });
 
 test('workspace navigation reuses loaded data and keeps Hubstaff refresh in the shared header', async ({ page }) => {
@@ -135,25 +160,36 @@ test('workspace navigation reuses loaded data and keeps Hubstaff refresh in the 
   const directory = page.locator('#team-directory');
   await expect(directory.getByText('Fixture Internal User')).toBeVisible();
   await expect.poll(() => requests.team).toBe(1);
-  const refresh = page.getByRole('banner').getByRole('button', { name: 'Refresh Hubstaff data' });
+  const refresh = page.getByRole('banner').getByRole('button', { name: 'Refresh Team data' });
   await expect(refresh).toBeVisible();
+  await expect(refresh.locator('svg')).toBeVisible();
   await refresh.click();
-  await expect(page.getByRole('banner').getByText('Hubstaff data updated.')).toBeVisible();
-  expect(requests.personal).toBe(2);
+  await expect(page.getByRole('banner').getByText('Team data checked.')).toBeVisible();
+  expect(requests.team).toBe(2);
+  expect(requests.personal).toBe(1);
 
   await internalUserNav.getByRole('link', { name: 'My Work' }).click();
   await expect(page.getByRole('heading', { name: 'Fix PDP layout' })).toBeVisible();
+  expect(requests.personal).toBe(1);
+  await page.getByRole('banner').getByRole('button', { name: 'Refresh My Work data' }).click();
+  await expect(page.getByRole('banner').getByText('My Work data checked.')).toBeVisible();
   expect(requests.personal).toBe(2);
 
   await internalUserNav.getByRole('link', { name: 'Team' }).click();
   await expect(directory.getByText('Fixture Internal User')).toBeVisible();
   await page.waitForTimeout(100);
-  expect(requests.team).toBe(1);
+  expect(requests.team).toBe(2);
 
   await internalUserNav.getByRole('link', { name: 'Settings' }).click();
   await expect(page.getByRole('heading', { name: 'Hubstaff connection' })).toBeVisible();
-  await expect(page.getByRole('banner').getByRole('button', { name: 'Refresh Hubstaff data' })).toBeVisible();
+  await expect(page.getByRole('banner').getByRole('button', { name: /Refresh .* data/ })).toHaveCount(0);
   await expect.poll(() => requests.settings).toBe(1);
+  await internalUserNav.getByRole('link', { name: 'My Work' }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileRefresh = page.getByRole('banner').getByRole('button', { name: 'Refresh My Work data' });
+  await expect(mobileRefresh).toBeVisible();
+  await expect(mobileRefresh.locator('svg')).toBeVisible();
+  await expect(mobileRefresh.locator('span')).toBeHidden();
 });
 
 test('workflow statuses have distinct badge treatments', async ({ page }) => {
@@ -206,12 +242,12 @@ test('loading, empty and safe error states work without showing stale task data'
   await expect(page.getByRole('heading', { name: 'Fix PDP layout' })).toBeVisible();
   await page.unroute('**/api/internal/dashboard**');
   await page.route('**/api/internal/dashboard**', route => route.fulfill({ status: 400, json: { error: 'Your Hubstaff access token is invalid or expired. Please reconnect.' } }));
-  await page.getByRole('button', { name: 'Refresh Hubstaff data' }).click();
+  await page.getByRole('button', { name: 'Refresh My Work data' }).click();
   await expect(page.getByRole('main').getByRole('alert')).toContainText('invalid or expired');
   await expect(page.getByRole('heading', { name: 'Fix PDP layout' })).toHaveCount(0);
   await page.unroute('**/api/internal/dashboard**');
   await page.route('**/api/internal/dashboard**', route => route.fulfill({ json: { ...fixture(), tasks: [] } }));
-  await page.getByRole('button', { name: 'Refresh Hubstaff data' }).click();
+  await page.getByRole('button', { name: 'Refresh My Work data' }).click();
   await expect(page.getByRole('heading', { name: 'No assigned tasks yet' })).toBeVisible();
 });
 
@@ -328,7 +364,7 @@ test('token entry is a native password POST with no browser storage or URL token
   expect(await page.content()).not.toContain(synthetic);
 });
 
-test('Internal Settings can toggle Team and shows planned permissions without exposing the protected role', async ({ page }) => {
+test('Internal Settings can toggle Team and shows HR permissions without exposing the protected role', async ({ page }) => {
   await page.goto('/role-settings');
   await expect(page.getByRole('heading', { name: 'My Workspace & permissions' })).toBeVisible();
   await expect(page.getByText('internal_admin')).toHaveCount(0);
@@ -348,7 +384,7 @@ test('Internal Settings can toggle Team and shows planned permissions without ex
   await teamDirectoryPanel.click();
   await expect(teamDirectoryPanel).not.toBeChecked();
   const roleCard = page.locator('section').filter({ has: page.getByRole('heading', { name: 'My Workspace & permissions' }) }).last();
-  const hr = roleCard.getByRole('checkbox', { name: /HR · Planned/ });
+  const hr = roleCard.getByRole('checkbox', { name: /^HR\b/ });
   const accessManager = roleCard.getByRole('checkbox', { name: /Internal Access Manager/ });
   await expect(roleCard).not.toContainText('Internal Admin');
   await expect(hr).not.toBeChecked();
@@ -364,11 +400,20 @@ test('Internal Settings can toggle Team and shows planned permissions without ex
     assignments.push(assignment);
     await route.fulfill({ json: { saved: true, internalUser: {
       id: '2', roles: assignment.assigned ? ['project_management', 'hr'] : ['project_management'],
+      panelAccess: assignment.assigned ? ['overview', 'account_settings', 'hr_overview',
+        'hr_leave_calendar', 'hr_leave_requests', 'hr_leave_balances', 'hr_schedule_coverage']
+        : ['overview', 'account_settings', 'hr_overview', 'hr_leave_calendar',
+          'hr_leave_requests', 'hr_leave_balances', 'hr_schedule_coverage'],
     } } });
   });
   await hr.click();
   await expect(hr).toBeChecked();
-  await expect(roleCard.locator('code').filter({ hasText: 'people.leave.read' })).toHaveCount(0);
+  await expect(page.getByRole('checkbox', { name: /Leave calendar/ })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: /Leave balances/ })).toBeChecked();
+  await page.getByRole('checkbox', { name: /Leave calendar/ }).click();
+  await expect(page.getByRole('checkbox', { name: /Leave calendar/ })).not.toBeChecked();
+  await page.getByRole('checkbox', { name: /Leave calendar/ }).click();
+  await expect(roleCard.locator('code').filter({ hasText: 'people.leave.read' })).toHaveCount(1);
   const roleToast = page.getByRole('status').filter({ hasText: 'Role granted to Taylor Team.' });
   await expect(roleToast).toBeVisible();
   await expect(roleToast).toHaveCSS('position', 'fixed');
@@ -379,6 +424,84 @@ test('Internal Settings can toggle Team and shows planned permissions without ex
   expect(await roleCard.evaluate(element => element.getBoundingClientRect().top + window.scrollY)).toBe(roleCardTop);
   await expect(page.getByText('Any other account edits remain unsaved.')).toHaveCount(0);
   await expect(page.getByRole('status').filter({ hasText: 'Role revoked from Taylor Team.' })).toHaveCount(0, { timeout: 6000 });
+});
+
+test('Audit Log navigation is visible to Access Managers but not ordinary internal users', async ({ page }) => {
+  await page.goto('/audit-nav');
+  await expect(page.getByRole('navigation', { name: 'Internal portal' })
+    .getByRole('link', { name: 'Audit Log' })).toBeVisible();
+  await page.goto('/audit-nav?viewer=ordinary');
+  await expect(page.getByRole('navigation', { name: 'Internal portal' })
+    .getByRole('link', { name: 'Audit Log' })).toHaveCount(0);
+});
+
+test('Integration & Sync matches Internal Settings cards on desktop and mobile', async ({ page }, testInfo) => {
+  await page.route('**/api/internal/sync-settings', route => route.fulfill({ json: {
+    schemaReady: true, canEdit: true, feeds: [
+      { id: 'personal_work', label: 'My Work', workspace: 'My Work', intervalMinutes: 5, lastRefreshedAt: null },
+      { id: 'team_roster', label: 'AOC member directory', workspace: 'Team and HR', intervalMinutes: 60, lastRefreshedAt: null },
+      { id: 'team_status', label: 'Team work status', workspace: 'Team', intervalMinutes: 1, lastRefreshedAt: null },
+      { id: 'hr_records', label: 'Leave, balances and schedules', workspace: 'HR', intervalMinutes: 1440, lastRefreshedAt: null },
+    ],
+  } }));
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/sync-settings');
+    const section = page.getByRole('region', { name: 'Data refresh intervals' });
+    await expect(section.getByRole('heading', { name: 'My Work' })).toBeVisible();
+    await expect(section).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    await expect(section.getByLabel('Refresh every').first()).toHaveValue('5');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await section.screenshot({ path: testInfo.outputPath(`sync-settings-${width}.png`) });
+  }
+});
+
+test('Integration Settings shows safe Hubstaff setup and an audited test result on mobile', async ({ page }) => {
+  await page.route('**/api/internal/integration-settings', route => route.fulfill({ json: {
+    hubstaff: { status: 'ready_to_test', tokenConfigured: true, teamConfigured: true,
+      teamId: '25', schedulesVerified: true, lastTest: route.request().method() === 'POST'
+        ? { status: 'succeeded', checkedAt: '2026-10-15T00:00:00Z', errorCode: null } : null },
+    planned: [
+      { id: 'hubspot', label: 'HubSpot' }, { id: 'help_scout', label: 'Help Scout' },
+      { id: 'google_drive', label: 'Google Drive' }, { id: 'make', label: 'Make' },
+    ], auditReady: true, canTest: true,
+  } }));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/integration-settings');
+  const section = page.getByRole('region', { name: 'Connections' });
+  await expect(section.getByRole('heading', { name: 'Hubstaff' })).toBeVisible();
+  await expect(section.getByText('Ready to test')).toBeVisible();
+  await expect(section.getByText('Team ID 25')).toBeVisible();
+  await expect(section.getByText('Not tested yet')).toBeVisible();
+  await expect(section.getByText('Planned', { exact: true })).toHaveCount(4);
+  await section.getByRole('button', { name: 'Test connection' }).click();
+  await expect(section.getByText(/Passed ·/)).toBeVisible();
+  await expect(section.getByRole('status')).toHaveText('Hubstaff organization and AOC team access verified.');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test('Internal Settings sub-navigation expands in the sidebar and mobile drawer', async ({ page }) => {
+  for (const width of [1440, 800, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto('/sidebar-subnav');
+    if (width < 720) await page.getByRole('button', { name: 'Open menu' }).click();
+    const nav = page.getByRole('navigation', { name: 'Internal portal' });
+    const toggle = nav.getByRole('button', { name: 'Internal Settings' });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const childLinks = nav.getByRole('link').filter({ hasText: /Users & Access|Integrations|Sync/ });
+    await expect(childLinks).toHaveCount(3);
+    await expect(nav.getByRole('link', { name: 'Integrations' }))
+      .toHaveAttribute('href', '/internal/internal-settings/integrations');
+    await expect(nav.getByRole('link', { name: 'Sync' }))
+      .toHaveAttribute('href', '/internal/internal-settings/sync');
+    if (width < 720) {
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('button', { name: 'Open menu' })).toBeFocused();
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
 });
 
 test('Internal Admin can grant Internal Access Manager to another account', async ({ page }) => {
@@ -405,7 +528,7 @@ test('Access Manager may change own business role but not own protected role in 
   await page.goto('/role-settings?viewer=manager');
   const roleCard = page.locator('section').filter({ has: page.getByRole('heading', { name: 'My Workspace & permissions' }) }).last();
   const manager = roleCard.getByRole('checkbox', { name: /Internal Access Manager/ });
-  const hr = roleCard.getByRole('checkbox', { name: /HR · Planned/ });
+  const hr = roleCard.getByRole('checkbox', { name: /^HR\b/ });
   await expect(manager).toBeChecked();
   await expect(manager).toBeDisabled();
   await expect(hr).toBeEnabled();
@@ -589,6 +712,100 @@ test('Internal Settings resets another user password with manager reauthenticati
   await expect(page.getByRole('status')).toContainText('Taylor Team\'s password was reset');
   await page.getByRole('button', { name: /Fixture Admin/ }).click();
   await expect(page.getByRole('button', { name: 'Reset password' })).toHaveCount(0);
+});
+
+test('HR workspace shows read-only leave, balances, and schedule coverage on mobile', async ({ page }) => {
+  const requests = [];
+  await page.route('**/api/internal/hr?**', route => {
+    requests.push(route.request());
+    const month = new URL(route.request().url()).searchParams.get('month');
+    return route.fulfill({ json: { month, generatedAt: new Date().toISOString(), scheduleVerified: false,
+      freshness: { hrRecords: { source: 'hubstaff', refreshedAt: '2026-10-15T08:00:00Z' } },
+      summary: { members: 2, awayToday: 0, approvedRequests: 1, pendingRequests: 1,
+        scheduleCoverage: 1 },
+      people: [{ id: 'hr-member-1', name: 'Alex Example', portalAccountMapped: true,
+        portalPosition: 'HR Admin', scheduleCoverage: 'On file',
+        schedules: [{ startDate: `${month}-01`, startTime: '09:00', durationSeconds: 28800,
+          repeatSchedule: 'weekly', weekdays: ['mon'], useTimeZone: 'user', repeatUntil: null }] },
+      { id: 'hr-member-2', name: 'Taylor Example', portalAccountMapped: false,
+        portalPosition: null, scheduleCoverage: 'Missing', schedules: [] }],
+      leaveRequests: [{ id: 'hr-leave-1', personId: 'hr-member-1', status: 'approved',
+        policy: 'Annual leave', startAt: `${month}-15T00:00:00Z`, stopAt: `${month}-16T00:00:00Z`,
+        days: [{ date: `${month}-15`, amountSeconds: 28800 }],
+        reason: 'Private HR reason', amountSeconds: 28800 },
+      { id: 'hr-leave-2', personId: 'hr-member-2', status: 'submitted',
+        policy: 'Annual leave', startAt: `${month}-20T00:00:00Z`, stopAt: `${month}-21T00:00:00Z`,
+        days: [{ date: `${month}-20`, amountSeconds: 14400 }],
+        reason: 'Pending private reason', amountSeconds: 14400 }],
+      balances: [{ personId: 'hr-member-1', policy: 'Annual leave', amountSeconds: 36000,
+        year: Number(month.slice(0, 4)) },
+      { personId: 'hr-member-1', policy: 'Sick leave', amountSeconds: 14400,
+        year: Number(month.slice(0, 4)) }],
+    } });
+  });
+  await page.goto('/hr-workspace');
+  await expect(page.getByRole('heading', { name: 'People & leave' })).toBeVisible();
+  await expect(page.getByText('Fetched from Hubstaff', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Leave calendar' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Leave requests' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Leave balances' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'People & schedule coverage' })).toBeVisible();
+  const calendar = page.getByRole('region', { name: 'Leave calendar' });
+  await expect(calendar.getByText('Alex Example')).toHaveCount(1);
+  await expect(calendar.getByText('Taylor Example')).toHaveCount(0);
+  const balances = page.getByRole('region', { name: /Leave balances/ });
+  await expect(balances.getByRole('row', { name: /Alex Example/ })).toHaveCount(1);
+  await expect(balances.getByText('Annual leave')).toBeVisible();
+  await expect(balances.getByText('Sick leave')).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Leave balances rows per page' })).toHaveValue('10');
+  await page.getByRole('combobox', { name: 'Leave balances sort by' }).selectOption('total_desc');
+  const hrRefresh = page.getByRole('button', { name: 'Refresh HR data' });
+  await expect(hrRefresh.locator('svg')).toBeVisible();
+  await hrRefresh.click();
+  await expect.poll(() => requests.some(request => new URL(request.url()).searchParams.get('refresh') === '1')).toBe(true);
+  await expect(page.getByText('Private HR reason')).toBeHidden();
+  await page.getByRole('listitem').filter({ hasText: 'Alex Example' }).getByText('Leave details').click();
+  await expect(page.getByText('Private HR reason')).toBeVisible();
+  await expect(page.getByText('10.0 h')).toBeVisible();
+  await expect(page.getByText('Needs review', { exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('heading', { name: 'People & leave' })).toBeVisible();
+  await page.getByRole('button', { name: 'Next month' }).click();
+  await expect.poll(() => new Set(requests.map(request => new URL(request.url()).searchParams.get('month'))).size).toBe(2);
+  expect(requests.every(request => request.method() === 'GET')).toBe(true);
+});
+
+test('HR lists page 10 at a time and sort independently', async ({ page }) => {
+  await page.route('**/api/internal/hr?**', route => {
+    const month = new URL(route.request().url()).searchParams.get('month');
+    const people = Array.from({ length: 12 }, (_, index) => ({ id: `person-${index + 1}`,
+      name: `Member ${String(index + 1).padStart(2, '0')}`, scheduleCoverage: index % 2 ? 'Missing' : 'On file',
+      schedules: [], portalAccountMapped: false, portalPosition: null }));
+    return route.fulfill({ json: { month, generatedAt: new Date().toISOString(), scheduleVerified: false,
+      summary: { members: 12, awayToday: 0, approvedRequests: 12, pendingRequests: 0, scheduleCoverage: 6 },
+      people, calendarRequests: [],
+      leaveRequests: people.map((person, index) => ({ id: `request-${index + 1}`, personId: person.id,
+        status: 'approved', policy: 'Annual leave', days: [{ date: `${month}-${String(index + 1).padStart(2, '0')}`,
+          amountSeconds: 28800 }], reason: '', amountSeconds: 28800 })),
+      balances: people.map((person, index) => ({ personId: person.id, policy: 'Annual leave',
+        amountSeconds: index * 3600, year: Number(month.slice(0, 4)) })) } });
+  });
+  await page.goto('/hr-workspace');
+  const requests = page.getByRole('region', { name: 'Leave requests' });
+  await expect(requests.getByRole('listitem')).toHaveCount(10);
+  await requests.getByRole('button', { name: 'Next Leave requests page' }).click();
+  await expect(requests.getByRole('listitem')).toHaveCount(2);
+  await expect(requests.getByText('Member 12')).toBeVisible();
+  await requests.getByRole('combobox', { name: 'Leave requests sort by' }).selectOption('date_desc');
+  await expect(requests.getByRole('listitem').first()).toContainText('Member 12');
+  const balances = page.getByRole('region', { name: 'Leave balances' });
+  await expect(balances.getByRole('row')).toHaveCount(11);
+  await balances.getByRole('combobox', { name: 'Leave balances rows per page' }).selectOption('20');
+  await expect(balances.getByRole('row')).toHaveCount(13);
+  const schedules = page.getByRole('region', { name: 'People & schedule coverage' });
+  await expect(schedules.getByRole('listitem')).toHaveCount(10);
+  await schedules.getByRole('combobox', { name: 'People and schedules sort by' }).selectOption('missing_first');
+  await expect(schedules.getByRole('listitem').first()).toContainText('Needs review');
 });
 
 test('assigned functional roles link directly from the desktop sidebar', async ({ page }) => {

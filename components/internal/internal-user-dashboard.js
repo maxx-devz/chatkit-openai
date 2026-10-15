@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useInternalUserWorkspace } from './internal-workspace-provider';
 import InternalPasswordSettings from './internal-password-settings';
+import InternalDataFreshness from './internal-data-freshness';
 import { dueState, selectInternalUserTasks } from '@/lib/internal-user-view';
 import styles from './internal-user-dashboard.module.css';
 
@@ -87,6 +88,13 @@ function normalizeStoredPlan(value) {
     completedTaskIds: uniqueStringIds(value.completedTaskIds),
     carryOverHandled: value.carryOverHandled === true,
   };
+}
+
+function teamStatusClass(status) {
+  if (status === 'Away') return styles.teamStatusAway;
+  if (status === 'On Shift') return styles.teamStatusOnShift;
+  if (status === 'Off Shift') return styles.teamStatusOffShift;
+  return styles.teamStatusUnknown;
 }
 
 export default function InternalUserDashboard({ name, username = '', position, panelAccess = [], workspace = 'personal', connected, connectionMessage, children, previewData = null }) {
@@ -238,7 +246,7 @@ export default function InternalUserDashboard({ name, username = '', position, p
     ['overdue', 'Overdue', active.filter(task => dueState(task, now) === 'overdue').length],
   ];
   const workspaceCopy = isTeam
-    ? { title: 'Your team, in view.', detail: 'Find active colleagues and their positions.' }
+    ? { title: 'Your team, in view.', detail: 'Find AOC members and see who has a portal account.' }
     : isSettings
       ? { title: 'Account & settings.', detail: 'Manage your password and connected services.' }
       : { title: 'Your work, in focus.', detail: 'Review your own assignments, priorities, and recent activity.' };
@@ -248,6 +256,9 @@ export default function InternalUserDashboard({ name, username = '', position, p
       <div><p className={styles.eyebrow}>{String(position || 'Team Member').toUpperCase()}</p><h1>{workspaceCopy.title}</h1>
         <p>Welcome, {name}. {workspaceCopy.detail}</p></div>
     </section>
+    {isPersonal && data?.freshness?.personalWork && <div className={styles.freshnessLine}>
+      <InternalDataFreshness freshness={data.freshness.personalWork} />
+    </div>}
     {connectionMessage && <p className={styles.notice} role="status">{connectionMessage}</p>}
     {error && <p className={styles.error} role="alert">{error}</p>}
     {isPersonal && data?.truncated && <p className={styles.notice}>Showing a limited snapshot of your work. Some tasks or projects may be missing; counts reflect only this snapshot.</p>}
@@ -415,13 +426,21 @@ export default function InternalUserDashboard({ name, username = '', position, p
     </div>}
     {isTeam && canViewTeam && <div className={`${styles.bottomGrid} ${styles.singleColumnGrid}`}>
       {canViewTeam && <section className={`${styles.panel} ${styles.anchorSection}`} id="team-directory">
-        <div className={styles.sectionHeading}><div><h2>Team directory</h2><p>Active internal users and their current portal positions.</p></div>
-          <span className={styles.readOnly}>{data?.teamMembers?.length || 0} active</span></div>
+        <div className={styles.sectionHeading}><div><h2>Team directory</h2><p>Active AOC Hubstaff members, including those without portal accounts.</p></div>
+          <span className={styles.readOnly}>{data?.teamMembers?.length || 0} members</span></div>
         {busy && !data ? <div className={styles.skeleton} role="status"><span className="sr-only">Loading team directory</span><i /><i /></div>
           : data?.teamMembers?.length ? <ul className={styles.teamMembers}>{data.teamMembers.map(member => <li key={member.id}>
             <span>{member.name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase()}</span>
-            <div><strong>{member.name}</strong><small>{member.position}</small></div>
-          </li>)}</ul> : <p className={styles.emptySmall}>No active internal users are available.</p>}
+            <div><strong>{member.name}</strong><small>{member.position || 'No portal position'}</small>
+              {member.portalAccountMapped && <span className={styles.portalAccountBadge}>Portal account</span>}</div>
+            {member.workStatus && <span className={`${styles.teamStatus} ${teamStatusClass(member.workStatus)}`}>
+              {['Away', 'On Shift', 'Off Shift'].includes(member.workStatus) ? member.workStatus : 'Unknown'}
+            </span>}
+          </li>)}</ul> : <p className={styles.emptySmall}>No active AOC members are available.</p>}
+        {(data?.freshness?.teamDirectory || data?.freshness?.teamStatus) && <div className={styles.teamFreshness}>
+          <InternalDataFreshness freshness={data.freshness.teamDirectory} label="Directory" />
+          <InternalDataFreshness freshness={data.freshness.teamStatus} label="Status" />
+        </div>}
       </section>}
     </div>}
     {isPersonal && canViewActivity && <div className={styles.bottomGrid} id="activity">

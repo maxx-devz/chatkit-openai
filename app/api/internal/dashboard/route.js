@@ -10,7 +10,9 @@ export async function GET(request) {
   try {
     await resolveInternalUserContext(request.headers);
     const workspace = readInternalUserWorkspace(request);
-    return Response.json(await loadInternalUserDashboard(request.headers, { workspace }), {
+    return Response.json(await loadInternalUserDashboard(request.headers, {
+      workspace, force: new URL(request.url).searchParams.get('refresh') === '1',
+    }), {
       headers: { 'Cache-Control': 'private, no-store', Vary: 'Cookie' },
     });
   } catch (error) { return internalUserErrorResponse(error); }

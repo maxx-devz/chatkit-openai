@@ -1,6 +1,7 @@
 import { test, mock, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { internalUserA, internalUserB, hubstaffFixture, testToken } from './fixtures.mjs';
+import { INTERNAL_HR_PANEL_IDS } from '../../lib/internal-user-positions.js';
 
 let session = null;
 let internalUser = null;
@@ -12,6 +13,7 @@ let targetInternalUser = null;
 let targetRoles = [];
 let activeManagerCount = 2;
 const roleAudit = [];
+const panelAudit = [];
 const integrationRuns = [];
 const profileUpdates = [];
 const db = { query: async (query, values) => {
@@ -43,7 +45,18 @@ const db = { query: async (query, values) => {
     else if (!assigned) targetRoles = [...targetRoles, values[1]];
     return { rowCount: Number(!assigned), rows: assigned ? [] : [{ user_id: values[0] }] };
   }
+  if (query.startsWith('UPDATE portal_internal_users\n        SET panel_access')) {
+    const user = values[0] === '1' ? internalUser : targetInternalUser;
+    if (user && !values[2].some(panel => user.panel_access.includes(panel))) {
+      user.panel_access = [...user.panel_access, ...JSON.parse(values[1])];
+    }
+    return { rowCount: 1, rows: [] };
+  }
   if (query.startsWith('INSERT INTO portal_internal_access_audit')) {
+    if (query.includes("'panel.read.' || selected.panel_id")) {
+      panelAudit.push(...values[1].map(panel => ({ actor: values[0], panel })));
+      return { rowCount: values[1].length, rows: [] };
+    }
     roleAudit.push(values);
     return { rowCount: 1, rows: [] };
   }
@@ -76,6 +89,9 @@ const db = { query: async (query, values) => {
     roles: 'portal_internal_user_roles', audit: 'portal_internal_access_audit' }] };
   if (query.startsWith('SELECT to_regclass')) return { rows: [{ relation: 'portal_internal_users' }] };
   if (query.includes('SELECT 1 FROM portal_internal_users WHERE hubstaff_user_id')) return { rows: [] };
+  if (query === 'SELECT hubstaff_user_id, position FROM portal_internal_users') {
+    return { rows: [internalUser, targetInternalUser].filter(Boolean) };
+  }
   if (query.includes('FROM portal_internal_users e JOIN portal_users u')) {
     return { rows: internalUser ? [{ ...internalUser, connected: Boolean(internalUser.encrypted_access_token) },
       ...(targetInternalUser ? [{ ...targetInternalUser,
@@ -123,6 +139,7 @@ const { resolveInternalUserContext } = await import('../../lib/internal-user-dat
 const { encryptInternalUserToken } = await import('../../lib/internal-user-repository.js');
 const { GET: internalUserDashboard } = await import('../../app/api/internal/dashboard/route.js');
 const { GET: platformAudit } = await import('../../app/api/internal/audit/route.js');
+const { GET: hrDashboard } = await import('../../app/api/internal/hr/route.js');
 const { GET: internalUsersGet, POST: internalUsersPost, PATCH: internalUsersPatch, PUT: internalUsersPut,
 } = await import('../../app/api/internal/internal-users/route.js');
 const { GET: availableHubstaffMembers } = await import('../../app/api/internal/hubstaff-members/route.js');
@@ -134,6 +151,43 @@ const headers = new Headers({ origin: 'https://portal.example' });
 const request = (path, method = 'GET', body) => new Request(`https://portal.example${path}`, {
   method, headers: { origin: 'https://portal.example', ...(body ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}) }, body,
 });
+
+function mockTeamRoster(t, { token = 'hsoat_fixture_token', timeOffRequests = [], balances = [], policies = [],
+  schedules = [], members = [
+  { id: 101, name: 'AOC Member One' }, { id: 202, name: 'AOC Member Two' },
+] } = {}) {
+  const previousToken = process.env.HUBSTAFF_ACCESS_TOKEN;
+  const previousTeamId = process.env.HUBSTAFF_INTERNAL_TEAM_ID;
+  const previousFetch = globalThis.fetch;
+  process.env.HUBSTAFF_ACCESS_TOKEN = token;
+  process.env.HUBSTAFF_INTERNAL_TEAM_ID = '77';
+  globalThis.fetch = async url => {
+    if (url.pathname === '/v2/organizations') return Response.json({ organizations: [{ id: 7 }] });
+    if (url.pathname === '/v2/organizations/7/teams') {
+      return Response.json({ teams: [{ id: 77, name: 'AOC members' }] });
+    }
+    if (url.pathname === '/v2/teams/77/members') {
+      return Response.json({ team_members: members.map(member => ({ user_id: member.id })) });
+    }
+    if (url.pathname === '/v2/organizations/7/members') {
+      return Response.json({ members: members.map(member => ({ user_id: member.id, membership_status: 'active' })),
+        users: members.map(member => ({ id: member.id, name: member.name,
+          status: 'active', time_zone: 'Asia/Manila' })) });
+    }
+    if (url.pathname.endsWith('/time_off_requests')) return Response.json({ time_off_requests: timeOffRequests });
+    if (url.pathname.endsWith('/time_off_balances')) return Response.json({ time_off_balances: balances });
+    if (url.pathname.endsWith('/time_off_policies')) return Response.json({ time_off_policies: policies });
+    if (url.pathname.endsWith('/attendance_schedules')) return Response.json({ attendance_schedules: schedules });
+    throw new Error(`Unexpected Hubstaff route: ${url.pathname}`);
+  };
+  t.after(() => {
+    globalThis.fetch = previousFetch;
+    if (previousToken === undefined) delete process.env.HUBSTAFF_ACCESS_TOKEN;
+    else process.env.HUBSTAFF_ACCESS_TOKEN = previousToken;
+    if (previousTeamId === undefined) delete process.env.HUBSTAFF_INTERNAL_TEAM_ID;
+    else process.env.HUBSTAFF_INTERNAL_TEAM_ID = previousTeamId;
+  });
+}
 
 test('unauthenticated internal user endpoints reject access', async () => {
   session = null;
@@ -166,7 +220,8 @@ test('internal users, including inactive or accidentally dual-access accounts, c
   }
 });
 
-test('active internal user endpoint returns no legacy state and refuses every browser-selected identity', async () => {
+test('active internal user endpoint returns no legacy state and refuses every browser-selected identity', async t => {
+  mockTeamRoster(t);
   internalUser = { ...internalUserA };
   session = { user: { id: 'internal-user-a', name: 'InternalUser A' } };
   const context = await resolveInternalUserContext(headers);
@@ -178,24 +233,36 @@ test('active internal user endpoint returns no legacy state and refuses every br
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
   const teamResponse = await internalUserDashboard(request('/api/internal/dashboard?workspace=team'));
   assert.equal(teamResponse.status, 200);
-  assert.deepEqual(Object.keys((await teamResponse.json()).teamMembers[0]).sort(), ['id', 'name', 'position']);
+  const team = (await teamResponse.json()).teamMembers;
+  assert.equal(team.length, 2);
+  assert.deepEqual(Object.keys(team[0]).sort(), ['id', 'name', 'portalAccountMapped', 'position', 'workStatus']);
+  assert.deepEqual(team.map(member => member.portalAccountMapped), [true, false]);
+  assert.equal(team[1].position, null);
   assert.equal((await internalUserDashboard(request('/api/internal/dashboard?workspace=settings'))).status, 200);
   for (const key of ['internal_user_id', 'hubstaff_user_id', 'project_id', 'client_id']) {
     assert.equal((await internalUserDashboard(request(`/api/internal/dashboard?${key}=2`))).status, 400);
   }
 });
 
-test('project manager still sees only the basic Team directory', async () => {
+test('project manager still sees only the basic Team directory', async t => {
+  mockTeamRoster(t);
   internalUser = { ...internalUserA, position: 'project_manager', panel_access: undefined };
   roles = ['project_management'];
   session = { user: { id: 'internal-user-a', name: 'Manager' } };
+  const beforeAudit = integrationRuns.length;
   const response = await internalUserDashboard(request('/api/internal/dashboard?workspace=team'));
   assert.equal(response.status, 200);
   const payload = await response.json();
   assert.equal(payload.access.position, 'Project Manager');
   assert.equal(payload.access.panels.includes('team_directory'), true);
-  assert.equal(payload.teamMembers.length, 1);
-  assert.deepEqual(Object.keys(payload.teamMembers[0]).sort(), ['id', 'name', 'position']);
+  assert.equal(payload.teamMembers.length, 2);
+  assert.deepEqual(Object.keys(payload.teamMembers[0]).sort(),
+    ['id', 'name', 'portalAccountMapped', 'position', 'workStatus']);
+  const directoryRun = integrationRuns.slice(beforeAudit).find(run => run.operation === 'team_directory');
+  assert.equal(directoryRun?.source, 'hubstaff');
+  assert.equal(directoryRun?.status, 'succeeded');
+  assert.equal(directoryRun?.records_processed, 2);
+  assert.equal(directoryRun?.actor_user_id, internalUserA.user_id);
   roles = [];
 });
 
@@ -209,19 +276,22 @@ test('inactive internal users cannot use live panel or Internal Settings APIs', 
   roles = [];
 });
 
-test('Team defaults from position when panel access is unset, but an explicit omission denies access', async () => {
+test('Team defaults from position when panel access is unset, but an explicit omission denies access', async t => {
+  mockTeamRoster(t);
   internalUser = { ...internalUserA, position: 'project_manager', panel_access: undefined };
   roles = [];
   session = { user: { id: 'internal-user-a', name: 'Manager' } };
   const teamResponse = await internalUserDashboard(request('/api/internal/dashboard?workspace=team'));
   assert.equal(teamResponse.status, 200);
-  assert.deepEqual(Object.keys((await teamResponse.json()).teamMembers[0]).sort(), ['id', 'name', 'position']);
+  assert.deepEqual(Object.keys((await teamResponse.json()).teamMembers[0]).sort(),
+    ['id', 'name', 'portalAccountMapped', 'position', 'workStatus']);
   internalUser = { ...internalUserA, panel_access: ['overview'] };
   assert.equal((await internalUserDashboard(request('/api/internal/dashboard?workspace=team'))).status, 403);
   assert.equal((await resolveInternalUserContext(headers)).profile.panels.includes('team_directory'), false);
 });
 
-test('Team never exposes other users connection status, including to account managers', async () => {
+test('Team never exposes other users connection status, including to account managers', async t => {
+  mockTeamRoster(t);
   internalUser = { ...internalUserA, panel_access: ['overview', 'team_directory'] };
   session = { user: { id: 'internal-user-a', name: 'InternalUser A' } };
   for (const assignedRoles of [[], ['project_management'], ['hr'], ['internal_access_manager'], ['internal_admin']]) {
@@ -229,9 +299,142 @@ test('Team never exposes other users connection status, including to account man
     const response = await internalUserDashboard(request('/api/internal/dashboard?workspace=team'));
     assert.equal(response.status, 200);
     const payload = await response.json();
-    assert.deepEqual(Object.keys(payload.teamMembers[0]).sort(), ['id', 'name', 'position']);
+    assert.deepEqual(Object.keys(payload.teamMembers[0]).sort(),
+      ['id', 'name', 'portalAccountMapped', 'position', 'workStatus']);
     assert.equal(Object.hasOwn(payload.access, 'teamTasksAvailable'), false);
   }
+  roles = [];
+});
+
+test('Team status uses the organization reader for mapped and unmapped AOC members', async t => {
+  internalUser = { ...internalUserA, panel_access: ['team_directory'] };
+  session = { user: { id: 'internal-user-a', name: 'InternalUser A' } };
+  roles = [];
+  const now = Date.now();
+  mockTeamRoster(t, { token: 'hsoat_fixture_status_token', timeOffRequests: [{
+      user_id: 101, status: 'approved', message: 'private leave reason',
+      starts_at: new Date(now - 3_600_000).toISOString(),
+      stops_at: new Date(now + 3_600_000).toISOString(),
+      time_off_request_days: [{ amount_used: 3600,
+        starts_at: new Date(now - 3_600_000).toISOString(),
+        stops_at: new Date(now + 3_600_000).toISOString() }],
+    }] });
+  const response = await internalUserDashboard(request('/api/internal/dashboard?workspace=team'));
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.deepEqual(payload.teamMembers, [
+    { id: 'team-member-1', name: 'AOC Member One', position: 'Team Member',
+      portalAccountMapped: true, workStatus: 'Away' },
+    { id: 'team-member-2', name: 'AOC Member Two', position: null,
+      portalAccountMapped: false, workStatus: 'Unknown' },
+  ]);
+  assert.equal(JSON.stringify(payload).includes('private leave reason'), false);
+  assert.equal(JSON.stringify(payload).includes('hubstaffUserId'), false);
+  assert.equal(JSON.stringify(payload).includes('101'), false);
+  assert.equal(integrationRuns.at(-1)?.operation, 'team_work_status');
+  assert.equal(integrationRuns.at(-1)?.status, 'succeeded');
+});
+
+test('Team does not substitute a partial portal roster when AOC membership cannot be verified', async t => {
+  mockTeamRoster(t);
+  delete process.env.HUBSTAFF_INTERNAL_TEAM_ID;
+  internalUser = { ...internalUserA, panel_access: ['team_directory'] };
+  session = { user: { id: 'internal-user-a', name: 'InternalUser A' } };
+  roles = [];
+  const beforeAudit = integrationRuns.length;
+  const response = await internalUserDashboard(request('/api/internal/dashboard?workspace=team'));
+  assert.equal(response.status, 503);
+  const body = await response.json();
+  assert.equal(body.code, 'team_directory_unavailable');
+  assert.equal(JSON.stringify(body).includes(internalUserA.display_name), false);
+  const directoryRun = integrationRuns.slice(beforeAudit).find(run => run.operation === 'team_directory');
+  assert.equal(directoryRun?.status, 'failed');
+  assert.equal(directoryRun?.error_code, 'hubstaff_team_not_configured');
+});
+
+test('HR endpoint allows HR and Internal Admin, and returns only AOC members with approved fields', async t => {
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10);
+  const startAt = new Date(now.valueOf() - 3_600_000).toISOString();
+  const stopAt = new Date(now.valueOf() + 3_600_000).toISOString();
+  const leave = (id, userId, status, message) => ({ id, user_id: userId,
+    time_off_policy_id: 9, status, message, starts_at: startAt, stops_at: stopAt,
+    time_off_request_days: [{ date, amount_used: 3600, starts_at: startAt, stops_at: stopAt }] });
+  mockTeamRoster(t, {
+    timeOffRequests: [leave(1, 101, 'approved', 'Private HR reason'),
+      leave(2, 202, 'submitted', 'Pending reason'), leave(3, 303, 'approved', 'Outsider reason')],
+    balances: [{ user_id: 101, time_off_policy_id: 9, policy_name: 'Annual leave', amount: 36000 },
+      { user_id: 202, time_off_policy_id: 9, policy_name: 'Annual leave', amount: 18000 },
+      { user_id: 303, time_off_policy_id: 9, policy_name: 'Annual leave', amount: 72000 }],
+    policies: [{ id: 9, name: 'Annual leave' }],
+    schedules: [{ user_id: 101, start_date: '2026-01-01', start_time: '09:00', duration: 28800,
+      repeat_schedule: 'weekly', use_time_zone: 'user', weekdays: ['mon'], excluded_dates: [] },
+    { user_id: 303, start_date: '2026-01-01', start_time: '09:00', duration: 28800,
+      repeat_schedule: 'weekly', use_time_zone: 'user', weekdays: ['mon'], excluded_dates: [] }],
+  });
+  internalUser = { ...internalUserA, panel_access: [...internalUserA.panel_access, ...INTERNAL_HR_PANEL_IDS] };
+  session = { user: { id: 'internal-user-a', name: 'InternalUser A' } };
+  const path = `/api/internal/hr?month=${date.slice(0, 7)}`;
+  roles = [];
+  const beforeAudit = integrationRuns.length;
+  assert.equal((await hrDashboard(request(path))).status, 403);
+  assert.equal(integrationRuns.length, beforeAudit, 'Denied roles never read or audit HR data');
+  roles = ['internal_admin'];
+  const adminResponse = await hrDashboard(request(path));
+  assert.equal(adminResponse.status, 200);
+  assert.equal((await adminResponse.json()).leaveRequests[0].reason, 'Private HR reason');
+  roles = ['hr'];
+  const beforePanelAudit = panelAudit.length;
+  const response = await hrDashboard(request(path));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  const payload = await response.json();
+  assert.equal(payload.people.length, 2);
+  assert.deepEqual(payload.people.map(person => person.portalAccountMapped), [true, false]);
+  assert.equal(payload.people[0].scheduleCoverage, 'On file');
+  assert.equal(payload.people[1].scheduleCoverage, 'Missing');
+  assert.equal(payload.leaveRequests.length, 2);
+  assert.equal(payload.calendarRequests.length, 1);
+  assert.equal(Object.hasOwn(payload.calendarRequests[0], 'reason'), false);
+  assert.equal(payload.leaveRequests[0].reason, 'Private HR reason');
+  assert.equal(payload.balances.length, 2);
+  assert.equal(payload.summary.scheduleCoverage, 1);
+  assert.deepEqual(panelAudit.slice(beforePanelAudit).map(event => event.panel), INTERNAL_HR_PANEL_IDS);
+  assert.equal(JSON.stringify(payload).includes('Outsider reason'), false);
+  assert.equal(JSON.stringify(payload).includes('userId'), false);
+  assert.equal(JSON.stringify(payload).includes('hubstaff_user_id'), false);
+  assert.equal(integrationRuns.at(-1).operation, 'hr_dashboard');
+  assert.equal(integrationRuns.at(-1).status, 'succeeded');
+  internalUser.panel_access = ['hr_leave_calendar'];
+  const calendarOnly = await hrDashboard(request(path));
+  assert.equal(calendarOnly.status, 200);
+  const calendarPayload = await calendarOnly.json();
+  assert.equal(calendarPayload.summary, null);
+  assert.equal(calendarPayload.leaveRequests.length, 0);
+  assert.equal(calendarPayload.balances.length, 0);
+  assert.equal(Object.hasOwn(calendarPayload.people[0], 'schedules'), false);
+  assert.equal(calendarPayload.calendarRequests.length, 1);
+  assert.equal(panelAudit.at(-1).panel, 'hr_leave_calendar');
+  assert.equal((await hrDashboard(request('/api/internal/hr?month=2026-99'))).status, 400);
+  internalUser.panel_access = [];
+  assert.equal((await hrDashboard(request(path))).status, 403);
+  roles = [];
+});
+
+test('HR source failure returns no partial records and records an audit failure', async t => {
+  mockTeamRoster(t);
+  const rosterFetch = globalThis.fetch;
+  globalThis.fetch = url => url.pathname.endsWith('/time_off_balances')
+    ? Promise.resolve(Response.json({}, { status: 403 })) : rosterFetch(url);
+  internalUser = { ...internalUserA, panel_access: [...internalUserA.panel_access, ...INTERNAL_HR_PANEL_IDS] };
+  session = { user: { id: 'internal-user-a', name: 'InternalUser A' } };
+  roles = ['hr'];
+  const response = await hrDashboard(request(`/api/internal/hr?month=${new Date().toISOString().slice(0, 7)}`));
+  assert.equal(response.status, 503);
+  assert.equal(Object.hasOwn(await response.json(), 'people'), false);
+  assert.equal(integrationRuns.at(-1).operation, 'hr_dashboard');
+  assert.equal(integrationRuns.at(-1).status, 'failed');
+  assert.equal(integrationRuns.at(-1).error_code, 'hubstaff_forbidden');
   roles = [];
 });
 
@@ -277,6 +480,18 @@ test('personal Settings requires an enabled panel; a planned role cannot open In
   const hubstaffOnly = await internalUserDashboard(request('/api/internal/dashboard?workspace=settings'));
   assert.equal(hubstaffOnly.status, 200);
   assert.equal(Object.hasOwn(await hubstaffOnly.json(), 'connection'), true);
+});
+
+test('successful live-panel reads are audited; forbidden panel requests are not', async () => {
+  roles = [];
+  internalUser = { ...internalUserA, panel_access: ['account_settings'] };
+  session = { user: { id: 'internal-user-a', name: 'InternalUser A' } };
+  const before = panelAudit.length;
+  assert.equal((await internalUserDashboard(request('/api/internal/dashboard?workspace=settings'))).status, 200);
+  assert.deepEqual(panelAudit.slice(before), [{ actor: '1', panel: 'account_settings' }]);
+  internalUser.panel_access = [];
+  assert.equal((await internalUserDashboard(request('/api/internal/dashboard?workspace=settings'))).status, 403);
+  assert.equal(panelAudit.length, before + 1);
 });
 
 test('non-manager cannot read or create internal user accounts through the new API', async () => {
@@ -367,13 +582,14 @@ test('account managers default to AOC members, can list other unmapped organizat
   }
 });
 
-test('internal admin sees all current panels and cannot smuggle roles through account payloads', async () => {
+test('internal admin sees all current panels and cannot smuggle roles through account payloads', async t => {
+  mockTeamRoster(t);
   internalUser = { ...internalUserA, position: 'team_member', panel_access: ['overview'] };
   roles = ['internal_admin'];
   session = { user: { id: 'internal-user-a', name: 'Internal Admin' } };
   const context = await resolveInternalUserContext(headers);
   assert.deepEqual(context.profile.panels,
-    ['overview', 'my_tasks', 'activity', 'team_directory', 'account_settings', 'hubstaff']);
+    ['overview', 'my_tasks', 'activity', 'team_directory', 'account_settings', 'hubstaff', ...INTERNAL_HR_PANEL_IDS]);
   assert.equal((await internalUserDashboard(request('/api/internal/dashboard?workspace=team'))).status, 200);
   assert.equal((await internalUserDashboard(request('/api/internal/dashboard?workspace=settings'))).status, 200);
   const list = await internalUsersGet(request('/api/internal/internal-users'));
@@ -514,13 +730,16 @@ test('overview-only panel receives task summaries, not hidden task details', asy
   assert.ok(integrationRuns.at(-1).records_processed > 0);
 });
 
-test('audit log is denied to ordinary and access-manager users, and readable by internal admin', async () => {
+test('audit log is denied to ordinary users and readable by access managers and internal admins', async () => {
   internalUser = { ...internalUserA };
   session = { user: { id: 'internal-user-a', name: 'InternalUser A' } };
   roles = [];
   assert.equal((await platformAudit(request('/api/internal/audit'))).status, 403);
   roles = ['internal_access_manager'];
-  assert.equal((await platformAudit(request('/api/internal/audit'))).status, 403);
+  const managerResponse = await platformAudit(request('/api/internal/audit'));
+  assert.equal(managerResponse.status, 200);
+  assert.equal(managerResponse.headers.get('cache-control'), 'private, no-store');
+  assert.deepEqual(roleAudit.at(-1), ['1', 'audit_log.read']);
   roles = ['internal_admin'];
   const response = await platformAudit(request('/api/internal/audit'));
   assert.equal(response.status, 200);

@@ -117,7 +117,7 @@ Portal-native configuration, permissions, checkpoints, synchronization runs, and
 | Internal user directory, department, role, and capability | Human Resources Drive masters | Synchronize approved fields into permissioned internal user profiles | Edit in the approved HR source initially | Proposed; field approval pending |
 | Leave and time-off requests | Hubstaff, where leave is approved; portal reads the Time Off Requests API | Derive approved dates and minimum permitted availability fields; do not expose raw request details in the Team directory | Read-only initially | Source confirmed; local cross-member read passed; deployed access and HR field approval pending |
 | Expected work schedules | Hubstaff Attendance Schedules API is a candidate; HR must confirm whether AOC maintains complete schedules there | Derive shift status only from a verified schedule source; no raw schedules in the shared Team directory | Read-only initially | Local API access confirmed; 2 of 2 active portal mappings in `.env.local` matched schedules; full roster and source authority pending |
-| Other absences and leave balances | Pending HR decision | Normalize only approved dates and visibility fields for future calendar or self-service views | Read-only initially | Pending |
+| HR leave calendar, requests, and balances | Hubstaff Time Off Requests, Policies, and Balances APIs | Read-only HR workspace for AOC members; request dates, status, policy, reason, and annual balances are restricted to HR and Internal Admin; Team sees only derived shared status | Read-only; approvals and corrections stay in Hubstaff | Local reader implemented; review HR and Internal Admin role holders and retention before release |
 | Time entries and activity | Hubstaff Time | Normalize time records and approved aggregates | Read-only | Proposed |
 | Projects and tasks | Hubstaff Tasks | Mirror approved project, task, assignee, status, and due-date fields | Read-only initially | Proposed |
 | Companies, contacts, deals, and CRM activity | HubSpot | Normalize approved CRM objects and source IDs | Read-only initially; controlled writes in Phase 4 | Proposed |
@@ -184,6 +184,8 @@ Authentication proves who the user is. Authorization determines what that user m
 The current client, administrator, and internal user account boundaries remain in place while the internal role model is designed. Internal user position and UI panel access do not by themselves authorize sensitive data. The Phase 0 authorization matrix must define domain and field permissions for Leadership, HR/Admin, PM, Sales, Marketing, Development, Billing, internal users, and client users.
 
 The [Internal Portal Role and Permission Matrix](INTERNAL_ACCESS_MATRIX.md) records the proposed four-layer model and internal-user grants. Its planned business permissions remain unavailable until their scopes, fields, and sources are approved and implemented. Client account permissions require a separate matrix.
+
+The [Phase 0 entity relationship model](PHASE_0_DATA_MODEL.md) separates implemented account/access tables from proposed integration and read-only domain relationships. The [Phase 0 closeout record](PHASE_0_CLOSEOUT.md) tracks source owners, access paths, policy approvals, and staging evidence; neither document alone authorizes new ingestion or data grants.
 
 Sensitive access follows these rules:
 
@@ -356,6 +358,8 @@ Using both direct connectors and Make provides flexibility, but it creates dupli
 
 | Date | Change | Author |
 | --- | --- | --- |
+| 2026-10-15 | Project owner expanded Internal Admin to access every currently live Internal Portal workspace, including the detailed read-only HR workspace; personal Hubstaff work remains self-only. This supersedes the earlier HR-only detail audience for Internal Admin accounts | Codex, based on project-owner decision |
+| 2026-10-15 | Project owner approved Hubstaff Time, Tasks, and leave/shift status for the first internal increment; deferred other integrations to later Phase 1 work; accepted the baseline role matrix and all-Team derived-status audience with HR-role-only leave details. Refresh times remain planning targets, and failed-sync alerts should reach Internal Access Managers and Internal Admins | Codex, based on project-owner decisions |
 | 2026-10-14 | Matched both active internal portal Hubstaff IDs in the `.env.local` database to organization members with schedules; 15 other scheduled members have no active portal account there | Codex |
 | 2026-10-14 | Recorded the expectation that scheduled Hubstaff members cover Team; portal account matching remains pending | Codex, based on user confirmation |
 | 2026-10-14 | Confirmed local attendance-schedule API access: 18 records for 17 of 31 Hubstaff members in a 15-day window; source authority and coverage remain open | Codex |

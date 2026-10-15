@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  INTERNAL_HR_PANEL_IDS,
+  INTERNAL_ROLE_PANEL_WORKSPACES,
   INTERNAL_USER_PANELS,
   INTERNAL_USER_POSITIONS,
   INTERNAL_USER_WORKSPACES,
@@ -160,7 +162,7 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
     setDraft((current) => ({
       ...current,
       position: position.id,
-      panelAccess: [...position.panels],
+    panelAccess: [...position.panels, ...current.panelAccess.filter(panel => INTERNAL_HR_PANEL_IDS.includes(panel))],
     }));
     setStatus("");
     setError("");
@@ -279,7 +281,13 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
         throw new Error(payload?.error || 'The role assignment could not be changed.');
       }
       setInternalUsers(current => current.map(user => user.id === targetId
-        ? { ...user, roles: payload.internalUser.roles } : user));
+        ? { ...user, roles: payload.internalUser.roles,
+          panelAccess: payload.internalUser.panelAccess || user.panelAccess } : user));
+      if (role === 'hr' && assigned && Array.isArray(payload.internalUser.panelAccess)) {
+        setDraft(current => current?.id === targetId ? { ...current,
+          panelAccess: [...new Set([...current.panelAccess,
+            ...payload.internalUser.panelAccess.filter(panel => INTERNAL_HR_PANEL_IDS.includes(panel))])] } : current);
+      }
       setRoleAnnouncement(`Role ${assigned ? 'granted to' : 'revoked from'} ${targetName}.`);
     } catch (roleError) {
       setError(roleError.message || 'The role assignment could not be changed.');
@@ -425,7 +433,11 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
 
             <section className={`${styles.settingsCard} ${styles.wideCard}`}>
               <header><span><Icon name="shield" /></span><div><h3>Internal portal panels</h3><p>Choose visible panels for this account. Team is enabled by default and can be turned off.</p></div></header>
-              <div className={styles.workspaceAccessList}>{INTERNAL_USER_WORKSPACES.map((workspaceOption) => <section key={workspaceOption.id} className={styles.workspaceAccessGroup}>
+              <div className={styles.workspaceAccessList}>{[
+                ...INTERNAL_USER_WORKSPACES,
+                ...INTERNAL_ROLE_PANEL_WORKSPACES.filter(group => selectedInternalUser.roles.includes(group.role)
+                  || selectedInternalUser.roles.includes('internal_admin')),
+              ].map((workspaceOption) => <section key={workspaceOption.id} className={styles.workspaceAccessGroup}>
                 <div><strong>{workspaceOption.label}</strong><small>{workspaceOption.description}</small></div>
                 <div className={styles.panelAccessGrid}>{INTERNAL_USER_PANELS.filter((panel) => panel.workspace === workspaceOption.id)
                   .map((panel) => <label key={panel.id} className={styles.panelAccessOption}>
