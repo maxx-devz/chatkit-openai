@@ -449,8 +449,38 @@
   display: grid;
   align-items: start;
   margin-top: 16px;
-  grid-template-columns: minmax(0, 1.05fr) minmax(480px, 0.95fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 14px minmax(0, var(--assistant-width, 48%));
+  gap: 0;
+}
+
+.columnDivider {
+  display: flex;
+  align-self: stretch;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.columnDivider span {
+  width: 4px;
+  height: 54px;
+  border-radius: 999px;
+  background: #b5c8df;
+  transition: background 160ms ease, height 160ms ease;
+}
+
+.columnDivider:hover span,
+.columnDivider:focus-visible span {
+  height: 84px;
+  background: #1765ca;
+}
+
+.columnDivider:focus-visible {
+  outline: 2px solid #1765ca;
+  outline-offset: 2px;
 }
 
 .leftColumn,
@@ -1175,6 +1205,11 @@
 
   .dashboardGrid {
     grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .columnDivider {
+    display: none;
   }
 
   .rightColumn {

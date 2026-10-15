@@ -88,7 +88,7 @@ def make_agent(context, emit=None):
             "Answer the current general question directly and concisely. "
             "No live Hubstaff, website, document, or generation tool is available in this turn. "
             "Do not imply that client-specific data was checked. If the user asks for live work data "
-            "or a file action, ask for the specific request; the next turn can use approved tools. "
+            "or a file action, ask them to switch to Work questions for verified project data and tools. "
             "Use earlier turns only to understand conversation, never as verified current work facts.",
         ])
         return Agent(name="AOC client assistant", model=agent_model(getattr(context, "ai_model", None), context),
@@ -231,11 +231,11 @@ class PortalChatKitServer(ChatKitServer[Context]):
             latest_query = "\n".join(filter(None, [latest_query,
                 getattr(latest_user_message, "quoted_text", "") or ""]))
             context.response_query = latest_query
-            context.response_route = route_response(
+            context.response_route = ("general" if context.chat_mode == "general" else route_response(
                 latest_query,
                 has_attachment=bool(getattr(latest_user_message, "attachments", [])),
                 has_hubstaff=bool(context.hubstaff),
-            )
+            ))
             recent_attachments = [attachment.id for item in reversed(items) if isinstance(item, UserMessageItem)
                                   for attachment in item.attachments][:MAX_CONTEXT_ATTACHMENTS]
             agent_input = await AttachmentConverter(context, set(recent_attachments)).to_agent_input(items)

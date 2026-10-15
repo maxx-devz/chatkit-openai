@@ -43,6 +43,7 @@ class Envelope(BaseModel):
     instructions: str = Field(max_length=20_000)
     portal_origin: str = Field(default="", max_length=300)
     hubstaff: dict | None = None
+    chat_mode: str = Field(default="work", pattern=r"^(work|general)$")
     payload: dict
 
 
@@ -169,12 +170,13 @@ async def chatkit(request: Request):
         db = await connect_database(os.environ["DATABASE_URL"])
         client = await load_client(db, envelope)
         context = Context(db, envelope.client_id, envelope.user_id, envelope.instructions, client)
+        context.chat_mode = envelope.chat_mode
         # History and conversation-management requests do not use assistant
         # settings. Fetch them only when a reply will be generated.
         if parsed.type in GENERATE:
             context.config = await load_config(db, client)
         context.portal_origin = envelope.portal_origin.rstrip("/")
-        context.hubstaff = envelope.hubstaff
+        context.hubstaff = envelope.hubstaff if envelope.chat_mode == "work" else None
         if parsed.type in MUTATE:
             token = uuid4().hex
             await acquire_lease(context, token)
