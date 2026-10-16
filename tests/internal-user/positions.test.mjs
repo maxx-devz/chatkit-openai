@@ -16,7 +16,18 @@ test('internal user positions provide stable default panel policies', () => {
   ]);
   assert.deepEqual(internalUserPanelAccess(undefined, 'project_manager'), [
     'overview', 'my_tasks', 'activity', 'team_directory', 'account_settings', 'hubstaff',
+    'pm_projects', 'pm_project_tasks',
   ]);
+  for (const [id, label] of [
+    ['account_manager', 'Account Manager'],
+    ['hr_admin', 'HR Admin'],
+  ]) {
+    assert.equal(internalUserPosition(id).label, label);
+    assert.equal(isInternalUserPosition(id), true);
+    assert.deepEqual(internalUserPanelAccess(undefined, id), [
+      'overview', 'my_tasks', 'activity', 'team_directory', 'account_settings', 'hubstaff',
+    ]);
+  }
   assert.equal(isInternalUserPosition('project_manager'), true);
   assert.equal(isInternalUserPosition('invented_position'), false);
   assert.deepEqual(INTERNAL_USER_WORKSPACES.map((workspace) => [workspace.label, workspace.path]), [

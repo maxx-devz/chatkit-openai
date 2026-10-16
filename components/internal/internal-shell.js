@@ -6,7 +6,9 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import aocLogo from '@/aoc-logo.png';
 import SignOutButton from '@/components/auth/sign-out-button';
+import RefreshIcon from './refresh-icon';
 import { canAccessInternalWorkspace } from '@/lib/internal-panel-access';
+import { INTERNAL_PM_NAV, visibleInternalSubnav } from '@/lib/internal-navigation';
 import { availableInternalRolePanels } from '@/lib/internal-role-panels';
 import { useInternalUserWorkspaceStore } from './internal-workspace-provider';
 import styles from './internal-user-dashboard.module.css';
@@ -19,6 +21,7 @@ const ICON_PATHS = {
   teamTasks: 'M7 4h10M9 2h6v4H9zM5 5h14v16H5zM9 11h6M9 15h6',
   shield: 'M12 3l8 3v6c0 5-3.4 8.2-8 9-4.6-.8-8-4-8-9V6zM8.5 12l2.2 2.2 4.8-5',
   connection: 'M9 15l6-6M7.5 12.5l-2 2a3.5 3.5 0 0 0 5 5l2-2M16.5 11.5l2-2a3.5 3.5 0 0 0-5-5l-2 2',
+  sync: 'M20 7v5h-5M4 17v-5h5M5.8 9A7 7 0 0 1 18.6 7M18.2 15A7 7 0 0 1 5.4 17',
 };
 
 function InternalUserIcon({ name }) {
@@ -44,8 +47,10 @@ export default function InternalUserShell({ children, name, position, panelAcces
   const pathname = usePathname();
   const workspace = workspaceFromPath(pathname, rolePanelBasePath);
   const { entries, loadWorkspace } = useInternalUserWorkspaceStore();
-  const [refreshStatus, setRefreshStatus] = useState('');
+  const [refreshStatus, setRefreshStatus] = useState({ workspace: '', message: '', error: false });
   const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsNavState, setSettingsNavState] = useState({ pathname: '', open: false });
+  const [pmNavState, setPmNavState] = useState({ pathname: '', open: false });
   const menuButtonRef = useRef(null);
   const sidebarRef = useRef(null);
   const profile = { panels: panelAccess, permissions, roles };
@@ -54,15 +59,23 @@ export default function InternalUserShell({ children, name, position, panelAcces
   const canOpenSettings = canAccessInternalWorkspace(profile, 'settings');
   const rolePanels = availableInternalRolePanels(profile);
   const canManageInternalUsers = canAccessInternalWorkspace(profile, 'internalSettings');
+  const internalSettingsLinks = canManageInternalUsers ? visibleInternalSubnav(profile) : [];
+  const settingsNavOpen = settingsNavState.pathname === pathname
+    ? settingsNavState.open : workspace === 'internalSettings';
   const canReadAudit = permissions.includes('platform.audit.read');
   const activeRolePanel = rolePanels.find(panel => pathname === `${rolePanelBasePath}/${panel.id}`);
-  const refreshing = entries.personal?.busy === true;
+  const pmLinks = visibleInternalSubnav(profile, INTERNAL_PM_NAV);
+  const pmNavOpen = pmNavState.pathname === pathname
+    ? pmNavState.open : activeRolePanel?.id === 'project_management';
+  const refreshing = entries[workspace]?.busy === true;
+  const canRefresh = (workspace === 'personal' && canOpenPersonal) || (workspace === 'team' && canOpenTeam);
+  const refreshLabel = workspace === 'team' ? 'Team' : 'My Work';
   const workspaceTitles = {
     personal: 'My Work',
     team: 'Team',
     roles: activeRolePanel?.label || 'Role Panel',
     settings: 'Settings',
-    internalSettings: 'Internal Settings',
+    internalSettings: internalSettingsLinks.find(link => link.href === pathname)?.label || 'Internal Settings',
     audit: 'Audit Log',
   };
   useEffect(() => {
@@ -94,12 +107,12 @@ export default function InternalUserShell({ children, name, position, panelAcces
     };
   }, [menuOpen]);
   async function refreshHubstaff() {
-    setRefreshStatus('');
+    setRefreshStatus({ workspace, message: '', error: false });
     try {
-      await loadWorkspace('personal', { force: true });
-      setRefreshStatus('Hubstaff data updated.');
+      await loadWorkspace(workspace, { force: true });
+      setRefreshStatus({ workspace, message: `${refreshLabel} data checked.`, error: false });
     } catch {
-      setRefreshStatus('Hubstaff refresh failed.');
+      setRefreshStatus({ workspace, message: `${refreshLabel} refresh failed.`, error: true });
     }
   }
   return <div className={styles.shell}>
@@ -123,9 +136,30 @@ export default function InternalUserShell({ children, name, position, panelAcces
           aria-label="Team" onClick={() => setMenuOpen(false)}>
           <InternalUserIcon name="team" /><span>Team</span></Link>}
         {rolePanels.length > 0 && <p className={styles.roleNavHeading}>My Workspace</p>}
-        {rolePanels.map(panel => <Link key={panel.id}
+        {rolePanels.map(panel => panel.id === 'project_management' && pmLinks.length
+          ? <div key={panel.id} className={`${styles.navGroup} ${styles.pmNavGroup}`}>
+            <button type="button" className={`${styles.navGroupToggle} ${activeRolePanel?.id === panel.id ? styles.activeNav : ''}`}
+              aria-label={panel.label} aria-expanded={pmNavOpen} aria-controls="project-management-subnav"
+              onClick={() => setPmNavState({ pathname, open: !pmNavOpen })}>
+              <span className={styles.roleMonogram} aria-hidden="true">PM</span><span>{panel.label}</span>
+              <svg className={`${styles.navGroupChevron} ${pmNavOpen ? styles.navGroupChevronOpen : ''}`}
+                viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            </button>
+            <Link className={`${styles.pmCompactLink} ${activeRolePanel?.id === panel.id ? styles.activeNav : ''}`}
+              href={`${rolePanelBasePath}/${panel.id}`} aria-label={panel.label} title={panel.label}
+              prefetch={false} onClick={() => setMenuOpen(false)}>
+              <span className={styles.roleMonogram} aria-hidden="true">PM</span><span>{panel.label}</span>
+            </Link>
+            <div id="project-management-subnav" className={styles.navChildren} hidden={!pmNavOpen}>
+              {pmLinks.map(link => <Link key={link.id} className={styles.navChild} href={link.href}
+                aria-label={link.label} title={link.label} prefetch={false} onClick={() => setMenuOpen(false)}>
+                <InternalUserIcon name={link.icon} /><span>{link.label}</span></Link>)}
+            </div>
+          </div>
+          : <Link key={panel.id}
           className={activeRolePanel?.id === panel.id ? styles.activeNav : ''}
           href={`${rolePanelBasePath}/${panel.id}`} aria-label={panel.label} title={panel.label}
+          prefetch={false}
           onClick={() => setMenuOpen(false)}>
           <span className={styles.roleMonogram} aria-hidden="true">{panel.label.split(/[\s/]+/).map(part => part[0]).slice(0, 2).join('')}</span>
           <span>{panel.label}</span>
@@ -133,9 +167,22 @@ export default function InternalUserShell({ children, name, position, panelAcces
         {canOpenSettings && <Link className={workspace === 'settings' ? styles.activeNav : ''} href="/internal/settings"
           aria-label="Settings" onClick={() => setMenuOpen(false)}>
           <InternalUserIcon name="connection" /><span>Settings</span></Link>}
-        {canManageInternalUsers && <Link className={workspace === 'internalSettings' ? styles.activeNav : ''} href="/internal/internal-settings"
-          aria-label="Internal Settings" onClick={() => setMenuOpen(false)}>
-          <InternalUserIcon name="shield" /><span>Internal Settings</span></Link>}
+        {internalSettingsLinks.length > 0 && <div className={styles.navGroup}>
+          <button type="button" className={`${styles.navGroupToggle} ${workspace === 'internalSettings' ? styles.activeNav : ''}`}
+            aria-label="Internal Settings" aria-expanded={settingsNavOpen} aria-controls="internal-settings-subnav"
+            onClick={() => setSettingsNavState({ pathname, open: !settingsNavOpen })}>
+            <InternalUserIcon name="shield" /><span>Internal Settings</span>
+            <svg className={`${styles.navGroupChevron} ${settingsNavOpen ? styles.navGroupChevronOpen : ''}`}
+              viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </button>
+          <div id="internal-settings-subnav" className={styles.navChildren} hidden={!settingsNavOpen}>
+            {internalSettingsLinks.map(link => <Link key={link.id}
+              className={`${styles.navChild} ${pathname === link.href ? styles.activeNav : ''}`}
+              href={link.href} aria-current={pathname === link.href ? 'page' : undefined}
+              aria-label={link.label} title={link.label} prefetch={false} onClick={() => setMenuOpen(false)}>
+              <InternalUserIcon name={link.icon} /><span>{link.label}</span></Link>)}
+          </div>
+        </div>}
         {canReadAudit && <Link className={workspace === 'audit' ? styles.activeNav : ''} href="/internal/audit"
           aria-label="Audit Log" onClick={() => setMenuOpen(false)}>
           <InternalUserIcon name="activity" /><span>Audit Log</span></Link>}
@@ -159,14 +206,19 @@ export default function InternalUserShell({ children, name, position, panelAcces
           <div className={styles.headerCopy}><p>{position || 'Internal workspace'}</p><strong>{workspaceTitles[workspace] || 'Internal workspace'}</strong></div>
         </div>
         <div className={styles.headerTools}>
-          {canOpenPersonal && workspace !== 'roles' && <div className={styles.refreshControl}>
-            <button className={styles.headerRefresh} disabled={refreshing || !connected}
-              title={connected ? 'Load the latest Hubstaff tasks and activity' : 'Connect Hubstaff in Settings to refresh data'}
+          {canRefresh && <div className={styles.refreshControl}>
+            <button className={styles.headerRefresh} disabled={refreshing || workspace === 'personal' && !connected}
+              aria-label={`Refresh ${refreshLabel} data`}
+              title={workspace === 'team' ? 'Check the latest AOC members and work status'
+                : connected ? 'Check the latest Hubstaff tasks and activity'
+                  : 'Connect Hubstaff in Settings to refresh data'}
               onClick={refreshHubstaff} type="button">
-              {refreshing ? 'Refreshing…' : 'Refresh Hubstaff data'}
+              <RefreshIcon className={`${styles.refreshIcon} ${refreshing ? styles.refreshSpinning : ''}`} />
+              <span className={styles.refreshLabel}>{refreshing ? 'Refreshing…' : 'Refresh data'}</span>
             </button>
-            {refreshStatus && <span className={refreshStatus.includes('failed') ? styles.refreshError : styles.refreshSuccess}
-              role={refreshStatus.includes('failed') ? 'alert' : 'status'}>{refreshStatus}</span>}
+            {refreshStatus.workspace === workspace && refreshStatus.message
+              && <span className={refreshStatus.error ? styles.refreshError : styles.refreshSuccess}
+                role={refreshStatus.error ? 'alert' : 'status'}>{refreshStatus.message}</span>}
           </div>}
           <div className={styles.account}><span>{name}</span><SignOutButton className={styles.signOut} /></div>
         </div>

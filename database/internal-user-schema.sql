@@ -159,6 +159,37 @@ ALTER TABLE portal_internal_user_roles
   CHECK (role_key IN ('project_management', 'leadership', 'hr', 'sales', 'support',
     'marketing', 'seo_geo', 'cro', 'development', 'billing', 'internal_admin', 'internal_access_manager'));
 
+-- Existing HR role holders receive the initial panel defaults exactly once.
+-- Subsequent runs preserve their explicit per-panel choices, including all off.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM portal_internal_schema_migrations
+    WHERE migration_key = 'hr_panel_defaults_v1') THEN
+    UPDATE portal_internal_users AS internal_user
+    SET panel_access = panel_access ||
+      '["hr_overview","hr_leave_calendar","hr_leave_requests","hr_leave_balances","hr_schedule_coverage"]'::jsonb,
+      updated_at = NOW()
+    WHERE EXISTS (SELECT 1 FROM portal_internal_user_roles AS role
+      WHERE role.user_id = internal_user.user_id AND role.role_key = 'hr');
+    INSERT INTO portal_internal_schema_migrations (migration_key) VALUES ('hr_panel_defaults_v1');
+  END IF;
+END $$;
+
+-- Existing Project Management role holders receive the first PM panel defaults
+-- once. Later migrations preserve their explicit choices, including all off.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM portal_internal_schema_migrations
+    WHERE migration_key = 'pm_panel_defaults_v1') THEN
+    UPDATE portal_internal_users AS internal_user
+    SET panel_access = panel_access || '["pm_projects","pm_project_tasks"]'::jsonb,
+      updated_at = NOW()
+    WHERE EXISTS (SELECT 1 FROM portal_internal_user_roles AS role
+      WHERE role.user_id = internal_user.user_id AND role.role_key = 'project_management');
+    INSERT INTO portal_internal_schema_migrations (migration_key) VALUES ('pm_panel_defaults_v1');
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS portal_internal_access_audit (
   id BIGSERIAL PRIMARY KEY,
   actor_user_id BIGINT REFERENCES portal_users(id) ON DELETE SET NULL,
@@ -166,3 +197,6 @@ CREATE TABLE IF NOT EXISTS portal_internal_access_audit (
   action TEXT NOT NULL,
   occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS portal_internal_access_audit_occurred_idx
+  ON portal_internal_access_audit (occurred_at DESC, id DESC);

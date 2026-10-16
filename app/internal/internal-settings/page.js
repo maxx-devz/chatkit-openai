@@ -17,7 +17,7 @@ export default async function InternalSettingsPage() {
   }
   return <main className={styles.main}>
     <section className={styles.intro}><div><p className={styles.eyebrow}>INTERNAL SETTINGS</p>
-      <h1>Internal user access</h1><p>{data.canManage
+      <h1>Users &amp; Access</h1><p>{data.canManage
         ? 'Manage accounts, positions, panels, and approved Hubstaff mappings.'
         : 'View internal accounts, positions, panels, and approved Hubstaff mappings.'}</p></div></section>
     <InternalSettingsControls initialInternalUsers={data.internalUsers} schemaReady={data.schemaReady}
