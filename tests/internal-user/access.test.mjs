@@ -13,8 +13,11 @@ let targetInternalUser = null;
 let targetRoles = [];
 let activeManagerCount = 2;
 const roleAudit = [];
+const portalAuditEvents = [];
 const panelAudit = [];
 const integrationRuns = [];
+let pagedAuditRuns = null;
+let pagedAuditEvents = null;
 const profileUpdates = [];
 const db = { query: async (query, values) => {
   if (['BEGIN', 'COMMIT', 'ROLLBACK', 'LOCK TABLE portal_internal_user_roles IN SHARE ROW EXCLUSIVE MODE'].includes(query)) {
@@ -55,9 +58,14 @@ const db = { query: async (query, values) => {
   if (query.startsWith('INSERT INTO portal_internal_access_audit')) {
     if (query.includes("'panel.read.' || selected.panel_id")) {
       panelAudit.push(...values[1].map(panel => ({ actor: values[0], panel })));
+      portalAuditEvents.push(...values[1].map((panel, index) => ({ id: portalAuditEvents.length + index + 1,
+        actor_user_id: values[0], target_user_id: values[0], action: `panel.read.${panel}`,
+        occurred_at: new Date() })));
       return { rowCount: values[1].length, rows: [] };
     }
     roleAudit.push(values);
+    portalAuditEvents.push({ id: portalAuditEvents.length + 1, actor_user_id: values[0],
+      target_user_id: values[0], action: values[1], occurred_at: new Date() });
     return { rowCount: 1, rows: [] };
   }
   if (query.startsWith('INSERT INTO portal_integration_runs')) {
@@ -77,8 +85,15 @@ const db = { query: async (query, values) => {
   if (query.includes("to_regclass('portal_integration_runs') AS runs")) {
     return { rows: [{ runs: 'portal_integration_runs', access_audit: 'portal_internal_access_audit' }] };
   }
-  if (query.includes('FROM portal_integration_runs ORDER BY')) return { rows: integrationRuns };
-  if (query.includes('FROM portal_internal_access_audit ORDER BY')) return { rows: [] };
+  if (query.includes("SELECT to_char(clock_timestamp() AT TIME ZONE 'UTC'")) {
+    return { rows: [{ audit_as_of: new Date().toISOString() }] };
+  }
+  if (query.includes('FROM portal_integration_runs WHERE started_at <= $1')) {
+    return { rows: (pagedAuditRuns || integrationRuns.toReversed()).slice(values[2], values[2] + values[1]) };
+  }
+  if (query.includes('FROM portal_internal_access_audit WHERE occurred_at <= $1')) {
+    return { rows: (pagedAuditEvents || portalAuditEvents.toReversed()).slice(values[2], values[2] + values[1]) };
+  }
   if (query.includes('WITH changed_internalUser AS')) {
     profileUpdates.push(values);
     internalUser = { ...internalUser, position: values[0], panel_access: JSON.parse(values[1]),
@@ -767,8 +782,41 @@ test('audit log is denied to ordinary users and readable by access managers and 
   const response = await platformAudit(request('/api/internal/audit'));
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
-  assert.equal((await response.json()).integrationRuns.at(-1).source, 'hubstaff');
+  assert.equal((await response.json()).integrationRuns[0].source, 'hubstaff');
   roles = [];
+});
+
+test('audit log paginates each table independently and can reach older dates', async t => {
+  internalUser = { ...internalUserA };
+  session = { user: { id: 'internal-user-a', name: 'InternalUser A' } };
+  roles = ['internal_access_manager'];
+  t.after(() => { pagedAuditRuns = null; pagedAuditEvents = null; roles = []; });
+  pagedAuditRuns = Array.from({ length: 45 }, (_, index) => ({
+    id: 45 - index, source: 'hubstaff', started_at: new Date(Date.UTC(2026, 8, 45 - index)),
+  }));
+  pagedAuditEvents = Array.from({ length: 45 }, (_, index) => ({
+    id: 45 - index, action: 'panel.read.team', occurred_at: new Date(Date.UTC(2026, 8, 45 - index)),
+  }));
+
+  const first = await (await platformAudit(request('/api/internal/audit'))).json();
+  assert.equal(first.integrationRuns.length, 20);
+  assert.equal(first.accessEvents.length, 20);
+  assert.equal(first.integrationRuns[0].id, 45);
+  assert.equal(first.pagination.runsHasMore, true);
+  assert.equal(first.pagination.activityHasMore, true);
+
+  const query = new URLSearchParams({ asOf: first.pagination.asOf, runsPage: '2', activityPage: '3' });
+  const older = await (await platformAudit(request(`/api/internal/audit?${query}`))).json();
+  assert.equal(older.pagination.asOf, first.pagination.asOf);
+  assert.equal(older.integrationRuns[0].id, 25);
+  assert.equal(older.accessEvents[0].id, 5);
+  assert.equal(older.accessEvents.length, 5);
+  assert.equal(older.pagination.runsHasMore, true);
+  assert.equal(older.pagination.activityHasMore, false);
+
+  const invalid = await (await platformAudit(request('/api/internal/audit?runsPage=-1&activityPage=999999999'))).json();
+  assert.equal(invalid.pagination.runsPage, 1);
+  assert.equal(invalid.pagination.activityPage, 1);
 });
 
 test('failed Hubstaff loads record a safe error code without provider details', async () => {

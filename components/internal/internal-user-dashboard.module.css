@@ -113,6 +113,11 @@
 .auditTable { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
 .auditTable th, .auditTable td { padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .auditTable th { color: var(--muted); font-weight: 700; }
+.auditPagination { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 16px; font-size: 12px; color: var(--muted); }
+.auditPagination a, .auditPageDisabled { display: inline-block; padding: 8px 11px; border: 1px solid var(--line); border-radius: 7px; text-decoration: none; }
+.auditPagination a { background: white; color: var(--ink); }
+.auditPagination a:hover { border-color: var(--accent); }
+.auditPageDisabled { opacity: .55; }
 .panel h2 { font-size: 18px; margin: 0 0 8px; letter-spacing: -.3px; }
 .panel p, .panel small { font-size: 13px; }
 .panel small { color: var(--muted); line-height: 1.6; }
