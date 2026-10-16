@@ -16,6 +16,7 @@ test('internal user positions provide stable default panel policies', () => {
   ]);
   assert.deepEqual(internalUserPanelAccess(undefined, 'project_manager'), [
     'overview', 'my_tasks', 'activity', 'team_directory', 'account_settings', 'hubstaff',
+    'pm_projects', 'pm_project_tasks',
   ]);
   for (const [id, label] of [
     ['account_manager', 'Account Manager'],

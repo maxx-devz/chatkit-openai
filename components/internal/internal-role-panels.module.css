@@ -13,4 +13,5 @@
 .area { border: 1px solid var(--line); border-radius: 10px; padding: 18px; background: #f8fafc; }
 .area h3 { margin: 0 0 6px; font-size: 16px; }
 .area p { margin: 0; }
+.areaSource { display: block; margin-top: 12px; color: var(--muted); font-size: 11px; line-height: 1.4; }
 @media (max-width: 600px) { .main { padding: 28px 16px; } }

@@ -22,7 +22,8 @@
 .internalUserNav .navGroupToggle:hover { background: rgba(255, 255, 255, .08); color: white; }
 .internalUserNav .navGroupToggle:focus-visible { outline: 3px solid rgba(104, 194, 255, .65); outline-offset: 2px; }
 .internalUserNav .navGroupToggle.activeNav { background: rgba(120, 190, 255, .12); box-shadow: none; color: white; }
-.navGroupToggle span { flex: 1; }
+.navGroupToggle > span:not(.roleMonogram) { flex: 1; }
+.internalUserNav .pmCompactLink { display: none; }
 .internalUserNav .navGroupChevron { width: 14px; height: 14px; transition: transform 120ms ease; }
 .internalUserNav .navGroupChevronOpen { transform: rotate(180deg); }
 .navChildren { display: grid; gap: 2px; margin: 1px 0 5px 19px; padding-left: 10px; border-left: 1px solid rgba(225, 241, 255, .3); }
@@ -274,11 +275,15 @@
   .portalSidebar { padding-right: 10px; padding-left: 10px; }
   .brand { align-items: center; padding-right: 0; padding-left: 0; }
   .brand img { width: 48px; height: 48px; object-fit: cover; object-position: left; }
-  .brand > span, .internalUserNav a > span:last-child, .navGroupToggle span, .navGroupChevron, .roleNavHeading, .sidebarStatus, .sidebarIdentity div { display: none; }
+  .brand > span, .internalUserNav a > span:last-child, .navGroupToggle > span:not(.roleMonogram), .navGroupChevron, .roleNavHeading, .sidebarStatus, .sidebarIdentity div { display: none; }
   .internalUserNav a, .internalUserNav .navGroupToggle { justify-content: center; padding: 10px; }
   .navChildren { margin: 0; padding: 0; border: 0; }
   .sidebarIdentity { display: flex; justify-content: center; }
   .focusGrid, .grid { grid-template-columns: 1fr; } .sidebar { grid-template-columns: 1fr; } .stats { gap: 12px; }
+}
+@media (min-width: 721px) and (max-width: 900px) {
+  .pmNavGroup > .navGroupToggle, .pmNavGroup > .navChildren { display: none; }
+  .internalUserNav .pmCompactLink { display: flex; }
 }
 @media (max-width: 720px) {
   .shell { display: block; }
@@ -290,7 +295,7 @@
   .brand > span { display: block; }
   .closeMenu { position: absolute; top: 0; right: 0; display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid rgba(255, 255, 255, .4); border-radius: 8px; background: transparent; color: white; font-size: 24px; cursor: pointer; }
   .internalUserNav a, .internalUserNav .navGroupToggle { justify-content: flex-start; }
-  .internalUserNav a > span:last-child, .navGroupToggle span, .navGroupChevron, .roleNavHeading, .sidebarStatus, .sidebarIdentity div { display: block; }
+  .internalUserNav a > span:last-child, .navGroupToggle > span:not(.roleMonogram), .navGroupChevron, .roleNavHeading, .sidebarStatus, .sidebarIdentity div { display: block; }
   .navChildren { margin: 1px 0 5px 19px; padding-left: 10px; border-left: 1px solid rgba(225, 241, 255, .3); }
   .sidebarIdentity { display: grid; justify-content: stretch; }
   .menuButton { display: flex; width: 40px; height: 40px; flex: 0 0 40px; align-items: center; justify-content: center; flex-direction: column; gap: 4px; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); cursor: pointer; }

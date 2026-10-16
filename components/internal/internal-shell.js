@@ -8,7 +8,7 @@ import aocLogo from '@/aoc-logo.png';
 import SignOutButton from '@/components/auth/sign-out-button';
 import RefreshIcon from './refresh-icon';
 import { canAccessInternalWorkspace } from '@/lib/internal-panel-access';
-import { visibleInternalSubnav } from '@/lib/internal-navigation';
+import { INTERNAL_PM_NAV, visibleInternalSubnav } from '@/lib/internal-navigation';
 import { availableInternalRolePanels } from '@/lib/internal-role-panels';
 import { useInternalUserWorkspaceStore } from './internal-workspace-provider';
 import styles from './internal-user-dashboard.module.css';
@@ -50,6 +50,7 @@ export default function InternalUserShell({ children, name, position, panelAcces
   const [refreshStatus, setRefreshStatus] = useState({ workspace: '', message: '', error: false });
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsNavState, setSettingsNavState] = useState({ pathname: '', open: false });
+  const [pmNavState, setPmNavState] = useState({ pathname: '', open: false });
   const menuButtonRef = useRef(null);
   const sidebarRef = useRef(null);
   const profile = { panels: panelAccess, permissions, roles };
@@ -63,6 +64,9 @@ export default function InternalUserShell({ children, name, position, panelAcces
     ? settingsNavState.open : workspace === 'internalSettings';
   const canReadAudit = permissions.includes('platform.audit.read');
   const activeRolePanel = rolePanels.find(panel => pathname === `${rolePanelBasePath}/${panel.id}`);
+  const pmLinks = visibleInternalSubnav(profile, INTERNAL_PM_NAV);
+  const pmNavOpen = pmNavState.pathname === pathname
+    ? pmNavState.open : activeRolePanel?.id === 'project_management';
   const refreshing = entries[workspace]?.busy === true;
   const canRefresh = (workspace === 'personal' && canOpenPersonal) || (workspace === 'team' && canOpenTeam);
   const refreshLabel = workspace === 'team' ? 'Team' : 'My Work';
@@ -132,7 +136,27 @@ export default function InternalUserShell({ children, name, position, panelAcces
           aria-label="Team" onClick={() => setMenuOpen(false)}>
           <InternalUserIcon name="team" /><span>Team</span></Link>}
         {rolePanels.length > 0 && <p className={styles.roleNavHeading}>My Workspace</p>}
-        {rolePanels.map(panel => <Link key={panel.id}
+        {rolePanels.map(panel => panel.id === 'project_management' && pmLinks.length
+          ? <div key={panel.id} className={`${styles.navGroup} ${styles.pmNavGroup}`}>
+            <button type="button" className={`${styles.navGroupToggle} ${activeRolePanel?.id === panel.id ? styles.activeNav : ''}`}
+              aria-label={panel.label} aria-expanded={pmNavOpen} aria-controls="project-management-subnav"
+              onClick={() => setPmNavState({ pathname, open: !pmNavOpen })}>
+              <span className={styles.roleMonogram} aria-hidden="true">PM</span><span>{panel.label}</span>
+              <svg className={`${styles.navGroupChevron} ${pmNavOpen ? styles.navGroupChevronOpen : ''}`}
+                viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            </button>
+            <Link className={`${styles.pmCompactLink} ${activeRolePanel?.id === panel.id ? styles.activeNav : ''}`}
+              href={`${rolePanelBasePath}/${panel.id}`} aria-label={panel.label} title={panel.label}
+              prefetch={false} onClick={() => setMenuOpen(false)}>
+              <span className={styles.roleMonogram} aria-hidden="true">PM</span><span>{panel.label}</span>
+            </Link>
+            <div id="project-management-subnav" className={styles.navChildren} hidden={!pmNavOpen}>
+              {pmLinks.map(link => <Link key={link.id} className={styles.navChild} href={link.href}
+                aria-label={link.label} title={link.label} prefetch={false} onClick={() => setMenuOpen(false)}>
+                <InternalUserIcon name={link.icon} /><span>{link.label}</span></Link>)}
+            </div>
+          </div>
+          : <Link key={panel.id}
           className={activeRolePanel?.id === panel.id ? styles.activeNav : ''}
           href={`${rolePanelBasePath}/${panel.id}`} aria-label={panel.label} title={panel.label}
           prefetch={false}

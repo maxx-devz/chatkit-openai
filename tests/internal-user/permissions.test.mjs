@@ -14,7 +14,9 @@ test('baseline includes personal permissions and the basic Team directory', () =
 
 test('functional roles add explicit grants and unknown future roles fail closed', () => {
   const project = internalUserPermissions(['project_management']);
-  assert.deepEqual(project, internalUserPermissions());
+  assert.equal(project.includes('work.projects.read'), true);
+  assert.equal(project.includes('work.team_tasks.read'), true);
+  assert.equal(project.includes('work.time.read'), false);
   assert.equal(project.includes('people.directory.read'), true);
   assert.equal(project.includes('internal_users.read'), false);
   const manager = internalUserPermissions(['internal_access_manager']);
@@ -23,13 +25,14 @@ test('functional roles add explicit grants and unknown future roles fail closed'
   assert.equal(internalUserPermissions(['hr']).includes('people.leave_balance.read'), true);
   assert.equal(internalUserPermissions(['hr']).includes('people.schedules.read'), true);
   assert.equal(INTERNAL_ASSIGNABLE_ROLES.some(role => role.id === 'hr' && !role.planned), true);
-  assert.equal(INTERNAL_ASSIGNABLE_ROLES.some(role => role.id === 'project_management' && role.planned), true);
+  assert.equal(INTERNAL_ASSIGNABLE_ROLES.some(role => role.id === 'project_management' && !role.planned), true);
   assert.equal(INTERNAL_ASSIGNABLE_ROLES.some(role => role.id === 'internal_admin'), false);
   assert.equal(internalPermissionScope('work.tasks.read'), 'Self');
   assert.equal(internalPermissionScope('people.directory.read'), 'Organization · basic fields');
   assert.equal(internalPermissionScope('internal_users.roles.manage'), 'Internal accounts');
   assert.equal(internalPermissionScope('people.work_status.read'), 'Organization: derived Team status only');
   assert.equal(internalPermissionScope('people.leave.read'), 'AOC team: HR records only');
+  assert.equal(internalPermissionScope('work.projects.read'), 'Shared AOC Hubstaff Tasks organization: read-only');
 });
 
 test('an assigned business role gains its implemented permissions without a second approval', () => {

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   INTERNAL_HR_PANEL_IDS,
+  INTERNAL_PM_PANEL_IDS,
   INTERNAL_ROLE_PANEL_WORKSPACES,
   INTERNAL_USER_PANELS,
   INTERNAL_USER_POSITIONS,
@@ -162,7 +163,8 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
     setDraft((current) => ({
       ...current,
       position: position.id,
-    panelAccess: [...position.panels, ...current.panelAccess.filter(panel => INTERNAL_HR_PANEL_IDS.includes(panel))],
+    panelAccess: [...position.panels, ...current.panelAccess.filter(panel =>
+      INTERNAL_HR_PANEL_IDS.includes(panel) || INTERNAL_PM_PANEL_IDS.includes(panel))],
     }));
     setStatus("");
     setError("");
@@ -283,10 +285,12 @@ export default function InternalUserControls({ initialInternalUsers = [], schema
       setInternalUsers(current => current.map(user => user.id === targetId
         ? { ...user, roles: payload.internalUser.roles,
           panelAccess: payload.internalUser.panelAccess || user.panelAccess } : user));
-      if (role === 'hr' && assigned && Array.isArray(payload.internalUser.panelAccess)) {
+      if (['hr', 'project_management'].includes(role) && assigned
+        && Array.isArray(payload.internalUser.panelAccess)) {
         setDraft(current => current?.id === targetId ? { ...current,
           panelAccess: [...new Set([...current.panelAccess,
-            ...payload.internalUser.panelAccess.filter(panel => INTERNAL_HR_PANEL_IDS.includes(panel))])] } : current);
+            ...payload.internalUser.panelAccess.filter(panel =>
+              INTERNAL_HR_PANEL_IDS.includes(panel) || INTERNAL_PM_PANEL_IDS.includes(panel))])] } : current);
       }
       setRoleAnnouncement(`Role ${assigned ? 'granted to' : 'revoked from'} ${targetName}.`);
     } catch (roleError) {

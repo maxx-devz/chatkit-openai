@@ -2,9 +2,10 @@ import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { InternalRolePanelDetail } from '@/components/internal/internal-role-panels';
 import InternalHrWorkspace from '@/components/internal/internal-hr-workspace';
+import InternalPmWorkspace from '@/components/internal/internal-pm-workspace';
 import { resolveInternalUserContext } from '@/lib/internal-user-data';
 import { canViewInternalRolePanel, internalRolePanel } from '@/lib/internal-role-panels';
-import { INTERNAL_HR_PANEL_IDS } from '@/lib/internal-user-positions';
+import { INTERNAL_HR_PANEL_IDS, INTERNAL_PM_PANEL_IDS } from '@/lib/internal-user-positions';
 import { canAccessInternalPanel } from '@/lib/internal-panel-access';
 import { internalUserDatabase } from '@/lib/internal-user-access';
 import { auditInternalRoleView } from '@/lib/internal-panel-audit';
@@ -25,6 +26,11 @@ export default async function RolePanelPage({ params }) {
   if (role === 'hr' && profile.roles.some(value => value === 'hr' || value === 'internal_admin')) {
     const panels = INTERNAL_HR_PANEL_IDS.filter(panel => canAccessInternalPanel(profile, panel));
     return <InternalHrWorkspace panels={panels} />;
+  }
+  if (role === 'project_management'
+    && profile.roles.some(value => value === 'project_management' || value === 'internal_admin')) {
+    const panels = INTERNAL_PM_PANEL_IDS.filter(panel => canAccessInternalPanel(profile, panel));
+    return <InternalPmWorkspace panels={panels} />;
   }
   return <InternalRolePanelDetail panel={internalRolePanel(role)} />;
 }

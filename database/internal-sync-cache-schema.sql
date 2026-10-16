@@ -1,7 +1,7 @@
 -- Shared, portable PostgreSQL read-through cache for approved Internal Portal data.
 -- Provider records remain authoritative. Apply with `npm run internal-sync:migrate`.
 CREATE TABLE IF NOT EXISTS portal_internal_sync_settings (
-  feed_key TEXT PRIMARY KEY CHECK (feed_key IN ('personal_work', 'team_roster', 'team_status', 'hr_records')),
+  feed_key TEXT PRIMARY KEY CHECK (feed_key IN ('personal_work', 'team_roster', 'team_status', 'hr_records', 'pm_catalog', 'pm_project_tasks')),
   interval_minutes INTEGER NOT NULL CHECK (interval_minutes BETWEEN 1 AND 1440),
   updated_by BIGINT REFERENCES portal_users(id) ON DELETE SET NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -20,7 +20,7 @@ CREATE INDEX IF NOT EXISTS portal_internal_sync_settings_audit_changed_idx
 
 CREATE TABLE IF NOT EXISTS portal_internal_sync_snapshots (
   cache_key TEXT PRIMARY KEY CHECK (char_length(cache_key) = 64),
-  feed_key TEXT NOT NULL CHECK (feed_key IN ('personal_work', 'team_roster', 'team_status', 'hr_records')),
+  feed_key TEXT NOT NULL CHECK (feed_key IN ('personal_work', 'team_roster', 'team_status', 'hr_records', 'pm_catalog', 'pm_project_tasks')),
   payload JSONB,
   refreshed_at TIMESTAMPTZ,
   expires_at TIMESTAMPTZ,
@@ -35,3 +35,16 @@ CREATE INDEX IF NOT EXISTS portal_internal_sync_snapshots_feed_idx
   ON portal_internal_sync_snapshots (feed_key, refreshed_at DESC);
 CREATE INDEX IF NOT EXISTS portal_internal_sync_snapshots_expiry_idx
   ON portal_internal_sync_snapshots (expires_at);
+
+-- Upgrade the feed allow-list on existing installations. The names below are
+-- PostgreSQL's default names for the checks created above and in Phase 0.
+ALTER TABLE portal_internal_sync_settings
+  DROP CONSTRAINT IF EXISTS portal_internal_sync_settings_feed_key_check;
+ALTER TABLE portal_internal_sync_settings
+  ADD CONSTRAINT portal_internal_sync_settings_feed_key_check CHECK
+    (feed_key IN ('personal_work', 'team_roster', 'team_status', 'hr_records', 'pm_catalog', 'pm_project_tasks'));
+ALTER TABLE portal_internal_sync_snapshots
+  DROP CONSTRAINT IF EXISTS portal_internal_sync_snapshots_feed_key_check;
+ALTER TABLE portal_internal_sync_snapshots
+  ADD CONSTRAINT portal_internal_sync_snapshots_feed_key_check CHECK
+    (feed_key IN ('personal_work', 'team_roster', 'team_status', 'hr_records', 'pm_catalog', 'pm_project_tasks'));

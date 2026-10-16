@@ -815,12 +815,14 @@ test('assigned functional roles link directly from the desktop sidebar', async (
   await expect(nav.getByText('My Workspace')).toBeVisible();
   await expect(nav.getByRole('link')).toHaveCount(2);
   await expect(nav.getByRole('link', { name: 'HR' })).toBeVisible();
-  await expect(nav.getByRole('link', { name: 'Sales' })).toBeVisible();
+  await expect(nav.getByRole('link', { name: 'Sales Pipeline' })).toBeVisible();
   await expect(nav.getByRole('link', { name: 'Billing' })).toHaveCount(0);
   await expect(nav.getByRole('link', { name: 'Role Panels' })).toHaveCount(0);
-  await nav.getByRole('link', { name: 'Sales' }).click();
+  await nav.getByRole('link', { name: 'Sales Pipeline' }).click();
   await expect(page).toHaveURL(/\/role-panels\/sales$/);
-  await expect(page.getByRole('heading', { name: 'Sales', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sales Pipeline', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Pipeline snapshot' })).toBeVisible();
+  await expect(page.getByText('Planned source: HubSpot', { exact: true }).first()).toBeVisible();
 });
 
 test('mobile hamburger opens the same role sidebar and closes after navigation', async ({ page }) => {
@@ -841,14 +843,14 @@ test('mobile hamburger opens the same role sidebar and closes after navigation',
   await expect(drawer).toBeVisible();
   await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
   await expect(drawer.getByRole('link', { name: 'HR' })).toBeVisible();
-  await expect(drawer.getByRole('link', { name: 'Sales' })).toBeVisible();
+  await expect(drawer.getByRole('link', { name: 'Sales Pipeline' })).toBeVisible();
   await expect(drawer.getByRole('link', { name: 'Billing' })).toHaveCount(0);
-  await drawer.getByRole('link', { name: 'Sales' }).click();
+  await drawer.getByRole('link', { name: 'Sales Pipeline' }).click();
   await expect(page).toHaveURL(/\/role-panels\/sales$/);
   await expect(drawer).toHaveCount(0);
   await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
-  await expect(page.getByRole('heading', { name: 'Planned areas' })).toBeVisible();
-  await expect(page.getByText('No live business data or actions are available here yet.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'What you will see here' })).toBeVisible();
+  await expect(page.getByText('Planned · no live data')).toBeVisible();
   await menuButton.click();
   await page.keyboard.press('Escape');
   await expect(drawer).toHaveCount(0);
@@ -881,4 +883,51 @@ test('short sidebar keeps identity visible and scrolls only the navigation on de
   expect(mobile.overflowY).toBe('auto');
   await nav.evaluate(element => { element.scrollTop = element.scrollHeight; });
   await expect(drawer.getByText('Fixture Internal User')).toBeVisible();
+});
+
+test('Project Management sidebar works in desktop, tablet rail, and mobile drawer layouts', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  await page.route('**/api/internal/project-management**', route => {
+    const selected = new URL(route.request().url()).searchParams.has('project_id');
+    return route.fulfill({ json: {
+      organizationName: 'Always Open Commerce', visiblePanels: ['pm_projects', 'pm_project_tasks'],
+      folders: [{ id: '11', name: 'Storefronts' }],
+      projects: [{ id: '22', folderId: '11', name: 'Shop Alpha' },
+        { id: '33', folderId: null, name: 'Shop Beta' }],
+      selectedProjectId: selected ? '22' : null,
+      tasks: selected ? [{ id: '44', title: 'Review storefront', stage: 'In progress',
+        status: 'Active', done: false, assignees: ['Alex'], dueOn: '2026-10-20', updatedAt: null }] : [],
+      truncated: false,
+      freshness: { catalog: { source: 'cache', refreshedAt: '2026-10-15T00:00:00Z' },
+        projectTasks: selected ? { source: 'hubstaff', refreshedAt: '2026-10-15T00:00:00Z' } : null },
+    } });
+  });
+  for (const width of [1440, 800, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto('/pm-workspace');
+    await expect(page.getByRole('heading', { name: 'Projects & tasks' })).toBeVisible();
+    await expect(page.getByText('Shop Alpha', { exact: true }).first()).toBeVisible();
+    const nav = width < 720 ? page.getByRole('dialog', { name: 'Internal portal navigation' }) :
+      page.getByRole('navigation', { name: 'Internal portal' });
+    if (width < 720) await page.getByRole('button', { name: 'Open menu' }).click();
+    if (width === 800) {
+      const compactLink = nav.getByRole('link', { name: 'Project Management' });
+      await expect(compactLink).toBeVisible();
+      await expect(compactLink).toHaveAttribute('href', '/internal/roles/project_management');
+      await expect(nav.getByRole('button', { name: 'Project Management' })).toBeHidden();
+    } else {
+      const toggle = nav.getByRole('button', { name: 'Project Management' });
+      await expect(toggle.locator('span').first()).toHaveCSS('width', '20px');
+      await toggle.click();
+      await expect(nav.getByRole('link', { name: 'Projects' })).toBeVisible();
+      await expect(nav.getByRole('link', { name: 'Project tasks' })).toBeVisible();
+    }
+    if (width < 720) await page.getByRole('button', { name: 'Close menu' }).click();
+    await page.getByRole('button', { name: 'View tasks' }).first().click();
+    await expect(page.getByText('Review storefront')).toBeVisible();
+    await expect(page.getByText('Alex')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+  expect(pageErrors).toEqual([]);
 });

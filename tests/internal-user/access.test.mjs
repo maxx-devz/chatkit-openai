@@ -1,7 +1,7 @@
 import { test, mock, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { internalUserA, internalUserB, hubstaffFixture, testToken } from './fixtures.mjs';
-import { INTERNAL_HR_PANEL_IDS } from '../../lib/internal-user-positions.js';
+import { INTERNAL_HR_PANEL_IDS, INTERNAL_PM_PANEL_IDS } from '../../lib/internal-user-positions.js';
 
 let session = null;
 let internalUser = null;
@@ -140,6 +140,7 @@ const { encryptInternalUserToken } = await import('../../lib/internal-user-repos
 const { GET: internalUserDashboard } = await import('../../app/api/internal/dashboard/route.js');
 const { GET: platformAudit } = await import('../../app/api/internal/audit/route.js');
 const { GET: hrDashboard } = await import('../../app/api/internal/hr/route.js');
+const { GET: pmDashboard } = await import('../../app/api/internal/project-management/route.js');
 const { GET: internalUsersGet, POST: internalUsersPost, PATCH: internalUsersPatch, PUT: internalUsersPut,
 } = await import('../../app/api/internal/internal-users/route.js');
 const { GET: availableHubstaffMembers } = await import('../../app/api/internal/hubstaff-members/route.js');
@@ -244,7 +245,7 @@ test('active internal user endpoint returns no legacy state and refuses every br
   }
 });
 
-test('project manager still sees only the basic Team directory', async t => {
+test('Project Management role does not expand the shared Team directory fields', async t => {
   mockTeamRoster(t);
   internalUser = { ...internalUserA, position: 'project_manager', panel_access: undefined };
   roles = ['project_management'];
@@ -421,6 +422,27 @@ test('HR endpoint allows HR and Internal Admin, and returns only AOC members wit
   roles = [];
 });
 
+test('Project Management API rejects missing roles, disabled panels, and invalid project requests', async () => {
+  internalUser = { ...internalUserA, position: 'project_manager', panel_access: [...INTERNAL_PM_PANEL_IDS] };
+  session = { user: { id: 'internal-user-a', name: 'Manager' } };
+  roles = [];
+  const beforeRuns = integrationRuns.length;
+  const beforePanels = panelAudit.length;
+  assert.equal((await pmDashboard(request('/api/internal/project-management'))).status, 403);
+  assert.equal(integrationRuns.length, beforeRuns);
+  roles = ['project_management'];
+  internalUser.panel_access = [];
+  assert.equal((await pmDashboard(request('/api/internal/project-management'))).status, 403);
+  internalUser.panel_access = ['pm_projects'];
+  assert.equal((await pmDashboard(request('/api/internal/project-management?project_id=1'))).status, 403);
+  assert.equal((await pmDashboard(request('/api/internal/project-management?project_id=bad'))).status, 400);
+  assert.equal((await pmDashboard(request('/api/internal/project-management?refresh=0'))).status, 400);
+  assert.equal((await pmDashboard(request('/api/internal/project-management?other=1'))).status, 400);
+  assert.equal(integrationRuns.length, beforeRuns);
+  assert.equal(panelAudit.length, beforePanels);
+  roles = [];
+});
+
 test('HR source failure returns no partial records and records an audit failure', async t => {
   mockTeamRoster(t);
   const rosterFetch = globalThis.fetch;
@@ -589,7 +611,8 @@ test('internal admin sees all current panels and cannot smuggle roles through ac
   session = { user: { id: 'internal-user-a', name: 'Internal Admin' } };
   const context = await resolveInternalUserContext(headers);
   assert.deepEqual(context.profile.panels,
-    ['overview', 'my_tasks', 'activity', 'team_directory', 'account_settings', 'hubstaff', ...INTERNAL_HR_PANEL_IDS]);
+    ['overview', 'my_tasks', 'activity', 'team_directory', 'account_settings', 'hubstaff',
+      ...INTERNAL_HR_PANEL_IDS, ...INTERNAL_PM_PANEL_IDS]);
   assert.equal((await internalUserDashboard(request('/api/internal/dashboard?workspace=team'))).status, 200);
   assert.equal((await internalUserDashboard(request('/api/internal/dashboard?workspace=settings'))).status, 200);
   const list = await internalUsersGet(request('/api/internal/internal-users'));

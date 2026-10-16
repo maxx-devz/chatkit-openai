@@ -175,6 +175,21 @@ BEGIN
   END IF;
 END $$;
 
+-- Existing Project Management role holders receive the first PM panel defaults
+-- once. Later migrations preserve their explicit choices, including all off.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM portal_internal_schema_migrations
+    WHERE migration_key = 'pm_panel_defaults_v1') THEN
+    UPDATE portal_internal_users AS internal_user
+    SET panel_access = panel_access || '["pm_projects","pm_project_tasks"]'::jsonb,
+      updated_at = NOW()
+    WHERE EXISTS (SELECT 1 FROM portal_internal_user_roles AS role
+      WHERE role.user_id = internal_user.user_id AND role.role_key = 'project_management');
+    INSERT INTO portal_internal_schema_migrations (migration_key) VALUES ('pm_panel_defaults_v1');
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS portal_internal_access_audit (
   id BIGSERIAL PRIMARY KEY,
   actor_user_id BIGINT REFERENCES portal_users(id) ON DELETE SET NULL,
