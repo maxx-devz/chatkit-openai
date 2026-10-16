@@ -8,6 +8,7 @@ import HubstaffProvider, {
   HubstaffProjectProgress,
 } from "@/components/portal/hubstaff-live";
 import PresenceHeartbeat from "@/components/portal/presence-heartbeat";
+import ResizableDashboardGrid from "@/components/portal/resizable-dashboard-grid";
 import aocIcon from "@/aoc-icon.png";
 import aocLogo from "@/aoc-logo.png";
 import { PORTAL_CONFIG } from "@/config/portal";
@@ -171,12 +172,12 @@ export default function ClientPortal({ portalContext }) {
               <HubstaffMetrics />
             </section>
 
-            <div className={styles.dashboardGrid}>
-              <div className={styles.leftColumn}>
+            <ResizableDashboardGrid clientId={portalContext.client.id}
+              left={<div className={styles.leftColumn}>
                 <HubstaffMonthGlance />
                 <HubstaffProjectProgress />
-              </div>
-              <div className={styles.rightColumn}>
+              </div>}
+              right={<div className={styles.rightColumn}>
                 <AiAssistantPanel
                   clientId={portalContext.client.id}
                   clientName={portalContext.client.name}
@@ -186,8 +187,8 @@ export default function ClientPortal({ portalContext }) {
                   minHeight={portal.assistantPanel.minHeight}
                 />
                 <QuickQuestions questions={quickQuestions} />
-              </div>
-            </div>
+              </div>}
+            />
           </main>
         </HubstaffProvider>
         <footer className={styles.footer}>

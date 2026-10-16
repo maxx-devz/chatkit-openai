@@ -34,6 +34,7 @@ class Context:
     ai_client: object = field(default=None, repr=False)
     hosted_client: object = field(default=None, repr=False)
     response_route: str = "work"
+    chat_mode: str = "work"
     response_query: str = ""
     hubstaff_inlined: bool = False
 
@@ -51,8 +52,8 @@ class PostgresStore(Store[Context]):
 
     async def load_thread(self, thread_id, context):
         cursor = await context.db.execute(
-            "SELECT data FROM portal_chatkit_threads WHERE client_id=%s AND user_id=%s AND id=%s",
-            (*context.scope, thread_id),
+            "SELECT data FROM portal_chatkit_threads WHERE client_id=%s AND user_id=%s AND id=%s AND chat_mode=%s",
+            (*context.scope, thread_id, context.chat_mode),
         )
         row = await cursor.fetchone()
         if not row:
@@ -61,10 +62,11 @@ class PostgresStore(Store[Context]):
 
     async def save_thread(self, thread, context):
         await context.db.execute("""
-            INSERT INTO portal_chatkit_threads (client_id, user_id, id, data, created_at)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO portal_chatkit_threads (client_id, user_id, id, data, created_at, chat_mode)
+            VALUES (%s, %s, %s, %s, %s, %s)
             ON CONFLICT (client_id, user_id, id) DO UPDATE SET data=EXCLUDED.data
-        """, (*context.scope, thread.id, Jsonb(thread.model_dump(mode="json")), thread.created_at))
+        """, (*context.scope, thread.id, Jsonb(thread.model_dump(mode="json")), thread.created_at,
+              context.chat_mode))
 
     async def load_threads(self, limit, after, order, context):
         limit = max(1, min(limit, 100))
@@ -81,9 +83,10 @@ class PostgresStore(Store[Context]):
             params.extend((*context.scope, after))
         params.append(limit + 1)
         cursor = await context.db.execute(SQL("""
-            SELECT data FROM portal_chatkit_threads WHERE client_id=%s AND user_id=%s {}
+            SELECT data FROM portal_chatkit_threads WHERE client_id=%s AND user_id=%s
+              AND chat_mode=%s {}
             ORDER BY created_at {}, id {} LIMIT %s
-        """).format(clause, direction, direction), params)
+        """).format(clause, direction, direction), [*params[:2], context.chat_mode, *params[2:]])
         rows = await cursor.fetchall()
         data = [ThreadMetadata.model_validate(row["data"]) for row in rows[:limit]]
         return Page(data=data, has_more=len(rows) > limit,

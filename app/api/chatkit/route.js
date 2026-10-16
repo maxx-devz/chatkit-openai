@@ -3,6 +3,7 @@ import { chatKitBackendUrl, signChatKitRequest } from "@/lib/chatkit-security";
 import {
   getPortalAiContext,
   loadPortalConversationContext,
+  loadPortalConversationMode,
   portalErrorResponse,
 } from "@/lib/portal-data";
 import { uploadErrorMessage } from "@/lib/chatkit-uploads";
@@ -34,7 +35,16 @@ export async function POST(request) {
     }
     const payload = await readJsonRequest(request, 100_000);
     const threadId = chatKitThreadId(payload);
-    const conversationContext = threadId && hubstaffConversationContextRequested(payload)
+    const mode = request.headers.get("x-aoc-chat-mode") || "work";
+    if (mode !== "work" && mode !== "general") {
+      return Response.json({ error: "Choose Work questions or General chat." }, { status: 400, headers: noStore });
+    }
+    if (threadId) {
+      const savedMode = await loadPortalConversationMode(context.clientId, context.userId, threadId);
+      if (!savedMode) return Response.json({ error: "This conversation is no longer available." }, { status: 404, headers: noStore });
+      if (savedMode !== mode) return Response.json({ error: "This conversation belongs to the other chat mode. Reload and try again." }, { status: 409, headers: noStore });
+    }
+    const conversationContext = mode === "work" && threadId && hubstaffConversationContextRequested(payload)
       ? await loadPortalConversationContext(context.clientId, context.userId, threadId)
         .catch((error) => {
           console.warn("Conversation context could not be loaded for Hubstaff routing", {
@@ -43,7 +53,7 @@ export async function POST(request) {
           return "";
         })
       : "";
-    const hubstaffQuery = hubstaffContextQuery(payload, conversationContext);
+    const hubstaffQuery = mode === "work" ? hubstaffContextQuery(payload, conversationContext) : null;
     const hubstaff = hubstaffQuery !== null
         ? await loadHubstaffAssistantSnapshot(context.hubstaffProjectUrl, {
           monthlyHoursLimit: context.hubstaffMonthlyHoursLimit,
@@ -59,6 +69,7 @@ export async function POST(request) {
       instructions: ASSISTANT_INSTRUCTIONS,
       portal_origin: new URL(process.env.BETTER_AUTH_URL).origin,
       hubstaff,
+      chat_mode: mode,
       payload,
     });
     try {

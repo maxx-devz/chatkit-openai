@@ -12,6 +12,12 @@ CREATE TABLE IF NOT EXISTS portal_chatkit_threads (
     REFERENCES portal_memberships(client_id, user_id) ON DELETE CASCADE
 );
 
+-- Existing conversations remain in the work view. New conversations keep the
+-- client's selected mode for history filtering and request routing.
+ALTER TABLE portal_chatkit_threads
+  ADD COLUMN IF NOT EXISTS chat_mode TEXT NOT NULL DEFAULT 'work'
+  CHECK (chat_mode IN ('work', 'general'));
+
 CREATE TABLE IF NOT EXISTS portal_chatkit_items (
   client_id BIGINT NOT NULL,
   user_id BIGINT NOT NULL,
@@ -28,6 +34,8 @@ CREATE INDEX IF NOT EXISTS portal_chatkit_items_page_idx
   ON portal_chatkit_items (client_id, user_id, thread_id, sequence);
 CREATE INDEX IF NOT EXISTS portal_chatkit_threads_page_idx
   ON portal_chatkit_threads (client_id, user_id, created_at, id);
+CREATE INDEX IF NOT EXISTS portal_chatkit_threads_mode_page_idx
+  ON portal_chatkit_threads (client_id, user_id, chat_mode, created_at DESC, id DESC);
 
 -- A short renewable-by-replacement lease survives serverless process restarts.
 -- Serialize mutations per user/account so concurrent tabs cannot corrupt a reply.

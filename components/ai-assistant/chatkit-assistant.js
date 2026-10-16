@@ -12,7 +12,7 @@ function conversationDate(value) {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date);
 }
 
-function ConversationSidebar({ activeId, onDelete, onNew, onRename, onSelect, onReload, state }) {
+function ConversationSidebar({ activeId, mode, onDelete, onNew, onRename, onSelect, onReload, state }) {
   const [editingId, setEditingId] = useState("");
   const [title, setTitle] = useState("");
   const [saving, setSaving] = useState(false);
@@ -43,7 +43,7 @@ function ConversationSidebar({ activeId, onDelete, onNew, onRename, onSelect, on
   return (
     <aside className={styles.conversationSidebar} aria-label="Conversation history">
       <div className={styles.conversationHeader}>
-        <div><span>Workspace</span><h3>Conversations</h3></div>
+        <div><span>{mode === "work" ? "Work questions" : "General chat"}</span><h3>Conversations</h3></div>
         <button type="button" onClick={onNew} aria-label="Start a new conversation" title="New conversation">+</button>
       </div>
       <div className={styles.conversationList}>
@@ -178,8 +178,10 @@ function ChatSurface({
   clientId,
   clientName,
   domainKey,
+  mode,
   nonce,
   onConversationsChanged,
+  onResponseBusy,
   onThreadChange,
   refreshAccess,
   threadSelectionVersion,
@@ -191,6 +193,7 @@ function ChatSurface({
     const headers = new Headers(input instanceof Request ? input.headers : undefined);
     new Headers(init?.headers).forEach((value, name) => headers.set(name, value));
     headers.set("x-aoc-client", clientId);
+    headers.set("x-aoc-chat-mode", mode);
     const response = await fetch(input, { ...init, headers, credentials: "same-origin", cache: "no-store" });
     if (!response.ok) {
       const data = await response.clone().json().catch(() => ({}));
@@ -200,7 +203,7 @@ function ChatSurface({
       setError("");
     }
     return response;
-  }, [clientId, refreshAccess]);
+  }, [clientId, mode, refreshAccess]);
   const { control, setThreadId } = useChatKit({
     api: { url: "/api/chatkit", domainKey, fetch: fetchChatKit,
       ...(uploadsEnabled ? { uploadStrategy: { type: "direct", uploadUrl: "/api/chatkit/upload" } } : {}) },
@@ -214,8 +217,11 @@ function ChatSurface({
     header: { enabled: false },
     history: { enabled: false, showDelete: false, showRename: false },
     startScreen: {
-      greeting: appearance?.greeting || "What can we work on today?",
-      prompts: appearance?.starters ? appearance.starters.map((prompt) => ({ label: prompt, prompt, icon: "sparkle" })) : [
+      greeting: mode === "general" ? "What would you like to ask?" : appearance?.greeting || "What can we work on today?",
+      prompts: mode === "general" ? [
+        { label: "Ask a question", prompt: "I have a question.", icon: "sparkle" },
+        { label: "Brainstorm an idea", prompt: "Help me brainstorm an idea.", icon: "lightbulb" },
+      ] : appearance?.starters ? appearance.starters.map((prompt) => ({ label: prompt, prompt, icon: "sparkle" })) : [
         { label: "Plan my next steps", prompt: "Help me plan the next steps for my ecommerce project. Ask me what you need to know.", icon: "lightbulb" },
         { label: "Improve my store", prompt: "Help me identify ways to improve my online store. Start by asking about my goals.", icon: "sparkle" },
         { label: "Draft a message", prompt: "Help me write a clear message to the AOC team about my project.", icon: "write" },
@@ -234,11 +240,13 @@ function ChatSurface({
       onThreadChange(threadId);
       void onConversationsChanged();
     },
+    onResponseStart: () => onResponseBusy(true),
     onResponseEnd: () => {
+      onResponseBusy(false);
       void refreshAccess();
       void onConversationsChanged();
     },
-    onError: () => { setError((previous) => previous || "Chat could not load or finish the request. Please try again."); },
+    onError: () => { onResponseBusy(false); setError((previous) => previous || "Chat could not load or finish the request. Please try again."); },
   });
   useEffect(() => {
     if (ready) return;
@@ -266,6 +274,8 @@ function ChatSurface({
 
 export default function ChatKitAssistant({ clientId, clientName, domainKey, nonce, appearance }) {
   const [tab, setTab] = useState("chat");
+  const [mode, setMode] = useState("work");
+  const [responseBusy, setResponseBusy] = useState(false);
   const [access, setAccess] = useState(null);
   const [accessError, setAccessError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -273,28 +283,32 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
   const [threadSelectionVersion, setThreadSelectionVersion] = useState(0);
   const [conversationState, setConversationState] = useState({ loading: true, items: [], error: "" });
   const accessRequest = useRef(null);
-  const conversationRequest = useRef(null);
-  const loadConversations = useCallback(async () => {
-    if (conversationRequest.current) return conversationRequest.current;
+  const conversationRequest = useRef(0);
+  const conversationPending = useRef(null);
+  const modeRef = useRef("work");
+  const loadConversations = useCallback(async (selectedMode = mode) => {
+    if (selectedMode !== modeRef.current) return;
+    if (conversationPending.current?.mode === selectedMode) return conversationPending.current.promise;
+    const requestId = ++conversationRequest.current;
     const request = (async () => {
       try {
-        const response = await fetch("/api/conversations", { cache: "no-store" });
+        const response = await fetch(`/api/conversations?mode=${selectedMode}`, { cache: "no-store" });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || "Conversation history could not be loaded.");
-        setConversationState({ loading: false, items: data.conversations || [], error: "" });
+        if (conversationRequest.current === requestId && selectedMode === modeRef.current) setConversationState({ loading: false, items: data.conversations || [], error: "" });
       } catch (error) {
-        setConversationState((current) => ({
+        if (conversationRequest.current === requestId && selectedMode === modeRef.current) setConversationState((current) => ({
           ...current,
           loading: false,
           error: error.message || "Conversation history could not be loaded.",
         }));
       } finally {
-        if (conversationRequest.current === request) conversationRequest.current = null;
+        if (conversationPending.current?.id === requestId) conversationPending.current = null;
       }
     })();
-    conversationRequest.current = request;
+    conversationPending.current = { id: requestId, mode: selectedMode, promise: request };
     return request;
-  }, []);
+  }, [mode]);
   const refreshAccess = useCallback(async (signal) => {
     if (accessRequest.current) return accessRequest.current;
     const request = (async () => {
@@ -330,8 +344,18 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
     };
   }, [refreshAccess]);
   useEffect(() => {
-    void loadConversations();
-  }, [loadConversations]);
+    setConversationState({ loading: true, items: [], error: "" });
+    void loadConversations(mode);
+  }, [loadConversations, mode]);
+
+  function selectMode(nextMode) {
+    if (nextMode === mode || responseBusy) return;
+    modeRef.current = nextMode;
+    setMode(nextMode);
+    setActiveThreadId(null);
+    setThreadSelectionVersion((value) => value + 1);
+    setTab("chat");
+  }
 
   function startNewConversation() {
     setActiveThreadId(null);
@@ -393,6 +417,13 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
     : 0;
   return (
     <div className={styles.root}>
+      <div className={styles.modeBar}>
+        <div className={styles.modeSwitch} role="group" aria-label="Choose what to ask about">
+          <button type="button" className={mode === "work" ? styles.modeActive : ""} aria-pressed={mode === "work"} disabled={responseBusy} onClick={() => selectMode("work")}>Work questions</button>
+          <button type="button" className={mode === "general" ? styles.modeActive : ""} aria-pressed={mode === "general"} disabled={responseBusy} onClick={() => selectMode("general")}>General chat</button>
+        </div>
+        <span className={styles.modeHint}>{mode === "work" ? "Can use your project and Hubstaff context" : "Quick answers without live work data or file tools"}</span>
+      </div>
       <div className={styles.toolbar}>
         <div className={styles.tabs} role="tablist" aria-label="Assistant conversations" onKeyDown={(event) => {
           if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -422,6 +453,7 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
       <div id="assistant-chat" role="tabpanel" aria-labelledby="chat-tab" className={`${styles.content} ${styles.chatPanel}`} hidden={tab !== "chat"}>
         <ConversationSidebar
           activeId={activeThreadId}
+          mode={mode}
           state={conversationState}
           onDelete={(conversation) => void deleteConversation(conversation)}
           onNew={startNewConversation}
@@ -435,14 +467,16 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
         <div className={styles.chatStage}>
           {blocked ? <div className={styles.state} role="status">{blocked}</div> : (
             <ChatSurface
-              key={attempt}
+              key={`${mode}:${attempt}`}
               activeThreadId={activeThreadId}
               appearance={appearance}
               clientId={clientId}
               clientName={clientName}
               domainKey={domainKey}
+              mode={mode}
               nonce={nonce}
-              onConversationsChanged={loadConversations}
+              onConversationsChanged={() => loadConversations(mode)}
+              onResponseBusy={setResponseBusy}
               onThreadChange={setActiveThreadId}
               refreshAccess={refreshAccess}
               threadSelectionVersion={threadSelectionVersion}

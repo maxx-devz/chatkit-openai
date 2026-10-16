@@ -41,6 +41,10 @@ class ClientStreamTests(unittest.IsolatedAsyncioTestCase):
     async def test_independent_question_sends_no_tool_schemas(self):
         await self.check_client_reply("vendor/model:free", general=True)
 
+    async def test_general_mode_work_question_still_sends_no_work_tools(self):
+        await self.check_client_reply("vendor/model:free", general=True,
+                                      prompt="Which Hubstaff tasks need a reply today?")
+
     async def test_clear_task_question_reuses_prefetched_snapshot_in_one_model_call(self):
         await self.check_client_reply("vendor/model:free", prompt="What tasks are in progress?")
 
@@ -91,6 +95,7 @@ class ClientStreamTests(unittest.IsolatedAsyncioTestCase):
         store.load_thread.side_effect = load_thread
         store.load_thread_items.side_effect = load_items
         context = Context(AsyncMock(), "1", "2", "Be helpful.", {"display_name": "Test client"})
+        context.chat_mode = "general" if general else "work"
         context.hubstaff = None if general else {"workflow": {"columns": []}}
         context.ai_model = site_model
         with patch.dict(os.environ, {"OPENAI_API_KEY": "", "OPENROUTER_API_KEY": "sk-or-v1-test",
