@@ -104,6 +104,8 @@ Existing accounts, client records, conversations, and administrator tools are re
 | `npm start` | Serve a production build; configure a running HTTPS Python backend separately |
 | `npm run auth:migrate` | Better Auth schema |
 | `npm run portal:migrate` | Client, membership, and earlier-history schema |
+| `npm run client-access:migrate -- --dry-run` | Validate per-client roles and audit schema without keeping changes |
+| `npm run client-access:migrate` | Enable Viewer memberships and audited client access changes; run before deploying this branch |
 | `npm run admin:migrate` | Staff access, monthly usage, client integrations, and encrypted PAT storage |
 | `npm run chatkit:migrate` | ChatKit conversations and request leases |
 | `npm run uploads:migrate` | Conversation attachment storage and limits |
@@ -111,7 +113,8 @@ Existing accounts, client records, conversations, and administrator tools are re
 | `npm run builder:migrate` | Assistant configuration, tools, and generated files |
 | `npm run usage:migrate` | Anonymous AI activity totals, independent of allowance resets |
 | `npm run admin:create -- USERNAME "DISPLAY NAME"` | Create a staff login; password is prompted privately |
-| `npm run client:create -- USERNAME "DISPLAY NAME"` | Create a client login |
+| `npm run client:create -- USERNAME "DISPLAY NAME"` | Create a new client workspace and its first Client Administrator login |
+| `npm run client:admin -- grant\|revoke CLIENT_SLUG USERNAME` | Owner-controlled Client Administrator changes for an existing member |
 | `npm run list:client` | List current client accounts |
 | `npm run hubstaff:check -- PROJECT_URL` | Safely verify Hubstaff project access and summary data |
 | `npm run client:delete -- USERNAME --confirm-delete` | Permanently remove the specified client |
@@ -119,6 +122,11 @@ Existing accounts, client records, conversations, and administrator tools are re
 Create clients through **Add client** in `/admin` or the command above. Existing
 users do not need to be recreated. Migration commands use `.env.local`; they do
 not run automatically during Vercel builds.
+
+Client Administrators can create Viewer and Member logins for their own client
+under **Members & Access** after the client-access migration and deployment.
+See the [Client Portal access matrix](docs/CLIENT_PORTAL_ACCESS_MATRIX.md) for
+scope, protected grants, temporary-password handling, and staging checks.
 
 ## Deployment
 
