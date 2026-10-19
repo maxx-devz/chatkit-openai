@@ -4,6 +4,9 @@ import { ChatKit, useChatKit } from "@openai/chatkit-react";
 import Script from "next/script";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_COUNT, UPLOAD_ACCEPT } from "@/lib/chatkit-uploads";
+import { isReplyFetch, observeWorkflowStream } from "@/lib/chatkit-workflow";
+import { useClientAiWorkflowActions } from "@/components/portal/client-ai-workflow-store";
+import ClientAiWorkflowCard from "@/components/portal/client-ai-workflow-card";
 import styles from "./chatkit-assistant.module.css";
 
 function conversationDate(value) {
@@ -186,24 +189,64 @@ function ChatSurface({
   refreshAccess,
   threadSelectionVersion,
   uploadsEnabled,
+  workflow,
 }) {
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
+  const activeWorkflowRef = useRef(null);
+  const abortCleanupRef = useRef(null);
+  const finishWorkflow = useCallback((outcome = "complete", requestId = null) => {
+    if (requestId && activeWorkflowRef.current !== requestId) return;
+    abortCleanupRef.current?.();
+    abortCleanupRef.current = null;
+    if (activeWorkflowRef.current) workflow?.finish(activeWorkflowRef.current, outcome);
+    activeWorkflowRef.current = null;
+    onResponseBusy(false);
+  }, [onResponseBusy, workflow]);
   const fetchChatKit = useCallback(async (input, init) => {
+    const reply = await isReplyFetch(input, init);
     const headers = new Headers(input instanceof Request ? input.headers : undefined);
     new Headers(init?.headers).forEach((value, name) => headers.set(name, value));
     headers.set("x-aoc-client", clientId);
     headers.set("x-aoc-chat-mode", mode);
-    const response = await fetch(input, { ...init, headers, credentials: "same-origin", cache: "no-store" });
+    headers.set("x-aoc-workflow", "1");
+    if (reply && workflow) {
+      if (!activeWorkflowRef.current) activeWorkflowRef.current = workflow.start(mode);
+      onResponseBusy(true);
+    }
+    const requestWorkflowId = reply ? activeWorkflowRef.current : null;
+    if (reply && requestWorkflowId) {
+      const signal = init?.signal || (input instanceof Request ? input.signal : null);
+      if (signal) {
+        abortCleanupRef.current?.();
+        const onAbort = () => finishWorkflow("cancelled", requestWorkflowId);
+        signal.addEventListener("abort", onAbort, { once: true });
+        abortCleanupRef.current = () => signal.removeEventListener("abort", onAbort);
+        if (signal.aborted) onAbort();
+      }
+    }
+    let response;
+    try {
+      response = await fetch(input, { ...init, headers, credentials: "same-origin", cache: "no-store" });
+    } catch (failure) {
+      if (reply) finishWorkflow(failure?.name === "AbortError" ? "cancelled" : "error", requestWorkflowId);
+      throw failure;
+    }
     if (!response.ok) {
       const data = await response.clone().json().catch(() => ({}));
       setError(data.error || "The assistant could not connect. Please try again.");
       void refreshAccess();
+      if (reply) finishWorkflow("error", requestWorkflowId);
     } else {
       setError("");
     }
-    return response;
-  }, [clientId, mode, refreshAccess]);
+    if (!reply || !requestWorkflowId || !response.ok) return response;
+    return observeWorkflowStream(response, (stage) => {
+      if (requestWorkflowId && activeWorkflowRef.current === requestWorkflowId) {
+        workflow?.advance(requestWorkflowId, stage);
+      }
+    });
+  }, [clientId, finishWorkflow, mode, onResponseBusy, refreshAccess, workflow]);
   const { control, setThreadId } = useChatKit({
     api: { url: "/api/chatkit", domainKey, fetch: fetchChatKit,
       ...(uploadsEnabled ? { uploadStrategy: { type: "direct", uploadUrl: "/api/chatkit/upload" } } : {}) },
@@ -240,14 +283,28 @@ function ChatSurface({
       onThreadChange(threadId);
       void onConversationsChanged();
     },
-    onResponseStart: () => onResponseBusy(true),
+    onResponseStart: () => {
+      onResponseBusy(true);
+      if (!activeWorkflowRef.current && workflow) activeWorkflowRef.current = workflow.start(mode);
+    },
     onResponseEnd: () => {
-      onResponseBusy(false);
+      finishWorkflow("complete");
       void refreshAccess();
       void onConversationsChanged();
     },
-    onError: () => { onResponseBusy(false); setError((previous) => previous || "Chat could not load or finish the request. Please try again."); },
+    onError: ({ error: chatError } = {}) => {
+      const cancelled = chatError?.name === "AbortError" || chatError?.cause?.name === "AbortError";
+      finishWorkflow(cancelled ? "cancelled" : "error");
+      if (!cancelled) {
+        setError((previous) => previous || "Chat could not load or finish the request. Please try again.");
+      }
+    },
   });
+  useEffect(() => () => {
+    abortCleanupRef.current?.();
+    if (activeWorkflowRef.current) workflow?.finish(activeWorkflowRef.current, "cancelled");
+    activeWorkflowRef.current = null;
+  }, [workflow]);
   useEffect(() => {
     if (ready) return;
     const timer = window.setTimeout(() => setError("Chat is taking longer than expected to load. Check your connection and try again."), 20_000);
@@ -268,11 +325,13 @@ function ChatSurface({
       {error && <div className={styles.error} role="alert">{error}</div>}
       {!ready && <div className={styles.loading} role="status">Opening your assistant…</div>}
       <ChatKit control={control} className={styles.chat} />
+      <div className={styles.workflowViewport}><ClientAiWorkflowCard /></div>
     </div>
   );
 }
 
 export default function ChatKitAssistant({ clientId, clientName, domainKey, nonce, appearance }) {
+  const workflow = useClientAiWorkflowActions();
   const [tab, setTab] = useState("chat");
   const [mode, setMode] = useState("work");
   const [responseBusy, setResponseBusy] = useState(false);
@@ -448,7 +507,7 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
             role="progressbar"
           ><b style={{ width: `${allowancePercent}%` }} /></i>}
         </span>
-        {tab === "chat" && <button className={styles.reload} type="button" aria-label="Reconnect assistant" onClick={() => { setAttempt((value) => value + 1); void refreshAccess(); }}>Reconnect</button>}
+        {tab === "chat" && <button className={styles.reload} type="button" aria-label="Reconnect assistant" disabled={responseBusy} onClick={() => { setAttempt((value) => value + 1); void refreshAccess(); }}>Reconnect</button>}
       </div>
       <div id="assistant-chat" role="tabpanel" aria-labelledby="chat-tab" className={`${styles.content} ${styles.chatPanel}`} hidden={tab !== "chat"}>
         <ConversationSidebar
@@ -481,6 +540,7 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
               refreshAccess={refreshAccess}
               threadSelectionVersion={threadSelectionVersion}
               uploadsEnabled={access.uploadsEnabled}
+              workflow={workflow}
             />
           )}
         </div>

@@ -7,6 +7,8 @@ import {
   portalErrorResponse,
 } from "@/lib/portal-data";
 import { uploadErrorMessage } from "@/lib/chatkit-uploads";
+import { withDebuggerTrace, debuggerSpan } from "@/lib/debugger/server";
+import { isReplyRequest, streamWithWorkflow } from "@/lib/chatkit-workflow";
 import {
   chatKitThreadId,
   hubstaffContextQuery,
@@ -22,7 +24,11 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 const noStore = { "Cache-Control": "private, no-store", "X-Accel-Buffering": "no" };
+
 export async function POST(request) {
+  return withDebuggerTrace(request, () => handlePOST(request));
+}
+async function handlePOST(request) {
   try {
     assertTrustedOrigin(request.headers);
     const context = await getPortalAiContext(request.headers);
@@ -44,7 +50,10 @@ export async function POST(request) {
       if (!savedMode) return Response.json({ error: "This conversation is no longer available." }, { status: 404, headers: noStore });
       if (savedMode !== mode) return Response.json({ error: "This conversation belongs to the other chat mode. Reload and try again." }, { status: 409, headers: noStore });
     }
-    const conversationContext = mode === "work" && threadId && hubstaffConversationContextRequested(payload)
+    const run = async (send = () => {}) => {
+    const needsConversationContext = mode === "work" && threadId && hubstaffConversationContextRequested(payload);
+    if (needsConversationContext) send("context");
+    const conversationContext = needsConversationContext
       ? await loadPortalConversationContext(context.clientId, context.userId, threadId)
         .catch((error) => {
           console.warn("Conversation context could not be loaded for Hubstaff routing", {
@@ -54,12 +63,13 @@ export async function POST(request) {
         })
       : "";
     const hubstaffQuery = mode === "work" ? hubstaffContextQuery(payload, conversationContext) : null;
+    if (hubstaffQuery !== null) send("hubstaff");
     const hubstaff = hubstaffQuery !== null
-        ? await loadHubstaffAssistantSnapshot(context.hubstaffProjectUrl, {
+        ? await debuggerSpan("Relevant Hubstaff context", () => loadHubstaffAssistantSnapshot(context.hubstaffProjectUrl, {
           monthlyHoursLimit: context.hubstaffMonthlyHoursLimit,
           trackingProjectId: context.hubstaffTrackingProjectId,
           query: hubstaffQuery,
-        })
+        }))
       : null;
     let url;
     let signedHeaders;
@@ -79,6 +89,7 @@ export async function POST(request) {
       console.error("ChatKit backend configuration is missing or invalid. See docs/CHATKIT_SETUP.md.");
       return Response.json({ error: "The assistant is being set up. Please contact Always Open Commerce." }, { status: 503, headers: noStore });
     }
+    send("backend");
     const upstream = await fetch(url, {
       method: "POST",
       headers: {
@@ -97,6 +108,8 @@ export async function POST(request) {
     if (!upstream.ok) {
       const details = await upstream.json().catch(() => ({}));
       const uploadMessage = uploadErrorMessage(details.code);
+      const providerMessage = ["provider_encryption_missing", "provider_credentials_unreadable"].includes(details.code)
+        ? "The assistant needs an administrator configuration update. Please contact Always Open Commerce." : "";
       // Do not forward hosting-provider HTML, headers, or internal diagnostics.
       const messages = {
         400: "This chat request is not supported. Please start a new conversation.",
@@ -106,7 +119,7 @@ export async function POST(request) {
         429: "Your account has reached its monthly AI allowance. Contact Always Open Commerce.",
       };
       console.error("ChatKit backend request failed", { status: upstream.status });
-      return Response.json({ error: uploadMessage || messages[upstream.status] || "The assistant could not connect. Please try again shortly." }, {
+      return Response.json({ error: uploadMessage || providerMessage || messages[upstream.status] || "The assistant could not connect. Please try again shortly." }, {
         status: uploadMessage || messages[upstream.status] ? upstream.status : 503, headers: noStore,
       });
     }
@@ -114,10 +127,16 @@ export async function POST(request) {
       await upstream.body?.cancel();
       return Response.json({ error: "The assistant could not connect. Please try again shortly." }, { status: 502, headers: noStore });
     }
+    if (contentType.startsWith("text/event-stream")) send("ready");
     return new Response(upstream.body, {
       status: upstream.status,
       headers: { ...noStore, "Content-Type": contentType },
     });
+    };
+    if (request.headers.get("x-aoc-workflow") === "1" && isReplyRequest(payload)) {
+      return streamWithWorkflow(run);
+    }
+    return await run();
   } catch (error) {
     const known = requestSecurityErrorResponse(error)
       || (error?.publicDetails ? portalErrorResponse(error) : null);

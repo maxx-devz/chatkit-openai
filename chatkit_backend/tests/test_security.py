@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app import app, validate_payload
 from chatkit.types import Page, ThreadMetadata
 from security import verify_signature
+from provider_settings import ProviderSettingsError
 
 SECRET = "test-only-shared-secret-with-at-least-32-characters"
 
@@ -87,6 +88,26 @@ async def post(body, headers=None, *, include_body=False):
 
 
 class EndpointTests(unittest.IsolatedAsyncioTestCase):
+    async def test_missing_provider_secret_returns_safe_code_without_spending_allowance(self):
+        db = AsyncMock()
+        payload = {"type": "threads.create", "params": {"input": {
+            "content": [{"type": "input_text", "text": "Hello"}], "attachments": [], "inference_options": {}}}}
+        body = json.dumps({"client_id": "1", "user_id": "2", "instructions": "Test", "payload": payload}).encode()
+        timestamp = str(int(time.time())).encode()
+        signature = hmac.new(SECRET.encode(), timestamp + b"." + body, hashlib.sha256).hexdigest().encode()
+        with patch.dict(os.environ, {"CHATKIT_BACKEND_SECRET": SECRET, "DATABASE_URL": "test-only"}), \
+                patch("app.connect_database", new_callable=AsyncMock, return_value=db), \
+                patch("app.load_client", new_callable=AsyncMock, return_value={}), \
+                patch("app.load_config", new_callable=AsyncMock, return_value={}), \
+                patch("app.acquire_lease", new_callable=AsyncMock), \
+                patch("app.load_provider_settings", new_callable=AsyncMock, side_effect=ProviderSettingsError("provider_encryption_missing")), \
+                patch("app.reserve_request", new_callable=AsyncMock) as reserve:
+            status, response = await post(body, [(b"x-chatkit-timestamp", timestamp), (b"x-chatkit-signature", signature)], include_body=True)
+            self.assertEqual(status, 503)
+            self.assertEqual(response["code"], "provider_encryption_missing")
+            reserve.assert_not_awaited()
+            db.close.assert_awaited_once()
+
     async def test_signed_browser_history_request_reaches_sdk_with_bounded_pagination(self):
         first = [ThreadMetadata(id=f"thr_{index}", created_at=datetime.now(timezone.utc))
                  for index in range(100)]

@@ -174,8 +174,10 @@ export default function ClientPortal({ portalContext }) {
 
             <ResizableDashboardGrid clientId={portalContext.client.id}
               left={<div className={styles.leftColumn}>
-                <HubstaffMonthGlance />
-                <HubstaffProjectProgress />
+                <div className={styles.overviewColumn}>
+                  <HubstaffMonthGlance />
+                  <HubstaffProjectProgress />
+                </div>
               </div>}
               right={<div className={styles.rightColumn}>
                 <AiAssistantPanel

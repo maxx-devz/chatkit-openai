@@ -9,6 +9,13 @@ from ai_provider import ProviderConfig, provider_config, OPENROUTER_BASE_URL
 from site_ai_settings import load_site_model
 
 
+class ProviderSettingsError(ValueError):
+    """Safe configuration diagnosis; never includes encrypted or clear keys."""
+    def __init__(self, code):
+        self.code = code
+        super().__init__(code)
+
+
 def unseal_provider_key(provider, value, secret):
     if provider not in ("openai", "openrouter") or len(secret) < 32:
         raise ValueError("Provider encryption is not configured")
@@ -37,7 +44,12 @@ async def load_provider_settings(db):
                               await load_site_model(db), fallback.default_headers,
                               os.getenv("OPENAI_API_KEY", "") if not os.getenv("OPENAI_API_KEY", "").startswith("sk-or-v1-") else "")
     secret = os.getenv("PROVIDER_SETTINGS_SECRET", "")
-    keys = {row["provider"]: unseal_provider_key(row["provider"], row["encrypted_key"], secret) for row in rows}
+    if len(secret) < 32:
+        raise ProviderSettingsError("provider_encryption_missing")
+    try:
+        keys = {row["provider"]: unseal_provider_key(row["provider"], row["encrypted_key"], secret) for row in rows}
+    except Exception as error:
+        raise ProviderSettingsError("provider_credentials_unreadable") from error
     router = active["provider"] == "openrouter"
     return ProviderConfig(active["provider"], "OpenRouter" if router else "OpenAI", keys[active["provider"]],
                           OPENROUTER_BASE_URL if router else None, active["model"],

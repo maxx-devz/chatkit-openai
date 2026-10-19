@@ -49,6 +49,7 @@ __pycache__/
 /.builder-review/
 /test-results/
 /playwright-report/
+/.debugger-profile/
 /tests/employee/ui/.next/
 /tests/employee/ui/AGENTS.md
 /tests/employee/ui/CLAUDE.md

@@ -3,11 +3,15 @@ import {
   loadHubstaffWorkflowTasks,
 } from "@/lib/hubstaff";
 import { resolvePortalContext, portalErrorResponse } from "@/lib/portal-data";
+import { withDebuggerTrace } from "@/lib/debugger/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
+  return withDebuggerTrace(request, () => handleGET(request));
+}
+async function handleGET(request) {
   try {
     const context = await resolvePortalContext(request.headers);
     const listId = request.nextUrl.searchParams.get("listId") || "";

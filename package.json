@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:web": "next dev -H 127.0.0.1 -p 3000",
+    "debugger:deep": "node scripts/debugger-deep.mjs",
+    "debugger:check": "node scripts/check-debugger.mjs",
+    "debugger:check-disabled": "node scripts/check-debugger-disabled.mjs",
+    "debugger:check-isolation": "node scripts/check-debugger-isolation.mjs",
     "build": "next build",
     "start": "next start -H 127.0.0.1 -p 3000",
     "lint": "eslint app components config lib scripts next.config.mjs proxy.js",
@@ -58,7 +62,8 @@
     "pg": "^8.23.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "web-vitals": "^6.2.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

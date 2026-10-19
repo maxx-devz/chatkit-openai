@@ -9,10 +9,19 @@ import ClientPortal from "@/components/portal/client-portal";
 import { resolveAdminContext } from "@/lib/admin-data";
 import { isPortalAuthConfigured } from "@/lib/auth";
 import { resolvePortalContext } from "@/lib/portal-data";
+import { notFound } from "next/navigation";
+import { debuggerAccess, debuggerEnabled } from "@/lib/debugger/access";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }) {
+  if ((await searchParams)?.debugger === "true") {
+    if (!debuggerEnabled()) notFound();
+    const access = await debuggerAccess(await headers());
+    if (!access) notFound();
+    const { default: DebuggerDashboard } = await import("@/components/debugger/dashboard");
+    return <DebuggerDashboard config={access} />;
+  }
   if (!isPortalAuthConfigured()) redirect("/login");
 
   let portalContext;
