@@ -10,6 +10,7 @@ import { canAccessInternalWorkspace } from '@/lib/internal-panel-access';
 import { internalPanelPreviewData, resolveInternalPanelPreview } from '@/lib/internal-user-preview';
 import { INTERNAL_USER_PANELS, INTERNAL_USER_WORKSPACES } from '@/lib/internal-user-positions';
 import { connectionMessages } from '@/lib/internal-user-view';
+import { isInternalHubstaffOAuthConfigured } from '@/lib/internal-hubstaff-oauth';
 import styles from '@/components/internal/internal-user-dashboard.module.css';
 
 function firstAvailableWorkspace(profile) {
@@ -67,12 +68,15 @@ export default async function InternalUserPortalPage({ workspace, searchParams }
   const message = Object.hasOwn(connectionMessages, connectionCode)
     ? connectionMessages[connectionCode]
     : '';
+  const hubstaffOAuthConfigured = profile.panels.includes('hubstaff')
+    && isInternalHubstaffOAuthConfigured();
 
   return <InternalUserDashboard name={profile.name} username={authUser.username || ''} position={profile.position}
       panelAccess={profile.panels} workspace={workspace}
-      connected={profile.connected} connectionMessage={message}>
+      connected={profile.connected} connectionMessage={message}
+      hubstaffOAuthConfigured={hubstaffOAuthConfigured}>
     {workspace === 'settings' && profile.panels.includes('hubstaff')
-      ? <HubstaffConnection connected={profile.connected} />
+      ? <HubstaffConnection connected={profile.connected} oauthConfigured={hubstaffOAuthConfigured} />
       : null}
   </InternalUserDashboard>;
 }

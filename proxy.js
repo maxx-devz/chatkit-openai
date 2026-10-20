@@ -6,6 +6,8 @@ export function proxy(request) {
   const isDevelopment = process.env.NODE_ENV === "development";
   // Client-side navigation keeps the initial document's CSP. Login and staff
   // pages must allow the same ChatKit frame as the client workspace.
+  // Chromium checks the destination after a form POST redirect, so allow the
+  // Hubstaff authorization host used by the OAuth start endpoint.
   const policy = `
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDevelopment ? " 'unsafe-eval'" : ""};
@@ -18,7 +20,7 @@ export function proxy(request) {
     worker-src 'self' blob:;
     object-src 'none';
     base-uri 'self';
-    form-action 'self';
+    form-action 'self' https://account.hubstaff.com;
     frame-ancestors 'none';
     manifest-src 'self';
     ${isDevelopment ? "" : "upgrade-insecure-requests;"}

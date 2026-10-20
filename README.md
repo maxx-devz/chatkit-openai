@@ -93,6 +93,7 @@ Existing accounts, client records, conversations, and administrator tools are re
 | `npm run setup:check` | Check local configuration and database tables without displaying secrets |
 | `npm run setup:check -- --internal-user` | Also check the optional internal user schema and encryption key |
 | `npm run internal-user:migrate` | Add/update internal user access, position, panel policy, and encrypted connection storage |
+| `npm run internal-hubstaff-oauth:migrate` | Add per-user Hubstaff connection method; preserve existing PAT connections ([setup](docs/INTERNAL_HUBSTAFF_OAUTH.md)) |
 | `npm run internal-user:create -- USERNAME "DISPLAY NAME" APPROVED_HUBSTAFF_USER_ID` | Privately provision internal-user-only access; password is prompted |
 | `npm run test:internal-user` | Internal user authorization, Hubstaff isolation, credential safety, and real Better Auth login tests |
 | `npm run test:internal-user:database` | Internal user SQL checks in rolled-back temporary tables |
