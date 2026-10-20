@@ -5,6 +5,7 @@ import NeuralGraph from "./graph";
 import { isError, mergeRecords, statusColor, warningsFor } from "@/lib/debugger/model";
 import { endpointKey } from "@/lib/debugger/scene";
 import { watchDebuggerSession } from "@/lib/debugger/browser-session";
+import { debuggerPortalPath } from "@/lib/debugger/routing";
 import styles from "./debugger.module.css";
 
 const CATEGORIES = ["document", "image", "script", "css", "font", "api", "media", "websocket", "eventsource", "other", "error", "performance", "navigation", "operation"];
@@ -38,7 +39,7 @@ function Inspector({ record, onClose, slowMs, occurrences = [], onSelect }) {
     </div>
   </aside>;
 }
-export default function DebuggerDashboard({ config }) {
+export default function DebuggerDashboard({ config, portalPath = "/" }) {
   const map = useRef(new Map()), sessionMap = useRef(new Map());
   const [records, setRecords] = useState([]), [sessions, setSessions] = useState([]), [connection, setConnection] = useState("Live · this browser only");
   const [tabId, setTabId] = useState(""), [navigation, setNavigation] = useState("latest"), [view, setView] = useState("graph");
@@ -107,7 +108,7 @@ export default function DebuggerDashboard({ config }) {
   for (const record of resourceRecords) { let domain; try { domain = new URL(record.url).host; } catch { continue; } const value = domains.get(domain) || { count: 0, bytes: 0 }; value.count++; value.bytes += record.transferSize || 0; domains.set(domain, value); }
   function clear() { map.current.clear(); setRecords([]); setSelectedId(null); }
   return <main className={styles.page}>
-    <header className={styles.header}><div className={styles.brandMark}>◉</div><div><span className={styles.eyebrow}>AOC developer observatory</span><h1>Neural network debugger</h1></div><div className={styles.headerActions}><span className={styles.live}>{connection}</span><a href="/" target="_blank" rel="noreferrer">Open portal ↗</a><button onClick={() => setPaused((v) => !v)}>{paused ? "Resume display" : "Pause display"}</button><button onClick={clear}>Clear history</button></div></header>
+    <header className={styles.header}><div className={styles.brandMark}>◉</div><div><span className={styles.eyebrow}>AOC developer observatory</span><h1>Neural network debugger</h1></div><div className={styles.headerActions}><span className={styles.live}>{connection}</span><a href={debuggerPortalPath(portalPath)} target="_blank" rel="noreferrer">Open portal ↗</a><button onClick={() => setPaused((v) => !v)}>{paused ? "Resume display" : "Pause display"}</button><button onClick={clear}>Clear history</button></div></header>
     <div className={styles.captureBar}><label>Monitored tab<select aria-label="Monitored tab" value={selectedTab || ""} onChange={(e) => { setTabId(e.target.value); setNavigation("latest"); }}>{!sessions.length ? <option value="">Waiting for a portal tab</option> : null}{sessions.map((s) => <option value={s.tabId} key={s.tabId}>{s.pageUrl} · {s.tabId.slice(-6)} · {s.mode}{s.closed ? " (closed / refreshed)" : ""}</option>)}</select></label><label>Navigation<select aria-label="Navigation" value={navigation} onChange={(e) => setNavigation(e.target.value)}><option value="latest">Current page load</option><option value="all">All retained page loads</option>{navigations.map((nav, index) => <option key={nav} value={nav}>Page load {index + 1} · {nav.slice(-8)}</option>)}</select></label><span className={styles.captureMode}>{selectedSession?.mode === "deep" ? "CDP deep capture active" : "Browser baseline capture"}</span><span className={styles.muted}>{records.length} / {config.maxRecords} retained records · {selectedSession?.callbackMs ?? "—"} ms measured recording callback work</span></div>
     <section className={styles.metrics} aria-label="Captured network summary"><Metric label="Requests" value={resourceRecords.length} /><Metric label="Active" value={active} /><Metric label="HTTP success" value={resourceRecords.filter((r) => r.status >= 200 && r.status < 300).length} /><Metric label="Errors" value={pageRecords.filter(isError).length} /><Metric label="Known transfer" value={bytes(resourceRecords.reduce((sum, r) => sum + (r.transferSize || 0), 0))} /><Metric label="Known decoded" value={bytes(resourceRecords.reduce((sum, r) => sum + (r.decodedSize || 0), 0))} /><Metric label="Third-party" value={resourceRecords.filter((r) => r.thirdParty).length} /><Metric label="Known cached" value={resourceRecords.filter((r) => /cache/.test(r.cache || "") && !/unknown/.test(r.cache || "")).length} /></section>
     <section className={styles.vitals} aria-label="Observed browser metrics">{["TTFB", "FCP", "LCP", "CLS", "INP", "DCL", "Load"].map((name) => <Metric key={name} label={name} value={name === "CLS" && metrics[name] != null ? metrics[name].toFixed(3) : ms(metrics[name])} note={name === "INP" && metrics.INP == null ? "Awaiting qualifying interaction" : undefined} />)}</section>

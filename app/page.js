@@ -11,16 +11,18 @@ import { isPortalAuthConfigured } from "@/lib/auth";
 import { resolvePortalContext } from "@/lib/portal-data";
 import { notFound } from "next/navigation";
 import { debuggerAccess, debuggerEnabled } from "@/lib/debugger/access";
+import { DEBUGGER_PORTAL_HEADER, debuggerPortalPath } from "@/lib/debugger/routing";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage({ searchParams }) {
   if ((await searchParams)?.debugger === "true") {
     if (!debuggerEnabled()) notFound();
-    const access = await debuggerAccess(await headers());
+    const requestHeaders = await headers();
+    const access = await debuggerAccess(requestHeaders);
     if (!access) notFound();
     const { default: DebuggerDashboard } = await import("@/components/debugger/dashboard");
-    return <DebuggerDashboard config={access} />;
+    return <DebuggerDashboard config={access} portalPath={debuggerPortalPath(requestHeaders.get(DEBUGGER_PORTAL_HEADER))} />;
   }
   if (!isPortalAuthConfigured()) redirect("/login");
 

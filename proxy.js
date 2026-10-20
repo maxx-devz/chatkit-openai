@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { DEBUGGER_PORTAL_HEADER, debuggerPageRequest } from "./lib/debugger/routing.js";
 
 export function proxy(request) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
@@ -24,10 +25,19 @@ export function proxy(request) {
   `.replace(/\s{2,}/g, " ").trim();
 
   const requestHeaders = new Headers(request.headers);
+  // Never trust a caller-supplied return path. Any page can open the same
+  // authenticated inspector, without rendering that page's role-specific shell.
+  requestHeaders.delete(DEBUGGER_PORTAL_HEADER);
+  const debuggerPage = debuggerPageRequest(request.url, request.method);
+  if (debuggerPage) requestHeaders.set(DEBUGGER_PORTAL_HEADER, debuggerPage.portalPath);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", policy);
 
-  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  const options = { request: { headers: requestHeaders } };
+  const response = debuggerPage?.rewrite
+    ? NextResponse.rewrite(debuggerPage.destination, options)
+    : NextResponse.next(options);
+  if (debuggerPage) response.headers.set("Cache-Control", "private, no-store");
   response.headers.set("Content-Security-Policy", policy);
   return response;
 }
@@ -40,6 +50,11 @@ export const config = {
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },
       ],
+    },
+    {
+      // A prefetched debugger URL must not cache the underlying portal page.
+      source: "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico)$).*)",
+      has: [{ type: "query", key: "debugger", value: "true" }],
     },
   ],
 };

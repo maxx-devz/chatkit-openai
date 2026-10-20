@@ -5,6 +5,26 @@ Run the portal with `npm run dev`, then open the normal portal and
 after enabling capture. Both tabs must use the exact same origin and an
 authorized account. The dashboard discovers monitored tabs automatically.
 
+The query works on **every portal page**, not just the client homepage: for
+example `/internal?debugger=true`,
+`/internal/internal-settings?debugger=true`, `/internal/team?debugger=true`, and
+`/admin?debugger=true`. When a URL already has filters, append
+`&debugger=true` instead. The page request is internally rewritten to the same
+authenticated inspector; the address bar keeps the requested route. Its
+**Open portal** link opens that original page without the debugger flag, with
+normal filters preserved. API/asset responses and POST requests are never
+rewritten. Capture is mounted in the root layout across client, internal-user,
+employee and admin pages, subject to the same session access checks.
+
+`skipProxyUrlNormalize` preserves the original request origin for these
+same-origin rewrites, including local IPv4 listeners. Proxy routing deliberately
+excludes `/_next` internals instead of relying on normalized data-route URLs.
+
+"Site-wide" means every authorized account can inspect its **own browser's**
+portal pages. It does not aggregate traffic from other accounts, browsers or
+devices. Keep a normal portal tab open alongside the inspector to generate
+real capture data; the inspector never records itself.
+
 `DEBUGGER=true` explicitly enables capture in development **or production**.
 The default in `.env.example` is false. In Vercel, set `DEBUGGER=true` on the
 Next.js project and redeploy; also enable it on the Python service and redeploy

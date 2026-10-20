@@ -3,21 +3,25 @@ import { spawn } from "node:child_process";
 import { loadEnvFile } from "node:process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "@playwright/test";
+import { cleanText } from "../lib/debugger/model.js";
 
 // Reuses a real signed-in profile. A second isolated browser receives the SAME
 // real cookies in memory, an even stronger test than two separate logins. No
 // credentials/cookies are printed, persisted, fabricated, or revoked by tests.
 loadEnvFile(".env.local");
 const origin = "http://127.0.0.1:3105", report = { checks: [] };
-let server, a, b, isolated;
+let server, a, b, isolated, serverDiagnostics = "";
 const pass = (name) => { report.checks.push(name); console.log(`PASS ${name}`); };
 async function start(enabled) {
   try { await fetch(`${origin}/api/debugger/events`, { signal: AbortSignal.timeout(500) }); throw new Error("Port 3105 is occupied; refusing to test another server."); }
   catch (error) { if (error.message.startsWith("Port 3105")) throw error; }
   server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "-H", "127.0.0.1", "-p", "3105"], {
     env: { ...process.env, NODE_ENV: "production", BETTER_AUTH_URL: origin, DEBUGGER: String(enabled), DEBUGGER_DEVELOPERS: "", DEBUGGER_CAPTURE_BODIES: "true" },
-    stdio: "ignore", windowsHide: true,
+    stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
   });
+  serverDiagnostics = "";
+  const recordOutput = chunk => { serverDiagnostics = (serverDiagnostics + chunk.toString()).slice(-16_000); };
+  server.stdout.on("data", recordOutput); server.stderr.on("data", recordOutput);
   for (let i = 0; i < 100; i++) {
     if (server.exitCode !== null) throw new Error("Production test server exited.");
     try { await fetch(`${origin}/api/debugger/events`, { signal: AbortSignal.timeout(1000) }); return; }
@@ -45,6 +49,31 @@ try {
   await dashA.getByRole("heading", { name: "Neural network debugger", exact: true }).waitFor();
   await dashA.waitForFunction(id => [...document.querySelector('[aria-label="Monitored tab"]').options].some(option => option.value === id), tabA);
   pass("production DEBUGGER=true authorizes the existing non-admin login and discovers its own portal tab");
+
+  const debuggerPaths = ["/internal", "/internal/internal-settings", "/internal/internal-settings/integrations", "/internal/team", "/internal/settings", "/admin", "/builder"];
+  for (const path of debuggerPaths) {
+    const response = await dashA.goto(`${origin}${path}?debugger=true`, { waitUntil: "domcontentloaded", timeout: 90_000 });
+    assert.equal(response.status(), 200, path);
+    await dashA.getByRole("heading", { name: "Neural network debugger", exact: true }).waitFor();
+    assert.equal(new URL(dashA.url()).pathname, path);
+    assert.equal(await dashA.getByRole("link", { name: "Open portal ↗", exact: true }).getAttribute("href"), path);
+    assert.match(response.headers()["cache-control"], /private.*no-store/);
+  }
+  pass("every tested nested internal, admin and builder URL opens the same authorized inspector and returns to its own page");
+
+  await dashA.goto(`${origin}/internal/team?sort=name&debugger=true`, { waitUntil: "domcontentloaded", timeout: 90_000 });
+  assert.equal(await dashA.getByRole("link", { name: "Open portal ↗", exact: true }).getAttribute("href"), "/internal/team?sort=name");
+  const prefetched = await a.request.get(`${origin}/internal/internal-settings?debugger=true`, {
+    headers: { "next-router-prefetch": "1", purpose: "prefetch", "x-aoc-debugger-portal-path": "//untrusted.example" },
+  });
+  assert.equal(prefetched.status(), 200);
+  const prefetchBody = await prefetched.text();
+  assert.ok(prefetchBody.includes("Neural network debugger"));
+  assert.ok(!prefetchBody.includes("untrusted.example"));
+  const sessionCheck = await a.request.get(`${origin}/api/debugger/session?debugger=true`);
+  assert.equal(sessionCheck.status(), 200);
+  assert.match(sessionCheck.headers()["content-type"], /application\/json/);
+  pass("filters survive return links, prefetches use the inspector, forged return headers are ignored and APIs remain JSON");
 
   b = await chromium.launch({ channel: "chrome", headless: true });
   isolated = await b.newContext();
@@ -90,7 +119,7 @@ try {
   for (const path of ["/debugger-lab", "/debugger-lab/image.svg", "/debugger-lab/data.json", "/debugger-lab/workflow"]) assert.equal((await a.request.get(origin + path)).status(), 404);
   pass("no account-wide trace feed or collector exists; all production test fixtures remain unavailable");
   const anonymous = await b.newContext();
-  assert.equal((await anonymous.request.get(`${origin}/?debugger=true`)).status(), 404);
+  for (const path of ["/", ...debuggerPaths]) assert.equal((await anonymous.request.get(`${origin}${path}?debugger=true`)).status(), 404, path);
   assert.equal((await anonymous.request.get(`${origin}/api/debugger/session`)).status(), 404);
   await anonymous.close();
   pass("anonymous visitors cannot activate the production debugger");
@@ -105,12 +134,12 @@ try {
   pass("ending one browser's capture clears only its own debugger and leaves the other browser active");
 
   await stop(); await start(false);
-  assert.equal((await a.request.get(`${origin}/?debugger=true`)).status(), 404);
+  for (const path of ["/", ...debuggerPaths]) assert.equal((await a.request.get(`${origin}${path}?debugger=true`)).status(), 404, path);
   await portalA.reload({ waitUntil: "domcontentloaded" });
   await portalA.waitForTimeout(1000);
   assert.equal(await portalA.evaluate(() => typeof window.__AOC_DEBUGGER__), "undefined");
   pass("DEBUGGER=false disables production dashboard and normal-page instrumentation even for a valid login");
-} catch (error) { process.exitCode = 1; report.error = error.message; console.error(error.message); }
+} catch (error) { process.exitCode = 1; report.error = error.message; console.error(error.message); console.error(cleanText(serverDiagnostics, 12_000)); }
 finally {
   await isolated?.close(); await b?.close(); await a?.close(); await stop();
   await mkdir("test-results", { recursive: true });
