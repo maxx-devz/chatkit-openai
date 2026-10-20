@@ -168,7 +168,7 @@ function ClientLibrary({ onUseChat }) {
             </div>
             <div className={styles.itemActions}>
               {item.type === "file" ? <a href={item.downloadUrl}>Download</a> : <a href={item.url} target="_blank" rel="noreferrer">Open</a>}
-              <button type="button" onClick={() => void remove(item)}>Remove</button>
+              {item.canRemove ? <button type="button" onClick={() => void remove(item)}>Remove</button> : null}
             </div>
           </li>)}</ul>}
     </div>

@@ -136,13 +136,19 @@ async function main() {
             display_name = EXCLUDED.display_name,
             updated_at = NOW()
       RETURNING id
+    ),
+    membership_row AS (
+      INSERT INTO portal_memberships (client_id, user_id, role)
+      SELECT client_row.id, user_row.id, 'client_admin'
+      FROM client_row, user_row
+      ON CONFLICT (client_id, user_id) DO UPDATE
+        SET role = EXCLUDED.role,
+            updated_at = NOW()
+      RETURNING client_id,user_id,role
     )
-    INSERT INTO portal_memberships (client_id, user_id, role)
-    SELECT client_row.id, user_row.id, 'client_admin'
-    FROM client_row, user_row
-    ON CONFLICT (client_id, user_id) DO UPDATE
-      SET role = EXCLUDED.role,
-          updated_at = NOW()
+    INSERT INTO portal_client_access_audit
+      (client_id,target_user_id,action,source,next_role)
+    SELECT client_id,user_id,'admin_grant','terminal',role FROM membership_row
   `;
 
   console.log(`\nCreated ${displayName}`);

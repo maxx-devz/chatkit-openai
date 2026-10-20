@@ -16,6 +16,8 @@ export default function AccountControls({ client, memberships, user }) {
     .map((part) => part[0])
     .join("")
     .toUpperCase();
+  const roleLabel = { client_viewer: "Viewer", member: "Member",
+    client_admin: "Client Administrator", aoc_admin: "Member" }[client.role] || "Client user";
 
   async function switchClient(event) {
     const slug = event.target.value;
@@ -66,7 +68,7 @@ export default function AccountControls({ client, memberships, user }) {
         ) : (
           <strong>{client.name}</strong>
         )}
-        <small>{user.username || user.name}</small>
+        <small>{user.username || user.name} · {roleLabel}</small>
       </div>
       <button
         aria-label="Sign out"
