@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useInternalUserWorkspace } from './internal-workspace-provider';
 import InternalPasswordSettings from './internal-password-settings';
@@ -97,7 +98,8 @@ function teamStatusClass(status) {
   return styles.teamStatusUnknown;
 }
 
-export default function InternalUserDashboard({ name, username = '', position, panelAccess = [], workspace = 'personal', connected, connectionMessage, children, previewData = null }) {
+export default function InternalUserDashboard({ name, username = '', position, panelAccess = [], workspace = 'personal',
+  connected, connectionMessage, hubstaffOAuthConfigured = false, children, previewData = null }) {
   const panels = new Set(panelAccess);
   const isPersonal = workspace === 'personal';
   const isTeam = workspace === 'team';
@@ -261,8 +263,21 @@ export default function InternalUserDashboard({ name, username = '', position, p
     </div>}
     {connectionMessage && <p className={styles.notice} role="status">{connectionMessage}</p>}
     {error && <p className={styles.error} role="alert">{error}</p>}
+    {isPersonal && !connected && canConnectHubstaff && !previewData && <section className={`${styles.panel} ${styles.connectPrompt}`} aria-labelledby="connect-hubstaff-title">
+      <div><h2 id="connect-hubstaff-title">Connect Hubstaff to see My Work</h2>
+        <p>Sign in with your approved Hubstaff account to load your personal assignments, time, and activity.</p></div>
+      {hubstaffOAuthConfigured
+        ? <form action="/api/internal/hubstaff/oauth/start" method="post">
+          <button className={styles.primary} type="submit">Connect Hubstaff</button>
+        </form>
+        : <Link className={styles.primary} href="/internal/settings#hubstaff-connection">Set up Hubstaff</Link>}
+    </section>}
+    {isPersonal && !connected && !canConnectHubstaff && !previewData && <section className={`${styles.panel} ${styles.connectPrompt}`} aria-labelledby="hubstaff-access-title">
+      <div><h2 id="hubstaff-access-title">My Work needs Hubstaff access</h2>
+        <p>Ask an Internal Access Manager to enable your Hubstaff connection panel.</p></div>
+    </section>}
     {isPersonal && data?.truncated && <p className={styles.notice}>Showing a limited snapshot of your work. Some tasks or projects may be missing; counts reflect only this snapshot.</p>}
-    {isPersonal && canOverview && <><section className={styles.stats} aria-label="My task counts">
+    {isPersonal && connected && canOverview && <><section className={styles.stats} aria-label="My task counts">
       {counts.map(([key, title, count]) => <button key={key} type="button" onClick={() => { setStatus(key); setPage(1); }} aria-pressed={status === key}>
         <span>{title}</span><strong>{busy || !data ? '—' : count}</strong><small>View tasks →</small>
       </button>)}
@@ -298,7 +313,7 @@ export default function InternalUserDashboard({ name, username = '', position, p
       </section>
     </div>
     </>}
-    {isPersonal && canViewTasks && <div className={styles.grid}>
+    {isPersonal && connected && canViewTasks && <div className={styles.grid}>
       {canViewTasks && <section className={`${styles.panel} ${styles.anchorSection}`} aria-labelledby="assigned-title" aria-busy={busy} id="assigned-tasks">
         <div className={styles.sectionHeading}><div><h2 id="assigned-title">My Assigned Tasks</h2><p>Your personal task list. Changes are managed in Hubstaff.</p></div>
           <span className={styles.readOnly}>Read only</span></div>
@@ -313,10 +328,9 @@ export default function InternalUserDashboard({ name, username = '', position, p
           <label>Order<select aria-label="Sort direction" value={sortDirection} onChange={event => { setSortDirection(event.target.value); setPage(1); }}><option value="desc">Descending</option><option value="asc">Ascending</option></select></label>
         </div>
         {busy ? <div className={styles.skeleton} role="status"><span className="sr-only">Loading your assigned tasks</span><i /><i /><i /></div>
-          : !connected ? <div className={styles.empty}><h3>Bring your work together</h3><p>Connect your approved Hubstaff account to see your personal assignments.</p></div>
-            : error ? <div className={styles.empty}><h3>Work is temporarily unavailable</h3><p>Check the connection message above, then refresh.</p></div>
-              : !visible.length ? <div className={styles.empty}><h3>{tasks.length ? 'No tasks match these filters' : 'No assigned tasks yet'}</h3><p>{tasks.length ? 'Try another search, project, or status.' : 'Your assignments will appear here after they are added in Hubstaff.'}</p></div>
-                : <ul className={styles.tasks}>{visible.map(task => {
+          : error ? <div className={styles.empty}><h3>Work is temporarily unavailable</h3><p>Check the connection message above, then refresh.</p></div>
+            : !visible.length ? <div className={styles.empty}><h3>{tasks.length ? 'No tasks match these filters' : 'No assigned tasks yet'}</h3><p>{tasks.length ? 'Try another search, project, or status.' : 'Your assignments will appear here after they are added in Hubstaff.'}</p></div>
+              : <ul className={styles.tasks}>{visible.map(task => {
                   const due = dueState(task, now);
                   const expanded = expandedTaskId === task.id;
                   const plannedToday = todayTaskIds.includes(task.id);
@@ -411,18 +425,20 @@ export default function InternalUserDashboard({ name, username = '', position, p
         </section>}
       </aside>
     </div>}
-    {isSettings && canAccountSettings && !previewData && <InternalPasswordSettings username={username} />}
-    {isSettings && canConnectHubstaff && <div className={`${styles.grid} ${styles.singleColumnGrid}`}>
-      <section className={`${styles.panel} ${styles.settingsPanel}`} id="hubstaff-connection">
-        <div className={styles.sectionHeading}><div><h2>Hubstaff connection</h2><p>Connect the approved personal account used for your work data.</p></div>
-          <span className={data?.connection.connected && !error ? styles.connectionReady : styles.connectionPending}>
-            {data?.connection.connected && !error ? 'Connected' : 'Setup needed'}
-          </span></div>
-        <p className={styles.health}><span className={data?.connection.connected && !error ? styles.healthy : styles.pending} />{busy ? 'Checking connection…' : error ? 'Needs attention' : data?.connection.connected ? 'Connected and ready' : connected ? 'Ready to verify' : 'Not connected'}</p>
-        <p>{data?.connection.name || 'Your approved personal Hubstaff account'}</p>
-        <small>{data?.syncedAt ? `Last synchronized ${new Date(data.syncedAt).toLocaleString()}` : 'No successful synchronization recorded yet.'}</small>
-        {children}
-      </section>
+    {isSettings && ((canAccountSettings && !previewData) || canConnectHubstaff) && <div className={styles.settingsStack}>
+      {canAccountSettings && !previewData && <InternalPasswordSettings username={username} />}
+      {canConnectHubstaff && <div className={`${styles.grid} ${styles.singleColumnGrid}`}>
+        <section className={`${styles.panel} ${styles.settingsPanel}`} id="hubstaff-connection">
+          <div className={styles.sectionHeading}><div><h2>Hubstaff connection</h2><p>Connect the approved personal account used for your work data.</p></div>
+            <span className={data?.connection.connected && !error ? styles.connectionReady : styles.connectionPending}>
+              {data?.connection.connected && !error ? 'Connected' : 'Setup needed'}
+            </span></div>
+          <p className={styles.health}><span className={data?.connection.connected && !error ? styles.healthy : styles.pending} />{busy ? 'Checking connection…' : error ? 'Needs attention' : data?.connection.connected ? 'Connected and ready' : connected ? 'Ready to verify' : 'Not connected'}</p>
+          <p>{data?.connection.name || 'Your approved personal Hubstaff account'}</p>
+          <small>{data?.syncedAt ? `Last synchronized ${new Date(data.syncedAt).toLocaleString()}` : 'No successful synchronization recorded yet.'}</small>
+          {children}
+        </section>
+      </div>}
     </div>}
     {isTeam && canViewTeam && <div className={`${styles.bottomGrid} ${styles.singleColumnGrid}`}>
       {canViewTeam && <section className={`${styles.panel} ${styles.anchorSection}`} id="team-directory">
@@ -443,7 +459,7 @@ export default function InternalUserDashboard({ name, username = '', position, p
         </div>}
       </section>}
     </div>}
-    {isPersonal && canViewActivity && <div className={styles.bottomGrid} id="activity">
+    {isPersonal && connected && canViewActivity && <div className={styles.bottomGrid} id="activity">
       <section className={`${styles.panel} ${styles.anchorSection}`}><h2>Recent task activity</h2><p>Latest updates to your assigned tasks.</p>
         {recent.length ? <ul className={styles.activity}>{recent.map(task => <li key={task.id}><div><strong>{task.title}</strong><span>{task.projectName} · {task.status}</span></div><time>{displayDate(task.updatedAt)}</time></li>)}</ul> : <p className={styles.emptySmall}>No recent activity to show.</p>}</section>
       <section className={styles.panel}><h2>Recently completed</h2><p>Your most recent finished assignments.</p>

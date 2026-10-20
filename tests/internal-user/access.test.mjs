@@ -130,6 +130,19 @@ const db = { query: async (query, values) => {
   }
   if (query.includes('SET next_request_at')) return { rowCount: claimed ? 1 : 0, rows: [] };
   if (query.includes('SELECT encrypted_refresh_token, access_expires_at')) return { rows: [] };
+  if (query.startsWith('WITH disconnected AS')) {
+    assert.match(query, /encrypted_access_token=NULL, encrypted_refresh_token=NULL/);
+    assert.match(query, /hubstaff_connection_kind='pat'/);
+    assert.match(query, /'hubstaff\.connection\.unlink'/);
+    if (!internalUser?.encrypted_access_token || values[0] !== internalUser.user_id
+      || values[1] !== internalUser.hubstaff_user_id
+      || values[2] !== internalUser.connection_version) return { rowCount: 0, rows: [] };
+    internalUser = { ...internalUser, encrypted_access_token: null, encrypted_refresh_token: null,
+      access_expires_at: null, hubstaff_connection_kind: 'pat', last_synced_at: null,
+      next_request_at: null, connection_version: String(Number(internalUser.connection_version) + 1) };
+    roleAudit.push([internalUser.user_id, internalUser.user_id, 'hubstaff.connection.unlink']);
+    return { rowCount: 1, rows: [{ target_user_id: internalUser.user_id }] };
+  }
   if (query.includes('SET encrypted_access_token')) { savedCiphertext = values[3]; return { rowCount: 1 }; }
   if (query.includes('SET last_synced_at')) return { rowCount: 1, rows: [{ last_synced_at: new Date() }] };
   throw new Error('Unexpected SQL');
@@ -151,7 +164,7 @@ after(() => { globalThis.fetch = originalFetch; });
 const { resolvePortalContext, loadPortalAiAccess } = await import('../../lib/portal-data.js');
 const { resolveAdminContext } = await import('../../lib/admin-data.js');
 const { resolveInternalUserContext } = await import('../../lib/internal-user-data.js');
-const { encryptInternalUserToken } = await import('../../lib/internal-user-repository.js');
+const { encryptInternalUserToken, unlinkInternalUserConnection } = await import('../../lib/internal-user-repository.js');
 const { GET: internalUserDashboard } = await import('../../app/api/internal/dashboard/route.js');
 const { GET: platformAudit } = await import('../../app/api/internal/audit/route.js');
 const { GET: hrDashboard } = await import('../../app/api/internal/hr/route.js');
@@ -160,6 +173,7 @@ const { GET: internalUsersGet, POST: internalUsersPost, PATCH: internalUsersPatc
 } = await import('../../app/api/internal/internal-users/route.js');
 const { GET: availableHubstaffMembers } = await import('../../app/api/internal/hubstaff-members/route.js');
 const { POST: connect } = await import('../../app/api/internal/connection/route.js');
+const { POST: unlink } = await import('../../app/api/internal/connection/unlink/route.js');
 const { POST: chatkit } = await import('../../app/api/chatkit/route.js');
 const { GET: clientHubstaff } = await import('../../app/api/hubstaff/route.js');
 const { GET: builder } = await import('../../app/api/builder/route.js');
@@ -876,4 +890,49 @@ test('connection POST validates identity, stores ciphertext only, rejects origin
   response = await connect(request('/api/internal/connection', 'POST', new URLSearchParams({ token: testToken })));
   assert.equal(response.headers.get('location'), '/internal/settings?connection=identity_mismatch');
   assert.equal(savedCiphertext, saved, 'A failed connection never overwrites the working one');
+});
+
+test('Hubstaff unlink clears only the signed-in user connection, audits once, and rejects denied requests', async () => {
+  roles = [];
+  session = { user: { id: 'internal-user-a', name: 'InternalUser A' } };
+  const connected = { ...internalUserA, encrypted_access_token: 'fixture-encrypted-access-never-real',
+    encrypted_refresh_token: 'fixture-encrypted-refresh-never-real',
+    access_expires_at: new Date('2026-12-01'), hubstaff_connection_kind: 'oauth',
+    last_synced_at: new Date('2026-10-01') };
+  internalUser = { ...connected, panel_access: ['overview'] };
+  let response = await unlink(request('/api/internal/connection/unlink', 'POST'));
+  assert.equal(response.headers.get('location'), '/internal/settings?connection=panel_forbidden');
+  assert.equal(internalUser.encrypted_access_token, connected.encrypted_access_token);
+
+  internalUser = { ...connected };
+  response = await unlink(new Request('https://portal.example/api/internal/connection/unlink', {
+    method: 'POST', headers: { origin: 'https://evil.example' },
+  }));
+  assert.equal(response.status, 403);
+  assert.equal(internalUser.encrypted_access_token, connected.encrypted_access_token);
+  response = await unlink(request('/api/internal/connection/unlink?user_id=2', 'POST'));
+  assert.equal(response.headers.get('location'), '/internal/settings?connection=invalid_request');
+  assert.equal(internalUser.encrypted_access_token, connected.encrypted_access_token);
+
+  const beforeAudit = roleAudit.length;
+  const beforeRuns = integrationRuns.length;
+  response = await unlink(request('/api/internal/connection/unlink', 'POST'));
+  assert.equal(response.status, 303);
+  assert.equal(response.headers.get('location'), '/internal/settings?connection=unlinked');
+  assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  assert.equal(internalUser.encrypted_access_token, null);
+  assert.equal(internalUser.encrypted_refresh_token, null);
+  assert.equal(internalUser.access_expires_at, null);
+  assert.equal(internalUser.last_synced_at, null);
+  assert.equal(internalUser.hubstaff_connection_kind, 'pat');
+  assert.equal(internalUser.connection_version, '1');
+  assert.equal(internalUser.hubstaff_user_id, connected.hubstaff_user_id);
+  assert.deepEqual(roleAudit.slice(beforeAudit), [['1', '1', 'hubstaff.connection.unlink']]);
+  assert.equal(integrationRuns.length, beforeRuns, 'No provider request or integration run is needed');
+
+  response = await unlink(request('/api/internal/connection/unlink', 'POST'));
+  assert.equal(response.headers.get('location'), '/internal/settings?connection=connection_changed');
+  assert.equal(roleAudit.length, beforeAudit + 1);
+  await assert.rejects(unlinkInternalUserConnection(db, connected), error =>
+    error.publicDetails?.code === 'connection_changed');
 });
