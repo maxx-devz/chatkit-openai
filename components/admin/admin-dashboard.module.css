@@ -13,6 +13,10 @@
   color: var(--admin-ink);
 }
 
+.mobileNavButton,
+.mobileNavBackdrop,
+.mobileCloseButton { display: none; }
+
 .sidebar {
   position: sticky;
   top: 0;
@@ -921,8 +925,70 @@
 
 @media (max-width: 720px) {
   .shell { display: block; }
-  .sidebar { display: none; }
-  .topbar { position: static; min-height: 80px; padding: 13px 15px; }
+  .mobileNavButton {
+    position: fixed;
+    z-index: 50;
+    top: 14px;
+    left: 14px;
+    display: grid;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    border: 1px solid #c9dbe9;
+    border-radius: 10px;
+    background: #fff;
+    color: #063968;
+    font-size: 22px;
+    cursor: pointer;
+  }
+  .mobileNavBackdrop {
+    position: fixed;
+    z-index: 51;
+    inset: 0;
+    display: block;
+    width: 100%;
+    border: 0;
+    background: rgba(5, 29, 54, 0.58);
+    cursor: pointer;
+  }
+  .sidebar {
+    position: fixed;
+    z-index: 52;
+    top: 0;
+    left: 0;
+    display: flex;
+    width: min(310px, 86vw);
+    max-width: 100%;
+    overflow-y: auto;
+    visibility: hidden;
+    transform: translateX(-101%);
+    transition: transform 180ms ease, visibility 180ms ease;
+  }
+  .sidebarOpen { visibility: visible; transform: translateX(0); }
+  .brand img { width: 100%; max-width: 190px; height: auto; object-fit: contain; }
+  .brand span { display: block; }
+  .sidebar nav a,
+  .sidebar nav a:not(.activeNav) { justify-content: flex-start; font-size: 13px; }
+  .sidebar nav svg { width: 19px; height: 19px; }
+  .sidebarStatus,
+  .adminIdentity div { display: block; }
+  .mobileCloseButton {
+    position: absolute;
+    z-index: 2;
+    top: 18px;
+    right: 13px;
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, .3);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, .08);
+    color: #fff;
+    font-size: 22px;
+    cursor: pointer;
+  }
+  .topbar { position: static; min-height: 80px; padding: 13px 15px 13px 68px; }
   .topbar > div:first-child > span,
   .secureBadge { display: none; }
   .topbar h1 { font-size: 20px; }

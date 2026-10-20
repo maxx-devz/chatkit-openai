@@ -20,4 +20,4 @@
 .filter label { display: grid; gap: 6px; font-weight: 700; }
 .filter select { min-width: 220px; padding: 8px; border: 1px solid #bad0e2; border-radius: 7px; background: #fff; }
 .notice { color: #9a4d18; }
-@media (max-width: 720px) { .page { padding: 16px; } .section { padding: 17px; } .top { flex-direction: column; } }
+@media (max-width: 720px) { .page { padding: 72px 16px 16px; } .section { padding: 17px; } .top { flex-direction: column; } }

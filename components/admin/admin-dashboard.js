@@ -1,13 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import aocIcon from "@/aoc-icon.png";
-import aocLogo from "@/aoc-logo.png";
 import SignOutButton from "@/components/auth/sign-out-button";
 import AdminAssistant from "@/components/admin/admin-assistant";
+import AdminSidebar from '@/components/admin/admin-sidebar';
 import PortalUsage from "@/components/admin/portal-usage";
 import ProviderSettings from "@/components/admin/provider-settings";
 import styles from "./admin-dashboard.module.css";
@@ -316,36 +315,7 @@ export default function AdminDashboard({ initialData }) {
 
   return (
     <div className={styles.shell}>
-      <aside className={styles.sidebar}>
-        <div className={styles.brand}>
-          <Image src={aocLogo} alt="Always Open Commerce" priority />
-          <span>Administrator Portal</span>
-        </div>
-
-        <nav aria-label="Administrator portal">
-          <a className={styles.activeNav} href="#overview"><Icon name="overview" />Overview</a>
-          <a href="#portal-usage"><Icon name="activity" />AI usage</a>
-          <Link href="/admin/audit"><Icon name="shield" />Audit Log</Link>
-          <a href="#clients"><Icon name="clients" />Client controls</a>
-          <a href="#assistant"><Icon name="spark" />AI assistant</a>
-          <Link href="/builder"><Icon name="spark" />Assistant settings</Link>
-          <a href="#ai-controls"><Icon name="activity" />AI allowances</a>
-          <a href="#security"><Icon name="shield" />Access & security</a>
-        </nav>
-
-        <div className={styles.sidebarStatus}>
-          <span><i /> Production controls</span>
-          <p>Changes apply immediately to the connected Neon database.</p>
-        </div>
-
-        <div className={styles.adminIdentity}>
-          <span>{initials(initialData.admin.name)}</span>
-          <div>
-            <strong>{initialData.admin.name}</strong>
-            <small>{initialData.admin.username || initialData.admin.role}</small>
-          </div>
-        </div>
-      </aside>
+      <AdminSidebar admin={initialData.admin} />
 
       <div className={styles.main}>
         <header className={styles.topbar}>

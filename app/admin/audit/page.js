@@ -2,7 +2,9 @@ import { headers } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
+import AdminSidebar from '@/components/admin/admin-sidebar';
 import { loadAocAdminAudit } from '@/lib/admin-audit-data';
+import adminStyles from '@/components/admin/admin-dashboard.module.css';
 import styles from '@/components/portal/audit-view.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -45,7 +47,9 @@ export default async function AocAuditPage({ searchParams }) {
     </div></main>;
   }
   const p = audit.pagination;
-  return <main className={styles.page}><div className={styles.content}>
+  return <div className={adminStyles.shell}>
+    <AdminSidebar admin={audit.admin} active="audit" />
+    <div className={adminStyles.main}><main className={styles.page}><div className={styles.content}>
     <header className={styles.top}><div><Link href="/admin">← Back to AOC Admin</Link>
       <h1>AOC Admin Audit Log</h1><p>Administrative changes, integration runs, and AI token usage. No prompts, replies, or credentials.</p>
     </div><Link href="/admin/audit">Show latest</Link></header>
@@ -92,5 +96,6 @@ export default async function AocAuditPage({ searchParams }) {
       {!audit.usage.rows.length && <p>No matching AI actions.</p>}
       <Pagination pagination={p} kind="usagePage" hasMore={audit.usage.hasMore} anchor="ai-usage" />
     </section>
-  </div></main>;
+    </div></main></div>
+  </div>;
 }
