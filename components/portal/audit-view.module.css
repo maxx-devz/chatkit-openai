@@ -1,0 +1,23 @@
+.page { min-height: 100vh; padding: 28px; background: #f4f7fb; color: #17334e; }
+.content { max-width: 1280px; margin: 0 auto; }
+.top { display: flex; justify-content: space-between; align-items: start; gap: 16px; margin-bottom: 22px; }
+.top h1 { margin: 5px 0; font-size: 28px; }
+.top p { margin: 0; color: #587088; }
+.top a, .controls a { color: #075596; font-weight: 700; text-decoration: none; }
+.section { min-width: 0; margin: 18px 0; padding: 22px; border: 1px solid #dce5ef; border-radius: 14px; background: #fff; }
+.section h2 { margin: 0 0 4px; font-size: 19px; }
+.section > p { margin: 0 0 15px; color: #60748a; font-size: 13px; }
+.scroll { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
+.table th, .table td { padding: 11px 12px; border-bottom: 1px solid #e7edf4; vertical-align: top; white-space: nowrap; }
+.table th { color: #586e82; font-weight: 800; }
+.table td { color: #23405d; }
+.table td:first-child { white-space: normal; min-width: 150px; }
+.controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 14px; font-size: 12px; }
+.controls button, .filter button { padding: 8px 12px; border: 1px solid #bad0e2; border-radius: 7px; background: #fff; color: #075596; font-weight: 700; cursor: pointer; }
+.controls button:disabled { opacity: .5; cursor: default; }
+.filter { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; margin: 18px 0; font-size: 12px; }
+.filter label { display: grid; gap: 6px; font-weight: 700; }
+.filter select { min-width: 220px; padding: 8px; border: 1px solid #bad0e2; border-radius: 7px; background: #fff; }
+.notice { color: #9a4d18; }
+@media (max-width: 720px) { .page { padding: 16px; } .section { padding: 17px; } .top { flex-direction: column; } }

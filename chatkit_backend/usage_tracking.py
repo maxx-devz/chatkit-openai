@@ -1,8 +1,38 @@
 """Anonymous operational totals. Model usage is not a billing balance."""
 import logging
+import os
 import anyio
+from uuid import uuid4
 
 logger = logging.getLogger(__name__)
+
+
+async def record_ai_usage_event(db, *, client_id, user_id, action, provider, model,
+                                status, started_at, usage=None):
+    """Record one user action and its provider run without prompt or reply text."""
+    if action not in {"client_ai.reply", "builder.preview"} or status not in {"succeeded", "failed", "cancelled"}:
+        raise ValueError("Invalid AI usage event")
+    reported = usage is not None and usage.requests > 0
+    counts = (usage.input_tokens, usage.output_tokens, usage.total_tokens) if reported else (None, None, None)
+    request_id = str(uuid4())
+    area = "client_portal" if action == "client_ai.reply" else "aoc_admin"
+    with anyio.CancelScope(shield=True):
+        try:
+            await db.execute("""WITH recorded AS (
+                INSERT INTO portal_ai_usage_events(request_id,client_id,actor_user_id,action,provider,model,
+                    status,input_tokens,output_tokens,total_tokens,started_at)
+                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT(request_id) DO NOTHING RETURNING request_id
+            ) INSERT INTO portal_integration_runs(source,operation,environment,trigger_type,request_id,
+                actor_user_id,client_id,portal_area,status,started_at,finished_at)
+              SELECT %s,%s,%s,'request',request_id,%s,%s,%s,%s,%s,NOW() FROM recorded""",
+                (request_id, client_id, user_id, action, (provider or "")[:64] or None,
+                 (model or "")[:120] or None, status, *counts, started_at,
+                 (provider or "ai")[:64], "client_reply" if area == "client_portal" else "builder_preview",
+                 os.getenv("VERCEL_ENV", "development")[:32], user_id, client_id, area,
+                 "succeeded" if status == "succeeded" else "failed", started_at))
+        except Exception as error:
+            logger.error("AI usage event recording failed: %s", type(error).__name__)
 
 
 async def record_usage(db, source, started_at, usage=None):

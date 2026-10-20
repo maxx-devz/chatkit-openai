@@ -3,6 +3,7 @@ import Image from "next/image";
 import AiAssistantPanel from "@/components/ai-assistant/ai-assistant-panel";
 import AccountControls from "@/components/portal/account-controls";
 import ClientDocumentsPanel from "@/components/portal/client-documents-panel";
+import ClientAuditPanel from '@/components/portal/client-audit-panel';
 import ClientMembersPanel from "@/components/portal/client-members-panel";
 import ClientPasswordSettings from "@/components/portal/client-password-settings";
 import HubstaffProvider, {
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   ["chart", "Project Status", "#project-status"],
   ["folder", "Documents", "#client-documents", CLIENT_PERMISSIONS.DOCUMENTS_READ],
   ["users", "Members & Access", "#client-members", CLIENT_PERMISSIONS.MEMBERS_MANAGE],
+  ["clipboard", "Audit Log", "#client-audit", CLIENT_PERMISSIONS.ACCESS_AUDIT_READ],
   ["user", "Account", "#account-security"],
 ];
 
@@ -208,6 +210,8 @@ export default function ClientPortal({ portalContext }) {
         {portal.permissions.includes(CLIENT_PERMISSIONS.MEMBERS_MANAGE)
           ? <ClientMembersPanel key={`members:${portalContext.client.id}`} clientId={portalContext.client.id}
             currentUserId={portalContext.user.id} /> : null}
+        {portal.permissions.includes(CLIENT_PERMISSIONS.ACCESS_AUDIT_READ)
+          ? <ClientAuditPanel key={`audit:${portalContext.client.id}`} clientId={portalContext.client.id} /> : null}
         <ClientPasswordSettings username={portalContext.user.username} />
         <footer className={styles.footer}>
           <span>© 2026 Always Open Commerce. Prototype client portal.</span>

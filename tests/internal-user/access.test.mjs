@@ -88,7 +88,7 @@ const db = { query: async (query, values) => {
   if (query.includes("SELECT to_char(clock_timestamp() AT TIME ZONE 'UTC'")) {
     return { rows: [{ audit_as_of: new Date().toISOString() }] };
   }
-  if (query.includes('FROM portal_integration_runs WHERE started_at <= $1')) {
+  if (query.includes("FROM portal_integration_runs WHERE portal_area='internal' AND started_at <= $1")) {
     return { rows: (pagedAuditRuns || integrationRuns.toReversed()).slice(values[2], values[2] + values[1]) };
   }
   if (query.includes('FROM portal_internal_access_audit WHERE occurred_at <= $1')) {

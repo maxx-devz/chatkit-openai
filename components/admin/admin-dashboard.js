@@ -325,6 +325,7 @@ export default function AdminDashboard({ initialData }) {
         <nav aria-label="Administrator portal">
           <a className={styles.activeNav} href="#overview"><Icon name="overview" />Overview</a>
           <a href="#portal-usage"><Icon name="activity" />AI usage</a>
+          <Link href="/admin/audit"><Icon name="shield" />Audit Log</Link>
           <a href="#clients"><Icon name="clients" />Client controls</a>
           <a href="#assistant"><Icon name="spark" />AI assistant</a>
           <Link href="/builder"><Icon name="spark" />Assistant settings</Link>
