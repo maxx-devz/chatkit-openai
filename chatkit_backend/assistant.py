@@ -15,7 +15,7 @@ from store import Context
 from generation import generation_tools
 from provider_errors import provider_issue
 from uploads import AttachmentConverter, MAX_CONTEXT_ATTACHMENTS
-from usage_tracking import record_usage
+from usage_tracking import record_usage, record_ai_usage_event
 from client_library import client_library_tools
 from ai_provider import agent_model, configure_agents, supports_openai_hosted_tools
 from streaming import PortalAgentContext, stream_portal_response
@@ -205,6 +205,7 @@ class PortalChatKitServer(ChatKitServer[Context]):
     async def respond(self, thread, input_user_message, context):
         result = None
         agent_context = None
+        stream_failed = False
         started_at = datetime.now(timezone.utc)
         started = perf_counter()
         model_started = None
@@ -251,6 +252,7 @@ class PortalChatKitServer(ChatKitServer[Context]):
             async for event in stream_portal_response(agent_context, result):
                 yield event
         except Exception as error:
+            stream_failed = True
             issue = provider_issue(error)
             # Log only our known code, never the provider body, prompt or API key.
             logger.error("Assistant response failed: %s code=%s", type(error).__name__, issue.code)
@@ -259,10 +261,11 @@ class PortalChatKitServer(ChatKitServer[Context]):
             stream_finished = perf_counter()
             if agent_context is not None:
                 await agent_context.close_stream()
+            usage = result.context_wrapper.usage if result else None
+            status = "failed" if stream_failed else "succeeded" if result and result.is_complete else "cancelled"
             if result:
                 if not result.is_complete:
                     result.cancel()
-                usage = result.context_wrapper.usage
                 await record_usage(context.db, "client", started_at, usage)
                 if context.period_start and usage.total_tokens:
                     try:
@@ -275,6 +278,9 @@ class PortalChatKitServer(ChatKitServer[Context]):
                               context.client_id, context.period_start))
                     except Exception as error:
                         logger.error("ChatKit token accounting failed: %s", type(error).__name__)
+            await record_ai_usage_event(context.db, client_id=context.client_id, user_id=context.user_id,
+                action="client_ai.reply", provider=getattr(context.ai_provider, "name", None),
+                model=context.ai_model, status=status, started_at=started_at, usage=usage)
             await close_provider_clients(context)
             total_ms = round((perf_counter() - started) * 1000)
             if total_ms >= 5000:

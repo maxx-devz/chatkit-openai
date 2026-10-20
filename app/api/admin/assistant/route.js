@@ -1,7 +1,10 @@
 import OpenAI from "openai";
+import { randomUUID } from 'node:crypto';
 import { resolveAiProvider } from "@/lib/ai-provider";
 import { getRuntimeProvider } from "@/lib/provider-settings";
 import { recordAdminUsage } from "@/lib/portal-usage";
+import { databasePool } from '@/lib/database';
+import { startIntegrationRun, finishIntegrationRun } from '@/lib/integration-run-audit';
 import { openaiIssue } from "@/lib/openai-issues";
 import { consumeAdminResponse } from "@/lib/admin-response-stream";
 import { getSiteAiModel, saveSiteAiModel } from "@/lib/site-ai-settings";
@@ -201,6 +204,8 @@ export async function POST(request) {
   let body;
   let messages;
   let provider;
+  let admin;
+  let selectedClient;
 
   try {
     assertTrustedOrigin(request.headers);
@@ -214,7 +219,7 @@ export async function POST(request) {
   }
 
   try {
-    await resolveAdminContext(request.headers);
+    ({ admin } = await resolveAdminContext(request.headers));
     provider = await getRuntimeProvider();
     if (!provider.apiKey) {
       return Response.json(
@@ -226,7 +231,7 @@ export async function POST(request) {
     // Browser overrides must not bypass the administrator's site-wide selection.
     const model = provider.model;
 
-    const selectedClient = await loadAdminAssistantClient(body?.clientSlug, request.headers);
+    selectedClient = await loadAdminAssistantClient(body?.clientSlug, request.headers);
     const clientContext = selectedClientContext(selectedClient, provider);
 
     const tools = provider.supportsOpenAiHostedTools && selectedClient?.vectorStoreId
@@ -241,6 +246,13 @@ export async function POST(request) {
     // temporary 429/503 responses. Keep the overall route deadline below Vercel's limit.
     const openai = new OpenAI({ apiKey: provider.apiKey, baseURL: provider.baseURL,
       defaultHeaders: provider.defaultHeaders, maxRetries: provider.id === "openrouter" ? 0 : 2 });
+    let result;
+    const startedAt = new Date().toISOString();
+    const requestId = randomUUID();
+    await databasePool.query('SELECT request_id FROM portal_ai_usage_events LIMIT 0');
+    const runId = await startIntegrationRun(databasePool, { source: provider.id,
+      operation: 'admin_assistant', actorUserId: admin.id,
+      clientId: selectedClient?.id || null, portalArea: 'aoc_admin' });
     const upstreamController = new AbortController();
     const timeout = setTimeout(() => {
       upstreamController.abort(new Error("Admin assistant request timed out."));
@@ -250,9 +262,6 @@ export async function POST(request) {
       () => upstreamController.abort(request.signal.reason),
       { once: true },
     );
-
-    let result;
-    const startedAt = new Date().toISOString();
     try {
       result = await openai.responses.create(
         {
@@ -268,7 +277,14 @@ export async function POST(request) {
       ).withResponse();
     } catch (error) {
       clearTimeout(timeout);
-      await recordAdminUsage(startedAt, null, { code: openaiIssue(error, provider.id).code, model, provider });
+      const audits = await Promise.allSettled([
+        recordAdminUsage(startedAt, null, { code: openaiIssue(error, provider.id).code, model, provider,
+          actorUserId: admin.id, clientId: selectedClient?.id || null, requestId }),
+        finishIntegrationRun(databasePool, runId, { status: 'failed', errorCode: 'connection_unavailable' }),
+      ]);
+      for (const audit of audits) if (audit.status === 'rejected') {
+        console.error('Admin AI failure audit failed', { code: audit.reason?.code || 'audit_error' });
+      }
       throw error;
     }
 
@@ -295,7 +311,17 @@ export async function POST(request) {
           failure = openaiIssue(error, provider.id);
         } finally {
           clearTimeout(timeout);
-          await recordAdminUsage(startedAt, usage, { code: failure?.code || "ready", model, provider });
+          try {
+            await recordAdminUsage(startedAt, usage, { code: failure?.code || "ready", model, provider,
+              actorUserId: admin.id, clientId: selectedClient?.id || null, requestId });
+          } catch (auditError) {
+            console.error('Admin AI usage audit failed', { code: auditError?.code || 'audit_error' });
+            failure ||= { code: 'audit_unavailable', message: 'The AI usage audit could not be saved.' };
+          }
+          await finishIntegrationRun(databasePool, runId, { status: failure ? 'failed' : 'succeeded',
+            errorCode: failure ? 'connection_unavailable' : null }).catch(error => {
+            console.error('Admin AI integration audit failed', { code: error?.code || 'audit_error' });
+          });
           try {
             sendLine(controller, failure
               ? { type: "error", message: failure.message, code: failure.code }

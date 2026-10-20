@@ -107,6 +107,8 @@ Existing accounts, client records, conversations, and administrator tools are re
 | `npm run portal:migrate` | Client, membership, and earlier-history schema |
 | `npm run client-access:migrate -- --dry-run` | Validate per-client roles and audit schema without keeping changes |
 | `npm run client-access:migrate` | Enable Viewer memberships and audited client access changes; run before deploying this branch |
+| `npm run admin-audit:migrate -- --dry-run` | Validate the Client/AOC Admin audit and AI usage migration without retaining changes |
+| `npm run admin-audit:migrate` | Enable Client/AOC Admin audit logs and per-action AI usage ([setup](docs/CLIENT_AND_AOC_ADMIN_AUDIT.md)) |
 | `npm run admin:migrate` | Staff access, monthly usage, client integrations, and encrypted PAT storage |
 | `npm run chatkit:migrate` | ChatKit conversations and request leases |
 | `npm run uploads:migrate` | Conversation attachment storage and limits |

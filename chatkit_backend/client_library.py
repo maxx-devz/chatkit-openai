@@ -171,6 +171,11 @@ async def save_attachment(context, *, filename, title, description="", period_st
         """, (identifier, *context.scope, title, description, source["filename"], source["mime_type"],
                 content, extracted_text(source), start, end, source["id"]))
         inserted = await cursor.fetchone()
+        if inserted:
+            await context.db.execute("""INSERT INTO portal_audit_events
+                (audience,client_id,actor_user_id,action,target_type,target_id)
+                VALUES('client',%s,%s,'client.document.add','document',%s)""",
+                (context.client_id, context.user_id, identifier))
     if not inserted:
         return {"saved": True, "alreadySaved": True, "filename": source["filename"]}
 
@@ -222,11 +227,16 @@ async def save_link(context, *, url, title, description="", period_start="", per
     if start and end and start > end:
         raise LibraryError("Start date cannot be after end date")
     identifier = "lib_" + uuid4().hex
-    await context.db.execute("""
-        INSERT INTO portal_client_library
-          (id,client_id,submitted_by,source_type,title,description,source_url,period_start,period_end,index_status)
-        VALUES (%s,%s,%s,'link',%s,%s,%s,%s,%s,'not_applicable')
-    """, (identifier, *context.scope, title, description, url, start, end))
+    async with context.db.transaction():
+        await context.db.execute("""
+            INSERT INTO portal_client_library
+              (id,client_id,submitted_by,source_type,title,description,source_url,period_start,period_end,index_status)
+            VALUES (%s,%s,%s,'link',%s,%s,%s,%s,%s,'not_applicable')
+        """, (identifier, *context.scope, title, description, url, start, end))
+        await context.db.execute("""INSERT INTO portal_audit_events
+            (audience,client_id,actor_user_id,action,target_type,target_id)
+            VALUES('client',%s,%s,'client.document.add','document',%s)""",
+            (context.client_id, context.user_id, identifier))
     return {"saved": True, "id": identifier, "title": title, "url": url,
             "notice": "The link is saved as a reference. Its protected content is not copied or indexed."}
 

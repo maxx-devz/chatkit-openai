@@ -35,6 +35,7 @@
     "internal-user:migrate": "node --env-file=.env.local scripts/migrate-internal-user.mjs",
     "internal-hubstaff-oauth:migrate": "node --env-file=.env.local scripts/migrate-internal-hubstaff-oauth.mjs",
     "integration-audit:migrate": "node --env-file=.env.local scripts/migrate-integration-audit.mjs",
+    "admin-audit:migrate": "node --env-file=.env.local scripts/migrate-admin-audit.mjs",
     "internal-sync:migrate": "node --env-file=.env.local scripts/migrate-internal-sync.mjs",
     "internal-sync:check": "node --env-file=.env.local scripts/check-internal-sync.mjs",
     "internal-user:create": "node --env-file=.env.local scripts/create-internal-user.mjs",
