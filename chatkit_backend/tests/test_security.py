@@ -149,7 +149,7 @@ class EndpointTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_oversized_request_is_rejected_before_database(self):
         with patch.dict(os.environ, {"CHATKIT_BACKEND_SECRET": SECRET}), patch("app.connect_database", new_callable=AsyncMock) as connect:
-            self.assertEqual(await post(b"x" * 150001), 413)
+            self.assertEqual(await post(b"x" * 250001), 413)
             connect.assert_not_awaited()
 
 

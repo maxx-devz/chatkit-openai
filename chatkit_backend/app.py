@@ -37,14 +37,24 @@ MUTATE = GENERATE | {"threads.update", "threads.delete", "attachments.delete"}
 ALLOWED = MUTATE | {"threads.list", "threads.get_by_id", "items.list"}
 
 
+class SourceReference(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(max_length=500)
+    revision: str = Field(pattern=r"^[0-9]{1,40}$")
+    text: str = Field(max_length=2000)
+    citation: str = Field(pattern=r"^SRC-[A-Za-z0-9_-]{12}$")
+    excerpt: bool
+
+
 class Envelope(BaseModel):
     model_config = ConfigDict(extra="forbid")
     client_id: str = Field(pattern=r"^[1-9][0-9]{0,18}$")
     user_id: str = Field(pattern=r"^[1-9][0-9]{0,18}$")
-    instructions: str = Field(max_length=20_000)
+    instructions: str = Field(max_length=30_000)
     portal_origin: str = Field(default="", max_length=300)
     hubstaff: dict | None = None
     chat_mode: str = Field(default="work", pattern=r"^(work|general)$")
+    source_references: list[SourceReference] = Field(default_factory=list, max_length=4)
     payload: dict
 
 
@@ -157,7 +167,7 @@ async def chatkit(request: Request):
     body = bytearray()
     async for chunk in request.stream():
         body.extend(chunk)
-        if len(body) > 150_000:
+        if len(body) > 250_000:
             return JSONResponse({"error": "Request too large"}, status_code=413, headers=NO_STORE)
     if not verify_signature(bytes(body), request.headers.get("x-chatkit-timestamp", ""),
                             request.headers.get("x-chatkit-signature", ""), secret):
@@ -180,6 +190,7 @@ async def chatkit(request: Request):
         context = Context(db, envelope.client_id, envelope.user_id, envelope.instructions, client)
         context.debug_trace = verified_debug_context(request.headers)
         context.chat_mode = envelope.chat_mode
+        context.source_references = [reference.model_dump() for reference in envelope.source_references]
         # History and conversation-management requests do not use assistant
         # settings. Fetch them only when a reply will be generated.
         if parsed.type in GENERATE:

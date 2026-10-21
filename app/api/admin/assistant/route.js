@@ -6,6 +6,9 @@ import { openaiIssue } from "@/lib/openai-issues";
 import { consumeAdminResponse } from "@/lib/admin-response-stream";
 import { getSiteAiModel, saveSiteAiModel } from "@/lib/site-ai-settings";
 import { validateSiteModel } from "@/lib/site-ai-repository";
+import { loadPreparedSourceContext } from "@/lib/prepared-source-context";
+import { appendPreparedInstructions, PREPARED_REFERENCE_NOTICE } from "@/lib/prepared-source-policy";
+import { DriveSourceError } from "@/lib/drive-source-policy";
 
 import { ADMIN_ASSISTANT_INSTRUCTIONS } from "@/config/assistant";
 import {
@@ -214,7 +217,7 @@ export async function POST(request) {
   }
 
   try {
-    await resolveAdminContext(request.headers);
+    const { admin } = await resolveAdminContext(request.headers);
     provider = await getRuntimeProvider();
     if (!provider.apiKey) {
       return Response.json(
@@ -228,6 +231,10 @@ export async function POST(request) {
 
     const selectedClient = await loadAdminAssistantClient(body?.clientSlug, request.headers);
     const clientContext = selectedClientContext(selectedClient, provider);
+    const prepared = await loadPreparedSourceContext({ ownerId: admin.id }, messages.at(-1).content);
+    const input = recentMessages(messages);
+    if (prepared.references.length) input.splice(-1, 0, { role: "user",
+      content: PREPARED_REFERENCE_NOTICE + JSON.stringify(prepared.references) });
 
     const tools = provider.supportsOpenAiHostedTools && selectedClient?.vectorStoreId
       ? [{
@@ -257,8 +264,8 @@ export async function POST(request) {
       result = await openai.responses.create(
         {
           model,
-          instructions: `${ADMIN_ASSISTANT_INSTRUCTIONS}\n\n${clientContext}`,
-          input: recentMessages(messages),
+          instructions: appendPreparedInstructions(`${ADMIN_ASSISTANT_INSTRUCTIONS}\n\n${clientContext}`, prepared.instructions),
+          input,
           max_output_tokens: MAX_OUTPUT_TOKENS,
           stream: true,
           store: false,
@@ -314,6 +321,7 @@ export async function POST(request) {
     provider ||= resolveAiProvider();
     console.error("Admin assistant request failed", diagnostic(error, model, provider));
     if (error?.publicDetails) return adminErrorResponse(error);
+    if (error instanceof DriveSourceError) return Response.json({ error: error.message, code: error.code }, { status: error.status, headers: { "Cache-Control": "private, no-store" } });
     const issue = openaiIssue(error, provider.id);
     return Response.json(
       {

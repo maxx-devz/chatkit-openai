@@ -328,6 +328,7 @@ export default function AdminDashboard({ initialData }) {
           <a href="#clients"><Icon name="clients" />Client controls</a>
           <a href="#assistant"><Icon name="spark" />AI assistant</a>
           <Link href="/builder"><Icon name="spark" />Assistant settings</Link>
+          <Link href="/admin/sources"><Icon name="shield" />Source connections</Link>
           <a href="#ai-controls"><Icon name="activity" />AI allowances</a>
           <a href="#security"><Icon name="shield" />Access & security</a>
         </nav>

@@ -1,7 +1,8 @@
 """Curated client messages for provider failures, including HTTP 200 streams."""
 from dataclasses import dataclass
+import re
 
-from openai import APIError
+from openai import APIConnectionError, APIError, APITimeoutError
 
 
 @dataclass(frozen=True)
@@ -9,6 +10,13 @@ class ProviderIssue:
     code: str
     message: str
     allow_retry: bool
+
+
+class ImageGenerationError(Exception):
+    """Only curated messages and validated response metadata may cross ChatKit."""
+    def __init__(self, issue):
+        self.issue = issue
+        super().__init__(issue.code)
 
 
 CONTACT = "Please contact Always Open Commerce."
@@ -61,6 +69,15 @@ ALIASES = {
 
 
 def provider_issue(error: Exception) -> ProviderIssue:
+    # Agents wraps tool failures in UserError. Recover only our safe image
+    # failure, never a wrapper's text or an arbitrary nested provider message.
+    cause = error
+    for _ in range(5):
+        if isinstance(cause, ImageGenerationError):
+            return cause.issue
+        cause = cause.__cause__ if isinstance(cause, Exception) else None
+        if cause is None:
+            break
     # A streaming APIError has a code but no status_code. Check the code first;
     # never infer exhausted credits from HTTP 429 or match raw error messages.
     if not isinstance(error, APIError):
@@ -89,3 +106,64 @@ def provider_issue(error: Exception) -> ProviderIssue:
     if status in (403, 404):
         return ISSUES["model_unavailable"]
     return ISSUES["request_failed"]
+
+
+IMAGE_ISSUES = {
+    "image_tool_disabled": ("Image generation is not enabled for this client. Ask an AOC administrator to enable and publish it in Assistant settings.", False),
+    "image_provider_unconfigured": ("Image generation requires an OpenAI API key saved in AI provider settings.", False),
+    "image_generation_limit_reached": ("This client's monthly image-generation allowance has been reached.", False),
+    "image_reply_limit_reached": ("At most two files can be generated in one reply. Send a new message for another image.", False),
+    "image_invalid_request": ("The image request was invalid. Revise the image description and try again.", False),
+    "image_response_invalid": ("OpenAI did not return usable image data. No image download was created. Please retry.", True),
+    "image_generation_failed": ("Image generation could not finish. No successful image download is available. " + CONTACT, True),
+    "image_generation_timeout": ("The OpenAI image request timed out before an image was received. Please retry.", True),
+    "image_connection_failed": ("The server could not connect to OpenAI to generate the image. Please retry.", True),
+    "image_server_error": ("OpenAI returned a server error while generating the image. Please retry shortly.", True),
+    "moderation_blocked": ("OpenAI blocked the image request under its safety policy. Revise the prompt and try again.", False),
+    "credit_balance_exhausted": ("OpenAI could not generate the image because API credits are exhausted. " + CONTACT, False),
+    "insufficient_quota": ("OpenAI could not generate the image because an API quota or billing limit was reached. " + CONTACT, False),
+    "authentication_failed": ("OpenAI rejected the image-generation credentials. " + CONTACT, False),
+    "model_unavailable": ("OpenAI could not access the configured image model or resource. " + CONTACT, False),
+    "rate_limit_exceeded": ("OpenAI temporarily rate-limited image generation. Please wait a moment, then retry.", True),
+}
+
+
+def image_generation_error(code, error=None):
+    """Keep actual HTTP/request identifiers, but never forward provider bodies."""
+    if code not in IMAGE_ISSUES:
+        code = "image_generation_failed"
+    message, retry = IMAGE_ISSUES[code]
+    details = ["Code: " + code]
+    if isinstance(error, APIError):
+        status = getattr(error, "status_code", None)
+        if type(status) is int and 100 <= status <= 599:
+            details.append("HTTP " + str(status))
+        request_id = getattr(error, "request_id", None)
+        if isinstance(request_id, str) and re.fullmatch(r"req_[A-Za-z0-9_-]{1,120}", request_id):
+            details.append("OpenAI request: " + request_id)
+    return ImageGenerationError(ProviderIssue(code, message + " (" + "; ".join(details) + ")", retry))
+
+
+def image_provider_error(error):
+    """Classify the real SDK failure; a 429 alone is never called billing."""
+    if isinstance(error, APITimeoutError):
+        code = "image_generation_timeout"
+    elif isinstance(error, APIConnectionError):
+        code = "image_connection_failed"
+    elif isinstance(error, APIError):
+        body = error.body if isinstance(error.body, dict) else {}
+        if error.code == "moderation_blocked":
+            code = "moderation_blocked"
+        elif body.get("type") == "image_generation_user_error":
+            code = "image_invalid_request"
+        elif provider_issue(error).code != "request_failed":
+            code = provider_issue(error).code
+        elif getattr(error, "status_code", None) == 400:
+            code = "image_invalid_request"
+        elif (getattr(error, "status_code", None) or 0) >= 500:
+            code = "image_server_error"
+        else:
+            code = "image_generation_failed"
+    else:
+        code = "image_generation_failed"
+    return image_generation_error(code, error)

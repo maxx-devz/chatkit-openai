@@ -11,10 +11,14 @@ import { withDebuggerTrace, debuggerSpan } from "@/lib/debugger/server";
 import { isReplyRequest, streamWithWorkflow } from "@/lib/chatkit-workflow";
 import {
   chatKitThreadId,
+  chatKitInputText,
   hubstaffContextQuery,
   hubstaffConversationContextRequested,
 } from "@/lib/chatkit-hubstaff";
 import { loadHubstaffAssistantSnapshot } from "@/lib/hubstaff";
+import { loadPreparedSourceContext } from "@/lib/prepared-source-context";
+import { appendPreparedInstructions } from "@/lib/prepared-source-policy";
+import { DriveSourceError } from "@/lib/drive-source-policy";
 import {
   assertTrustedOrigin, readJsonRequest, requestSecurityErrorResponse,
 } from "@/lib/request-security";
@@ -51,7 +55,8 @@ async function handlePOST(request) {
       if (savedMode !== mode) return Response.json({ error: "This conversation belongs to the other chat mode. Reload and try again." }, { status: 409, headers: noStore });
     }
     const run = async (send = () => {}) => {
-    const needsConversationContext = mode === "work" && threadId && hubstaffConversationContextRequested(payload);
+    const needsConversationContext = threadId && ((mode === "work" && hubstaffConversationContextRequested(payload))
+      || (isReplyRequest(payload) && !chatKitInputText(payload)));
     if (needsConversationContext) send("context");
     const conversationContext = needsConversationContext
       ? await loadPortalConversationContext(context.clientId, context.userId, threadId)
@@ -62,6 +67,9 @@ async function handlePOST(request) {
           return "";
         })
       : "";
+    const prepared = isReplyRequest(payload)
+      ? await loadPreparedSourceContext({ clientId: context.clientId }, chatKitInputText(payload) || conversationContext, mode)
+      : { instructions: "", references: [] };
     const hubstaffQuery = mode === "work" ? hubstaffContextQuery(payload, conversationContext) : null;
     if (hubstaffQuery !== null) send("hubstaff");
     const hubstaff = hubstaffQuery !== null
@@ -76,7 +84,8 @@ async function handlePOST(request) {
     const body = JSON.stringify({
       client_id: context.clientId,
       user_id: context.userId,
-      instructions: ASSISTANT_INSTRUCTIONS,
+      instructions: appendPreparedInstructions(ASSISTANT_INSTRUCTIONS, prepared.instructions),
+      source_references: prepared.references,
       portal_origin: new URL(process.env.BETTER_AUTH_URL).origin,
       hubstaff,
       chat_mode: mode,
@@ -138,6 +147,7 @@ async function handlePOST(request) {
     }
     return await run();
   } catch (error) {
+    if (error instanceof DriveSourceError) return Response.json({ error: error.message, code: error.code }, { status: error.status, headers: noStore });
     const known = requestSecurityErrorResponse(error)
       || (error?.publicDetails ? portalErrorResponse(error) : null);
     if (known) {
