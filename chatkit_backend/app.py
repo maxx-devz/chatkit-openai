@@ -53,6 +53,7 @@ class Envelope(BaseModel):
     instructions: str = Field(max_length=30_000)
     portal_origin: str = Field(default="", max_length=300)
     hubstaff: dict | None = None
+    hubstaff_index_binding: str = Field(default="", pattern=r"^(?:[0-9a-f]{64})?$")
     chat_mode: str = Field(default="work", pattern=r"^(work|general)$")
     source_references: list[SourceReference] = Field(default_factory=list, max_length=4)
     payload: dict
@@ -197,6 +198,7 @@ async def chatkit(request: Request):
             context.config = await load_config(db, client)
         context.portal_origin = envelope.portal_origin.rstrip("/")
         context.hubstaff = envelope.hubstaff if envelope.chat_mode == "work" else None
+        context.hubstaff_index_binding = envelope.hubstaff_index_binding if envelope.chat_mode == "work" else ""
         if parsed.type in MUTATE:
             token = uuid4().hex
             await acquire_lease(context, token)

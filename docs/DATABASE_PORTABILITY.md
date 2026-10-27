@@ -64,6 +64,12 @@ rollback and authorization plan.
    tested rollback window. Never allow both databases to accept production writes
    after cutover.
 
+Client Hubstaff search (`database/hubstaff-search-schema.sql`) uses standard
+PostgreSQL generated `tsvector` columns, GIN/B-tree indexes and parameterized SQL.
+It requires no vector extension or provider-specific service. Runtime access uses
+`lib/database.js`; the CLI migration uses a short-lived `pg` client. Rebuild these
+derived indexes after a database move if they were not included in the migration.
+
 Current Supabase references:
 
 - [Connect to PostgreSQL](https://supabase.com/docs/guides/database/connecting-to-postgres)

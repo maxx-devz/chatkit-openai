@@ -7,6 +7,7 @@ import { databasePool } from '@/lib/database';
 import { startIntegrationRun, finishIntegrationRun } from '@/lib/integration-run-audit';
 import { openaiIssue } from "@/lib/openai-issues";
 import { consumeAdminResponse } from "@/lib/admin-response-stream";
+import { environmentSecrets } from "@/lib/sensitive-text";
 import { getSiteAiModel, saveSiteAiModel } from "@/lib/site-ai-settings";
 import { validateSiteModel } from "@/lib/site-ai-repository";
 import { loadPreparedSourceContext } from "@/lib/prepared-source-context";
@@ -313,6 +314,7 @@ export async function POST(request) {
           });
 
           await consumeAdminResponse(result.data, {
+            knownSecrets: [...environmentSecrets(), provider.apiKey],
             onUsage: value => { usage = value; },
             onDelta: delta => sendLine(controller, { type: "delta", delta }),
           });

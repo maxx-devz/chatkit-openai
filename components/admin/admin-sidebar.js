@@ -22,6 +22,8 @@ const NAV_ITEMS = [
   ['clients', 'Client controls', '/admin#clients', 'clients'],
   ['spark', 'AI assistant', '/admin#assistant', 'assistant'],
   ['spark', 'Assistant settings', '/builder', 'builder'],
+  ['shield', 'Source connections', '/admin/sources', 'sources'],
+  ['activity', 'Project search index', '/admin/hubstaff-index', 'hubstaff-index'],
   ['activity', 'AI allowances', '/admin#ai-controls', 'allowances'],
   ['shield', 'Access & security', '/admin#security', 'security'],
 ];

@@ -9,6 +9,7 @@ from psycopg.sql import SQL
 from psycopg.types.json import Jsonb
 from pydantic import TypeAdapter
 from uploads import attachment_metadata, load_upload, UploadError
+from sensitive_text import sanitize_assistant_item
 
 ITEM = TypeAdapter(ThreadItem)
 
@@ -37,6 +38,7 @@ class Context:
     chat_mode: str = "work"
     response_query: str = ""
     hubstaff_inlined: bool = False
+    hubstaff_index_binding: str = ""
 
     @property
     def scope(self):
@@ -112,7 +114,7 @@ class PostgresStore(Store[Context]):
             ORDER BY sequence {} LIMIT %s
         """).format(clause, direction), params)
         rows = await cursor.fetchall()
-        data = [ITEM.validate_python(row["data"]) for row in rows[:limit]]
+        data = [sanitize_assistant_item(ITEM.validate_python(row["data"]), context) for row in rows[:limit]]
         return Page(data=data, has_more=len(rows) > limit,
                     after=data[-1].id if len(rows) > limit else None)
 
@@ -120,6 +122,7 @@ class PostgresStore(Store[Context]):
         await self.save_item(thread_id, item, context)
 
     async def save_item(self, thread_id, item, context):
+        item = sanitize_assistant_item(item, context)
         if item.thread_id != thread_id:
             raise NotFoundError("Conversation not found")
         cursor = await context.db.execute("""
@@ -144,7 +147,7 @@ class PostgresStore(Store[Context]):
         row = await cursor.fetchone()
         if not row:
             raise NotFoundError("Message not found")
-        return ITEM.validate_python(row["data"])
+        return sanitize_assistant_item(ITEM.validate_python(row["data"]), context)
 
     async def delete_thread(self, thread_id, context):
         await self.load_thread(thread_id, context)

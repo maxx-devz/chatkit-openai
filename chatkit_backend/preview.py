@@ -98,7 +98,8 @@ async def preview(request: Request):
                         model=context.ai_model,
                         status="succeeded" if result and result.is_complete and not preview_failed else "failed",
                         started_at=started_at, usage=result.context_wrapper.usage if result else None)
-                return JSONResponse({"text": str(result.final_output), "files": context.artifacts}, headers=HEADERS)
+                from sensitive_text import redact_sensitive_text, environment_secrets
+                return JSONResponse({"text": redact_sensitive_text(str(result.final_output), environment_secrets(context)), "files": context.artifacts}, headers=HEADERS)
     except Exception:
         # API/provider/database exceptions can contain prompts or configuration.
         return JSONResponse({"error": "Preview could not finish. Check the Python service, model access and API billing, then try again."}, 503, headers=HEADERS)

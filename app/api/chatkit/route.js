@@ -14,8 +14,11 @@ import {
   chatKitInputText,
   hubstaffContextQuery,
   hubstaffConversationContextRequested,
+  hubstaffMetricsRequested, hubstaffActivityAnalyticsRequested,
+  hubstaffCredentialAuditRequested, hubstaffTaskReferences,
 } from "@/lib/chatkit-hubstaff";
 import { loadHubstaffAssistantSnapshot } from "@/lib/hubstaff";
+import { indexedHubstaffSnapshot } from "@/lib/hubstaff-search-store";
 import { loadPreparedSourceContext } from "@/lib/prepared-source-context";
 import { appendPreparedInstructions } from "@/lib/prepared-source-policy";
 import { DriveSourceError } from "@/lib/drive-source-policy";
@@ -71,14 +74,21 @@ async function handlePOST(request) {
       ? await loadPreparedSourceContext({ clientId: context.clientId }, chatKitInputText(payload) || conversationContext, mode)
       : { instructions: "", references: [] };
     const hubstaffQuery = mode === "work" ? hubstaffContextQuery(payload, conversationContext) : null;
-    if (hubstaffQuery !== null) send("hubstaff");
-    const hubstaff = hubstaffQuery !== null
+    // Database lookup only: no project-history scan on the reply hot path.
+    const indexed = mode === "work" && isReplyRequest(payload)
+      ? await debuggerSpan("Project search index", () => indexedHubstaffSnapshot(context.clientId, context.hubstaffProjectUrl)) : null;
+    const needsLive = hubstaffQuery !== null && (!indexed || hubstaffMetricsRequested(hubstaffQuery)
+      || hubstaffActivityAnalyticsRequested(hubstaffQuery) || hubstaffCredentialAuditRequested(hubstaffQuery)
+      || hubstaffTaskReferences(hubstaffQuery).length > 0);
+    if (needsLive) send("hubstaff");
+    const live = needsLive
         ? await debuggerSpan("Relevant Hubstaff context", () => loadHubstaffAssistantSnapshot(context.hubstaffProjectUrl, {
           monthlyHoursLimit: context.hubstaffMonthlyHoursLimit,
           trackingProjectId: context.hubstaffTrackingProjectId,
           query: hubstaffQuery,
         }))
       : null;
+    const hubstaff = live ? { ...live, ...(indexed ? {index: indexed.snapshot.index} : {}) } : indexed?.snapshot || null;
     let url;
     let signedHeaders;
     const body = JSON.stringify({
@@ -88,6 +98,7 @@ async function handlePOST(request) {
       source_references: prepared.references,
       portal_origin: new URL(process.env.BETTER_AUTH_URL).origin,
       hubstaff,
+      hubstaff_index_binding: indexed?.binding || "",
       chat_mode: mode,
       payload,
     });

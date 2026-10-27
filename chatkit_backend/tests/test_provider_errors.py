@@ -129,9 +129,11 @@ class ChatKitProviderStreamTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(json.loads(requests[0].content)["stream"])
                 # A failed generation still records the attempt; missing token
                 # usage must not be mistaken for confirmation of zero cost.
-                db.execute.assert_awaited_once()
-                self.assertIn("portal_ai_activity_monthly", db.execute.await_args.args[0])
-                self.assertEqual(db.execute.await_args.args[1][2:6], (0, 0, 0, 0))
+                monthly = [call for call in db.execute.await_args_list if "portal_ai_activity_monthly" in str(call.args[0])]
+                ledger = [call for call in db.execute.await_args_list if "portal_ai_usage_events" in str(call.args[0])]
+                self.assertEqual(len(monthly), 1)
+                self.assertEqual(len(ledger), 1)
+                self.assertEqual(monthly[0].args[1][2:6], (0, 0, 0, 0))
                 await asyncio.sleep(0)
                 leaked_readers = [task for task in asyncio.all_tasks() - tasks_before
                                   if "_AsyncQueueIterator.__anext__" in repr(task.get_coro())]
