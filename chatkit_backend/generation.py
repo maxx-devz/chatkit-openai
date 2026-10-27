@@ -12,6 +12,7 @@ from docx.shared import Pt
 from pydantic import BaseModel, Field
 from chatkit.widgets import WidgetTemplate
 from ai_provider import has_openai_hosted_key, openai_hosted_client
+from provider_errors import ImageGenerationError, image_generation_error, image_provider_error
 
 FILE_CARD = WidgetTemplate.from_file(str(Path(__file__).with_name("generated-file.widget")))
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -98,21 +99,44 @@ async def create_document_artifact(context, title, sections, emit=None):
 
 async def create_image_artifact(context, title, prompt, emit=None):
     if not 1 <= len(title) <= 200 or not 1 <= len(prompt) <= 4000:
-        raise ValueError("Image title or description is too long")
-    await reserve_tool(context, "images")
-    api = openai_hosted_client(context, timeout=75, max_retries=2)
+        raise image_generation_error("image_invalid_request")
+    if not context.config.get("images"):
+        raise image_generation_error("image_tool_disabled")
+    # Surface the actual failed attempt promptly. ChatKit offers an explicit
+    # retry only for transient failures; quota/policy failures are not retried.
+    api = openai_hosted_client(context, timeout=75, max_retries=0)
     if api is None:
-        raise ValueError("Image generation requires a separate OpenAI API key")
-    result = await api.images.generate(
-        model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-2"),
-        prompt="Approved client instructions:\n" + context.config["instructions"]
-            + "\n\nRequested image:\n" + prompt,
-        n=1, size="1024x1024", quality="medium", output_format="webp",
-    )
-    if not result.data or not result.data[0].b64_json:
-        raise ValueError("Image generation returned no image")
-    content = base64.b64decode(result.data[0].b64_json, validate=True)
-    return await save_artifact(context, title, ".webp", "image/webp", content, emit)
+        raise image_generation_error("image_provider_unconfigured")
+    try:
+        await reserve_tool(context, "images")
+    except ValueError as error:
+        code = {
+            "At most two files can be generated in one reply": "image_reply_limit_reached",
+            "The client's monthly generation allowance has been reached": "image_generation_limit_reached",
+        }.get(str(error), "image_generation_failed")
+        raise image_generation_error(code) from None
+    try:
+        # The hosted client may have been reused by a different tool earlier in
+        # this reply. Override retry policy on this image call as well.
+        result = await api.with_options(timeout=75, max_retries=0).images.generate(
+            model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-2").strip() or "gpt-image-2",
+            prompt="Approved client instructions:\n" + context.config["instructions"]
+                + "\n\nRequested image:\n" + prompt,
+            n=1, size="1024x1024", quality="medium", output_format="webp",
+        )
+        if not result.data or not result.data[0].b64_json:
+            raise image_generation_error("image_response_invalid")
+        try:
+            content = base64.b64decode(result.data[0].b64_json, validate=True)
+        except (ValueError, TypeError):
+            raise image_generation_error("image_response_invalid") from None
+        if not content:
+            raise image_generation_error("image_response_invalid")
+        return await save_artifact(context, title, ".webp", "image/webp", content, emit)
+    except ImageGenerationError:
+        raise
+    except Exception as error:
+        raise image_provider_error(error) from None
 
 
 def generation_tools(context, emit=None):
@@ -121,7 +145,9 @@ def generation_tools(context, emit=None):
         """Create a downloadable Word document from approved content. Use headings, paragraphs and bullets; ask for missing facts first."""
         return await create_document_artifact(context, title, sections, emit)
 
-    @function_tool(failure_error_function=tool_failure)
+    # A failed image request must reach ChatKit's server error event, not become
+    # model input that can be paraphrased into a fictitious success or download.
+    @function_tool(failure_error_function=None)
     async def create_image(title: str, prompt: str) -> dict:
         """Generate one image when the user asks, following approved client instructions and branding. Describe the intended image in prompt."""
         return await create_image_artifact(context, title, prompt, emit)

@@ -4,7 +4,8 @@ The client portal uses OpenAI ChatKit for conversations and interactive file car
 A Python ChatKit server runs the assistant through the Agents SDK and a compatible
 Responses API. Chat replies can use OpenAI or OpenRouter without changing the UI.
 Next.js handles the portal, Better Auth login, administrator tools, and authenticated
-requests. Neon stores client settings, conversations, usage, and generated files.
+requests. PostgreSQL (currently hosted by Neon) stores client settings,
+conversations, usage, and generated files.
 
 **Start here: [Local setup and Vercel deployment](docs/CHATKIT_SETUP.md).**
 **Configure replies: [Assistant settings](docs/BUILDER_SETUP.md).**
@@ -13,7 +14,8 @@ requests. Neon stores client settings, conversations, usage, and generated files
 **Connect client work: [Hubstaff dashboard and assistant](docs/HUBSTAFF_SETUP.md).**
 **Restrict public web research: [Approved client websites](docs/WEBSITE_ACCESS_SETUP.md).**
 **Save cross-conversation files: [Persistent client library](docs/CLIENT_LIBRARY_SETUP.md).**
-**Employee work dashboard: [Employee prototype setup and security](docs/EMPLOYEE_PORTAL.md).**
+**Keep the database portable: [PostgreSQL and possible Supabase migration](docs/DATABASE_PORTABILITY.md).**
+**Internal user work dashboard: [Internal user prototype setup and security](docs/INTERNAL_PORTAL.md).**
 
 The portal's AOC-GPT is an API assistant. Your team's existing custom GPT inside
 ChatGPT Business does not automatically connect or synchronize with it. Transfer
@@ -67,6 +69,11 @@ to OpenRouter chat requests; switch chat back to OpenAI when that tool is requir
 - Staff-only settings at `/builder`: drafts, tests, publishing, versions,
   greeting, colors, and starter prompts.
 - Existing administrator dashboard and staff assistant at `/admin`.
+- Internal Settings for authorized Internal Access Managers and Internal Admins to provision
+  internal-user-only accounts, assign positions, panels, and non-Internal-Admin roles, and pause
+  eligible accounts. The Internal Admin role remains owner-controlled through the terminal.
+- One Internal Portal with separate My Work, shared Team directory, and Settings
+  containers, each protected by the internal user panel policy.
 - Staff usage panel with client allowances and recorded client/admin/draft tokens.
 - Per-client Hubstaff project, task, and monthly time reads for the dashboard
   and read-only AOC-GPT answers.
@@ -84,12 +91,13 @@ Existing accounts, client records, conversations, and administrator tools are re
 | `npm run dev` | Start Next.js and local Python |
 | `npm run dev:web` | Start Next.js when Python is already running |
 | `npm run setup:check` | Check local configuration and database tables without displaying secrets |
-| `npm run setup:check -- --employee` | Also check the optional employee schema and encryption key |
-| `npm run employee:migrate` | Add the separate employee access and encrypted connection table |
-| `npm run employee:create -- USERNAME "DISPLAY NAME" APPROVED_HUBSTAFF_USER_ID` | Privately provision employee-only access; password is prompted |
-| `npm run test:employee` | Employee authorization, Hubstaff isolation, credential safety, and real Better Auth login tests |
-| `npm run test:employee:database` | Employee SQL checks in rolled-back temporary tables |
-| `npm run test:employee:ui` | Isolated desktop/mobile browser checks; requires installed Chrome |
+| `npm run setup:check -- --internal-user` | Also check the optional internal user schema and encryption key |
+| `npm run internal-user:migrate` | Add/update internal user access, position, panel policy, and encrypted connection storage |
+| `npm run internal-hubstaff-oauth:migrate` | Add per-user Hubstaff connection method; preserve existing PAT connections ([setup](docs/INTERNAL_HUBSTAFF_OAUTH.md)) |
+| `npm run internal-user:create -- USERNAME "DISPLAY NAME" APPROVED_HUBSTAFF_USER_ID` | Privately provision internal-user-only access; password is prompted |
+| `npm run test:internal-user` | Internal user authorization, Hubstaff isolation, credential safety, and real Better Auth login tests |
+| `npm run test:internal-user:database` | Internal user SQL checks in rolled-back temporary tables |
+| `npm run test:internal-user:ui` | Isolated desktop/mobile browser checks; requires installed Chrome |
 | `npm run lint` | Check JavaScript/React |
 | `npm test` | Run JavaScript security/configuration tests |
 | `npm run test:http` | Check local routes while both dev services are running |
@@ -97,6 +105,10 @@ Existing accounts, client records, conversations, and administrator tools are re
 | `npm start` | Serve a production build; configure a running HTTPS Python backend separately |
 | `npm run auth:migrate` | Better Auth schema |
 | `npm run portal:migrate` | Client, membership, and earlier-history schema |
+| `npm run client-access:migrate -- --dry-run` | Validate per-client roles and audit schema without keeping changes |
+| `npm run client-access:migrate` | Enable Viewer memberships and audited client access changes; run before deploying this branch |
+| `npm run admin-audit:migrate -- --dry-run` | Validate the Client/AOC Admin audit and AI usage migration without retaining changes |
+| `npm run admin-audit:migrate` | Enable Client/AOC Admin audit logs and per-action AI usage ([setup](docs/CLIENT_AND_AOC_ADMIN_AUDIT.md)) |
 | `npm run admin:migrate` | Staff access, monthly usage, client integrations, and encrypted PAT storage |
 | `npm run chatkit:migrate` | ChatKit conversations and request leases |
 | `npm run uploads:migrate` | Conversation attachment storage and limits |
@@ -104,7 +116,8 @@ Existing accounts, client records, conversations, and administrator tools are re
 | `npm run builder:migrate` | Assistant configuration, tools, and generated files |
 | `npm run usage:migrate` | Anonymous AI activity totals, independent of allowance resets |
 | `npm run admin:create -- USERNAME "DISPLAY NAME"` | Create a staff login; password is prompted privately |
-| `npm run client:create -- USERNAME "DISPLAY NAME"` | Create a client login |
+| `npm run client:create -- USERNAME "DISPLAY NAME"` | Create a new client workspace and its first Client Administrator login |
+| `npm run client:admin -- grant\|revoke CLIENT_SLUG USERNAME` | Owner-controlled Client Administrator changes for an existing member |
 | `npm run list:client` | List current client accounts |
 | `npm run hubstaff:check -- PROJECT_URL` | Safely verify Hubstaff project access and summary data |
 | `npm run client:delete -- USERNAME --confirm-delete` | Permanently remove the specified client |
@@ -112,6 +125,11 @@ Existing accounts, client records, conversations, and administrator tools are re
 Create clients through **Add client** in `/admin` or the command above. Existing
 users do not need to be recreated. Migration commands use `.env.local`; they do
 not run automatically during Vercel builds.
+
+Client Administrators can create Viewer and Member logins for their own client
+under **Members & Access** after the client-access migration and deployment.
+See the [Client Portal access matrix](docs/CLIENT_PORTAL_ACCESS_MATRIX.md) for
+scope, protected grants, temporary-password handling, and staging checks.
 
 ## Deployment
 

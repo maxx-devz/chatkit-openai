@@ -598,7 +598,14 @@ export function HubstaffProjectProgress() {
                               <a href={task.href || data.project.url} key={task.id} target="_blank" rel="noreferrer">
                                 <span className={styles.taskCardIcon}><StageIcon stage={column.stage} /></span>
                                 <span>
-                                  <strong>{task.title}</strong>
+                                  <span className={styles.workflowTaskHeading}>
+                                    <strong>{task.title}</strong>
+                                    {task.priority ? (
+                                      <em className={`${styles.workflowPriority} ${styles[`priority_${task.priority.level}`] || ""}`} aria-label={`Priority: ${task.priority.name}`}>
+                                        {task.priority.name}
+                                      </em>
+                                    ) : null}
+                                  </span>
                                   <small>
                                     {task.doneAt
                                       ? `Completed ${formatTimestamp(task.doneAt)}`

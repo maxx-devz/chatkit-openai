@@ -1,5 +1,7 @@
 import "./globals.css";
 import aocIcon from "@/aoc-icon.png";
+import DebuggerGate from "@/components/debugger/gate";
+import { Suspense } from "react";
 
 export const metadata = {
   title: "AOC Client Portal",
@@ -16,7 +18,7 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body><Suspense fallback={null}><DebuggerGate /></Suspense>{children}</body>
     </html>
   );
 }

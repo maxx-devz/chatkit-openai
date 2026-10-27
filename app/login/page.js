@@ -27,7 +27,7 @@ export default function LoginPage() {
           <h1 id="login-title" style={{textAlign:"center"}}>Welcome back</h1>
           <p style={{textAlign:"center"}}>
             Sign in to your AOC workspace. Your account opens your client,
-            administrator, or employee portal.
+            administrator, or internal portal.
           </p>
         </div>
         <LoginForm configured={isPortalAuthConfigured()} />

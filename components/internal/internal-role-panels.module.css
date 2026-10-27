@@ -1,0 +1,17 @@
+.main { max-width: 1400px; margin: auto; padding: 42px 5% 60px; }
+.intro { margin-bottom: 28px; }
+.eyebrow { margin: 0; color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .14em; }
+.intro h1 { margin: 8px 0 10px; font-size: clamp(28px, 3vw, 40px); letter-spacing: -1.2px; }
+.intro > p:last-child { max-width: 680px; color: var(--muted); line-height: 1.6; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 16px; }
+.placeholder { border: 1px solid var(--line); border-radius: 14px; background: white; }
+.area p { color: var(--muted); font-size: 13px; line-height: 1.55; }
+.badge { display: inline-block; align-self: flex-start; padding: 6px 9px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-dark); font-size: 11px; font-weight: 700; }
+.placeholder { padding: 24px; }
+.heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.heading h2 { margin: 0; font-size: 20px; }
+.area { border: 1px solid var(--line); border-radius: 10px; padding: 18px; background: #f8fafc; }
+.area h3 { margin: 0 0 6px; font-size: 16px; }
+.area p { margin: 0; }
+.areaSource { display: block; margin-top: 12px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+@media (max-width: 600px) { .main { padding: 28px 16px; } }

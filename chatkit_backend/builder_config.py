@@ -1,5 +1,6 @@
 """The same validated configuration drives preview and live conversations."""
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from psycopg.errors import UndefinedTable
 
 
 class AssistantConfig(BaseModel):
@@ -26,13 +27,12 @@ class AssistantConfig(BaseModel):
 
 async def load_config(db, client):
     # Before the additive builder migration, the existing assistant still works.
-    cursor = await db.execute("SELECT to_regclass('portal_assistant_configs') AS name")
-    if not (await cursor.fetchone())["name"]:
-        value = {}
-    else:
+    try:
         cursor = await db.execute("SELECT published FROM portal_assistant_configs WHERE client_id=%s", (client["id"],))
         row = await cursor.fetchone()
         value = dict(row["published"] or {}) if row else {}
+    except UndefinedTable:
+        value = {}
     value.update(instructions=client.get("assistant_instructions") or "",
                  vectorStoreId=client.get("openai_vector_store_id") or "")
     return AssistantConfig.model_validate(value).model_dump()

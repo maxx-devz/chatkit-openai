@@ -1,4 +1,4 @@
-"""Neon-backed ChatKit Store. All queries include the server-established scope."""
+"""PostgreSQL-backed ChatKit Store. All queries include the server-established scope."""
 from dataclasses import dataclass, field
 from uuid import uuid4
 
@@ -9,6 +9,7 @@ from psycopg.sql import SQL
 from psycopg.types.json import Jsonb
 from pydantic import TypeAdapter
 from uploads import attachment_metadata, load_upload, UploadError
+from sensitive_text import sanitize_assistant_item
 
 ITEM = TypeAdapter(ThreadItem)
 
@@ -33,6 +34,11 @@ class Context:
     ai_provider: object = field(default=None, repr=False)
     ai_client: object = field(default=None, repr=False)
     hosted_client: object = field(default=None, repr=False)
+    response_route: str = "work"
+    chat_mode: str = "work"
+    response_query: str = ""
+    hubstaff_inlined: bool = False
+    hubstaff_index_binding: str = ""
 
     @property
     def scope(self):
@@ -48,8 +54,8 @@ class PostgresStore(Store[Context]):
 
     async def load_thread(self, thread_id, context):
         cursor = await context.db.execute(
-            "SELECT data FROM portal_chatkit_threads WHERE client_id=%s AND user_id=%s AND id=%s",
-            (*context.scope, thread_id),
+            "SELECT data FROM portal_chatkit_threads WHERE client_id=%s AND user_id=%s AND id=%s AND chat_mode=%s",
+            (*context.scope, thread_id, context.chat_mode),
         )
         row = await cursor.fetchone()
         if not row:
@@ -58,10 +64,11 @@ class PostgresStore(Store[Context]):
 
     async def save_thread(self, thread, context):
         await context.db.execute("""
-            INSERT INTO portal_chatkit_threads (client_id, user_id, id, data, created_at)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO portal_chatkit_threads (client_id, user_id, id, data, created_at, chat_mode)
+            VALUES (%s, %s, %s, %s, %s, %s)
             ON CONFLICT (client_id, user_id, id) DO UPDATE SET data=EXCLUDED.data
-        """, (*context.scope, thread.id, Jsonb(thread.model_dump(mode="json")), thread.created_at))
+        """, (*context.scope, thread.id, Jsonb(thread.model_dump(mode="json")), thread.created_at,
+              context.chat_mode))
 
     async def load_threads(self, limit, after, order, context):
         limit = max(1, min(limit, 100))
@@ -78,9 +85,10 @@ class PostgresStore(Store[Context]):
             params.extend((*context.scope, after))
         params.append(limit + 1)
         cursor = await context.db.execute(SQL("""
-            SELECT data FROM portal_chatkit_threads WHERE client_id=%s AND user_id=%s {}
+            SELECT data FROM portal_chatkit_threads WHERE client_id=%s AND user_id=%s
+              AND chat_mode=%s {}
             ORDER BY created_at {}, id {} LIMIT %s
-        """).format(clause, direction, direction), params)
+        """).format(clause, direction, direction), [*params[:2], context.chat_mode, *params[2:]])
         rows = await cursor.fetchall()
         data = [ThreadMetadata.model_validate(row["data"]) for row in rows[:limit]]
         return Page(data=data, has_more=len(rows) > limit,
@@ -106,7 +114,7 @@ class PostgresStore(Store[Context]):
             ORDER BY sequence {} LIMIT %s
         """).format(clause, direction), params)
         rows = await cursor.fetchall()
-        data = [ITEM.validate_python(row["data"]) for row in rows[:limit]]
+        data = [sanitize_assistant_item(ITEM.validate_python(row["data"]), context) for row in rows[:limit]]
         return Page(data=data, has_more=len(rows) > limit,
                     after=data[-1].id if len(rows) > limit else None)
 
@@ -114,14 +122,22 @@ class PostgresStore(Store[Context]):
         await self.save_item(thread_id, item, context)
 
     async def save_item(self, thread_id, item, context):
+        item = sanitize_assistant_item(item, context)
         if item.thread_id != thread_id:
             raise NotFoundError("Conversation not found")
-        await self.load_thread(thread_id, context)
-        await context.db.execute("""
+        cursor = await context.db.execute("""
             INSERT INTO portal_chatkit_items (client_id, user_id, thread_id, id, data)
-            VALUES (%s, %s, %s, %s, %s)
+            SELECT %s, %s, %s, %s, %s
+            WHERE EXISTS (
+                SELECT 1 FROM portal_chatkit_threads
+                WHERE client_id=%s AND user_id=%s AND id=%s
+            )
             ON CONFLICT (client_id, user_id, thread_id, id) DO UPDATE SET data=EXCLUDED.data
-        """, (*context.scope, thread_id, item.id, Jsonb(item.model_dump(mode="json"))))
+            RETURNING id
+        """, (*context.scope, thread_id, item.id, Jsonb(item.model_dump(mode="json")),
+              *context.scope, thread_id))
+        if not await cursor.fetchone():
+            raise NotFoundError("Conversation not found")
 
     async def load_item(self, thread_id, item_id, context):
         cursor = await context.db.execute("""
@@ -131,7 +147,7 @@ class PostgresStore(Store[Context]):
         row = await cursor.fetchone()
         if not row:
             raise NotFoundError("Message not found")
-        return ITEM.validate_python(row["data"])
+        return sanitize_assistant_item(ITEM.validate_python(row["data"]), context)
 
     async def delete_thread(self, thread_id, context):
         await self.load_thread(thread_id, context)

@@ -14,7 +14,7 @@ from builder_config import AssistantConfig
 from database import connect_database
 from security import verify_signature
 from store import Context
-from usage_tracking import record_usage
+from usage_tracking import record_usage, record_ai_usage_event
 from provider_settings import load_provider_settings, close_provider_clients
 
 router = APIRouter()
@@ -80,18 +80,26 @@ async def preview(request: Request):
                 context.ai_provider = await load_provider_settings(db)
                 context.ai_model = context.ai_provider.model
                 result = None
+                preview_failed = True
                 try:
                     result = Runner.run_streamed(make_agent(context), [item.model_dump() for item in data.messages],
                         context=context, max_turns=5, run_config=RunConfig(tracing_disabled=True, trace_include_sensitive_data=False))
                     async for _ in result.stream_events():
                         pass
+                    preview_failed = False
                 finally:
                     if result and not result.is_complete:
                         result.cancel()
                     await close_provider_clients(context)
                     if result:
                         await record_usage(db, "preview", started_at, result.context_wrapper.usage)
-                return JSONResponse({"text": str(result.final_output), "files": context.artifacts}, headers=HEADERS)
+                    await record_ai_usage_event(db, client_id=data.client_id, user_id=data.user_id,
+                        action="builder.preview", provider=getattr(context.ai_provider, "name", None),
+                        model=context.ai_model,
+                        status="succeeded" if result and result.is_complete and not preview_failed else "failed",
+                        started_at=started_at, usage=result.context_wrapper.usage if result else None)
+                from sensitive_text import redact_sensitive_text, environment_secrets
+                return JSONResponse({"text": redact_sensitive_text(str(result.final_output), environment_secrets(context)), "files": context.artifacts}, headers=HEADERS)
     except Exception:
         # API/provider/database exceptions can contain prompts or configuration.
         return JSONResponse({"error": "Preview could not finish. Check the Python service, model access and API billing, then try again."}, 503, headers=HEADERS)

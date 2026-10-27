@@ -11,6 +11,7 @@ import {
   normalizeHubstaffTask,
   normalizeHubstaffWorkflowList,
   normalizeHubstaffWorkflowTask,
+  resolveHubstaffTaskPriority,
   sanitizeHubstaffTaskDescription,
   resolveMonthlyHoursLimit,
   taskSummary,
@@ -143,8 +144,12 @@ test("normalizes tasks into todo, in-progress, and done stages", () => {
 });
 
 test("classifies each client's workflow names without replacing their labels", () => {
-  assert.equal(hubstaffWorkflowStage("TO-DO'S"), "todo");
-  assert.equal(hubstaffWorkflowStage("DOING (IN PROGRESS)"), "in_progress");
+  for (const status of ["To Do", "Todo", "Todos", "To-Dos", "TO-DO'S", "To-do’s", "to_do", "TO DO TASKS"]) {
+    assert.equal(hubstaffWorkflowStage(status), "todo", status);
+  }
+  for (const status of ["In Progress", "InProgress", "In-Progress", "In_Progress", "DOING (IN PROGRESS)", "Doing", "Working", "WIP", "Development", "Implementing"]) {
+    assert.equal(hubstaffWorkflowStage(status), "in_progress", status);
+  }
   assert.equal(hubstaffWorkflowStage("FOR CLIENT'S REVIEW"), "review");
   assert.equal(hubstaffWorkflowStage("Delivered", "done"), "done");
   assert.equal(hubstaffWorkflowStage("Meetings"), "other");
@@ -187,6 +192,30 @@ test("creates tenant-scoped Hubstaff task links from normalized workflow tasks",
     assigneeIds: [7],
     followerIds: [8, 9],
   });
+});
+
+test("maps only explicit Hubstaff priority labels and uses the highest attached priority", () => {
+  const task = { label_ids: [5, 6, 7, "invalid"] };
+  const labels = [
+    { id: 5, name: "Design", project_id: 34 },
+    { id: 6, name: "Priority: Low", project_id: 34 },
+    { id: 7, name: "P1", project_id: 34 },
+    { id: 7, name: "Urgent", project_id: 99 },
+  ];
+  assert.deepEqual(resolveHubstaffTaskPriority(task, labels, 34), { name: "P1", level: "high" });
+  assert.equal(resolveHubstaffTaskPriority({ label_ids: [6] }, labels, 99), null);
+  assert.equal(resolveHubstaffTaskPriority({ label_ids: [5] }, labels, 34), null);
+});
+
+test("adds a resolved priority to normalized workflow tasks", () => {
+  const normalized = normalizeHubstaffWorkflowTask({
+    id: 45,
+    subject: "Urgent checkout repair",
+    label_ids: [12],
+  }, { organizationId: 12, projectId: 34 }, [
+    { id: 12, name: "Critical", project_id: 34 },
+  ]);
+  assert.deepEqual(normalized.priority, { name: "Critical", level: "urgent" });
 });
 
 test("assistant snapshots retain only verified assignee and follower display names", () => {

@@ -9,10 +9,21 @@ import ClientPortal from "@/components/portal/client-portal";
 import { resolveAdminContext } from "@/lib/admin-data";
 import { isPortalAuthConfigured } from "@/lib/auth";
 import { resolvePortalContext } from "@/lib/portal-data";
+import { notFound } from "next/navigation";
+import { debuggerAccess, debuggerEnabled } from "@/lib/debugger/access";
+import { DEBUGGER_PORTAL_HEADER, debuggerPortalPath } from "@/lib/debugger/routing";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }) {
+  if ((await searchParams)?.debugger === "true") {
+    if (!debuggerEnabled()) notFound();
+    const requestHeaders = await headers();
+    const access = await debuggerAccess(requestHeaders);
+    if (!access) notFound();
+    const { default: DebuggerDashboard } = await import("@/components/debugger/dashboard");
+    return <DebuggerDashboard config={access} portalPath={debuggerPortalPath(requestHeaders.get(DEBUGGER_PORTAL_HEADER))} />;
+  }
   if (!isPortalAuthConfigured()) redirect("/login");
 
   let portalContext;
@@ -22,7 +33,7 @@ export default async function HomePage() {
     portalContext = await resolvePortalContext(requestHeaders);
   } catch (error) {
     if (error?.publicDetails?.status === 401) redirect("/login");
-    if (error?.publicDetails?.code === "employee_only") redirect("/employee");
+    if (error?.publicDetails?.code === "internal_user_only") redirect("/internal");
 
     let isAdministrator = false;
     try {

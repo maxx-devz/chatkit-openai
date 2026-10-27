@@ -1,6 +1,23 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  // Keep same-origin debugger rewrites on the original host. Normalization
+  // otherwise changes 127.0.0.1 to localhost, which can become an IPv6 proxy.
+  skipProxyUrlNormalize: true,
+  async redirects() {
+    return [
+      {
+        source: "/api/employee/:path*",
+        destination: "/api/internal/:path*",
+        permanent: false,
+      },
+      {
+        source: "/employee/:path*",
+        destination: "/internal/:path*",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     const headers = [
       { key: "Cross-Origin-Opener-Policy", value: "same-origin" },

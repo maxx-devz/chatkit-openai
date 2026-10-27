@@ -6,6 +6,7 @@ from urllib.parse import urlsplit
 from agents import set_default_openai_api, set_default_openai_client
 from agents.models.openai_provider import OpenAIProvider
 from openai import AsyncOpenAI
+from debugger_trace import debug_http_options
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_KEY_PREFIX = "sk-or-v1-"
@@ -70,7 +71,7 @@ def provider_config(context=None):
 
 def active_client(context=None, **options):
     config = provider_config(context)
-    kwargs = {"api_key": config.api_key, "base_url": config.base_url or "https://api.openai.com/v1", **options}
+    kwargs = {"api_key": config.api_key, "base_url": config.base_url or "https://api.openai.com/v1", **debug_http_options(context), **options}
     if config.default_headers:
         kwargs["default_headers"] = config.default_headers
     return AsyncOpenAI(**kwargs)
@@ -134,6 +135,6 @@ def openai_hosted_client(context=None, **options):
     if context is not None and getattr(context, "hosted_client", None):
         return context.hosted_client
     if context is not None:
-        context.hosted_client = AsyncOpenAI(api_key=key, base_url="https://api.openai.com/v1", **options)
+        context.hosted_client = AsyncOpenAI(api_key=key, base_url="https://api.openai.com/v1", **debug_http_options(context), **options)
         return context.hosted_client
     return AsyncOpenAI(api_key=key, base_url="https://api.openai.com/v1", **options)

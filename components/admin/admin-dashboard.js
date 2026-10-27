@@ -1,13 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import aocIcon from "@/aoc-icon.png";
-import aocLogo from "@/aoc-logo.png";
 import SignOutButton from "@/components/auth/sign-out-button";
 import AdminAssistant from "@/components/admin/admin-assistant";
+import AdminSidebar from '@/components/admin/admin-sidebar';
 import PortalUsage from "@/components/admin/portal-usage";
 import ProviderSettings from "@/components/admin/provider-settings";
 import styles from "./admin-dashboard.module.css";
@@ -105,6 +104,10 @@ export default function AdminDashboard({ initialData }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [createError, setCreateError] = useState("");
+  const [makeConnection, setMakeConnection] = useState({
+    state: "idle",
+    message: "Not tested in this session.",
+  });
   const createDialogRef = useRef(null);
 
   useEffect(() => {
@@ -237,6 +240,33 @@ export default function AdminDashboard({ initialData }) {
     }
   }
 
+  async function testMakeConnection() {
+    if (busy) return;
+    setBusy("make-test");
+    setMakeConnection({ state: "testing", message: "Contacting Make..." });
+
+    try {
+      const response = await fetch("/api/admin/make/test", { method: "POST" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.connected !== true) {
+        throw new Error(payload?.error || "The Make connection test failed.");
+      }
+      setMakeConnection({
+        state: "success",
+        message: payload.message || "Make accepted the connection test.",
+        requestId: payload.requestId,
+        sentAt: payload.sentAt,
+      });
+    } catch (connectionError) {
+      setMakeConnection({
+        state: "error",
+        message: connectionError.message || "The Make connection test failed.",
+      });
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function createClient(event) {
     event.preventDefault();
     if (busy) return;
@@ -285,42 +315,14 @@ export default function AdminDashboard({ initialData }) {
 
   return (
     <div className={styles.shell}>
-      <aside className={styles.sidebar}>
-        <div className={styles.brand}>
-          <Image src={aocLogo} alt="Always Open Commerce" priority />
-          <span>Administrator Portal</span>
-        </div>
-
-        <nav aria-label="Administrator portal">
-          <a className={styles.activeNav} href="#overview"><Icon name="overview" />Overview</a>
-          <a href="#portal-usage"><Icon name="activity" />AI usage</a>
-          <a href="#clients"><Icon name="clients" />Client controls</a>
-          <a href="#assistant"><Icon name="spark" />AI assistant</a>
-          <Link href="/builder"><Icon name="spark" />Assistant settings</Link>
-          <a href="#ai-controls"><Icon name="activity" />AI allowances</a>
-          <a href="#security"><Icon name="shield" />Access & security</a>
-        </nav>
-
-        <div className={styles.sidebarStatus}>
-          <span><i /> Production controls</span>
-          <p>Changes apply immediately to the connected Neon database.</p>
-        </div>
-
-        <div className={styles.adminIdentity}>
-          <span>{initials(initialData.admin.name)}</span>
-          <div>
-            <strong>{initialData.admin.name}</strong>
-            <small>{initialData.admin.username || initialData.admin.role}</small>
-          </div>
-        </div>
-      </aside>
+      <AdminSidebar admin={initialData.admin} />
 
       <div className={styles.main}>
         <header className={styles.topbar}>
           <div>
             <p>AOC operations</p>
-            <h1>Client AI control center</h1>
-            <span>Manage access, monthly AI allowances, and client knowledge.</span>
+            <h1>Portal control center</h1>
+            <span>Manage client AI settings and position-based internal user access.</span>
           </div>
           <div className={styles.topbarActions}>
             <span className={styles.secureBadge}><Icon name="shield" />Admin protected</span>
@@ -350,13 +352,6 @@ export default function AdminDashboard({ initialData }) {
               value={number(summary.requestsUsed)}
               detail={`${number(summary.allowance)} combined allowance`}
               tone="violet"
-            />
-            <Metric
-              icon="overview"
-              label="Saved conversations"
-              value={number(summary.conversations)}
-              detail="Across private client workspaces"
-              tone="green"
             />
           </section>
 
@@ -592,6 +587,26 @@ export default function AdminDashboard({ initialData }) {
                         />
                         <small>Optional per-client fallback. A monthly hours budget configured in Hubstaff takes priority.</small>
                       </label>
+                      <div className={styles.makeConnection}>
+                        <div>
+                          <strong>Make automation</strong>
+                          <small>Send a server-side test event and confirm that the Make scenario executed.</small>
+                          <span
+                            className={styles[`makeConnection_${makeConnection.state}`]}
+                            role={makeConnection.state === "error" ? "alert" : "status"}
+                          >
+                            {makeConnection.message}
+                            {makeConnection.requestId ? ` Request ${makeConnection.requestId}.` : ""}
+                          </span>
+                        </div>
+                        <button
+                          disabled={Boolean(busy)}
+                          onClick={testMakeConnection}
+                          type="button"
+                        >
+                          {busy === "make-test" ? "Testing..." : "Test Make connection"}
+                        </button>
+                      </div>
                     </section>
 
                     <section className={`${styles.settingsCard} ${styles.wideCard}`}>
@@ -631,6 +646,7 @@ export default function AdminDashboard({ initialData }) {
               )}
             </section>
           </section>
+
         </main>
       </div>
 

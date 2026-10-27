@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app import app, validate_payload
 from chatkit.types import Page, ThreadMetadata
 from security import verify_signature
+from provider_settings import ProviderSettingsError
 
 SECRET = "test-only-shared-secret-with-at-least-32-characters"
 
@@ -87,6 +88,26 @@ async def post(body, headers=None, *, include_body=False):
 
 
 class EndpointTests(unittest.IsolatedAsyncioTestCase):
+    async def test_missing_provider_secret_returns_safe_code_without_spending_allowance(self):
+        db = AsyncMock()
+        payload = {"type": "threads.create", "params": {"input": {
+            "content": [{"type": "input_text", "text": "Hello"}], "attachments": [], "inference_options": {}}}}
+        body = json.dumps({"client_id": "1", "user_id": "2", "instructions": "Test", "payload": payload}).encode()
+        timestamp = str(int(time.time())).encode()
+        signature = hmac.new(SECRET.encode(), timestamp + b"." + body, hashlib.sha256).hexdigest().encode()
+        with patch.dict(os.environ, {"CHATKIT_BACKEND_SECRET": SECRET, "DATABASE_URL": "test-only"}), \
+                patch("app.connect_database", new_callable=AsyncMock, return_value=db), \
+                patch("app.load_client", new_callable=AsyncMock, return_value={}), \
+                patch("app.load_config", new_callable=AsyncMock, return_value={}), \
+                patch("app.acquire_lease", new_callable=AsyncMock), \
+                patch("app.load_provider_settings", new_callable=AsyncMock, side_effect=ProviderSettingsError("provider_encryption_missing")), \
+                patch("app.reserve_request", new_callable=AsyncMock) as reserve:
+            status, response = await post(body, [(b"x-chatkit-timestamp", timestamp), (b"x-chatkit-signature", signature)], include_body=True)
+            self.assertEqual(status, 503)
+            self.assertEqual(response["code"], "provider_encryption_missing")
+            reserve.assert_not_awaited()
+            db.close.assert_awaited_once()
+
     async def test_signed_browser_history_request_reaches_sdk_with_bounded_pagination(self):
         first = [ThreadMetadata(id=f"thr_{index}", created_at=datetime.now(timezone.utc))
                  for index in range(100)]
@@ -96,7 +117,7 @@ class EndpointTests(unittest.IsolatedAsyncioTestCase):
         with patch.dict(os.environ, {"CHATKIT_BACKEND_SECRET": SECRET, "DATABASE_URL": "test-only"}), \
                 patch("app.connect_database", new_callable=AsyncMock, return_value=db), \
                 patch("app.load_client", new_callable=AsyncMock, return_value={}), \
-                patch("app.load_config", new_callable=AsyncMock, return_value={}), \
+                patch("app.load_config", new_callable=AsyncMock, return_value={}) as load_config, \
                 patch("app.store.load_threads", new_callable=AsyncMock, side_effect=pages) as load_threads, \
                 patch("app.reserve_request", new_callable=AsyncMock) as reserve:
             for after in [None, first[-1].id]:
@@ -118,6 +139,7 @@ class EndpointTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(args["after"], after)
                 self.assertEqual(args["context"].scope, ("1", "2"))
             reserve.assert_not_awaited()
+            load_config.assert_not_awaited()
             self.assertEqual(db.close.await_count, 2)
 
     async def test_unsigned_direct_backend_request_never_opens_database(self):
@@ -127,7 +149,7 @@ class EndpointTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_oversized_request_is_rejected_before_database(self):
         with patch.dict(os.environ, {"CHATKIT_BACKEND_SECRET": SECRET}), patch("app.connect_database", new_callable=AsyncMock) as connect:
-            self.assertEqual(await post(b"x" * 150001), 413)
+            self.assertEqual(await post(b"x" * 250001), 413)
             connect.assert_not_awaited()
 
 

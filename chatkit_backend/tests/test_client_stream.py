@@ -38,16 +38,40 @@ class ClientStreamTests(unittest.IsolatedAsyncioTestCase):
     async def test_follow_ups_preserve_existing_legacy_reply(self):
         await self.check_client_reply("vendor/model:free", follow_up=True, legacy=True)
 
-    async def check_client_reply(self, model, site_model=None, follow_up=False, legacy=False):
+    async def test_independent_question_sends_no_tool_schemas(self):
+        await self.check_client_reply("vendor/model:free", general=True)
+
+    async def test_general_mode_work_question_still_sends_no_work_tools(self):
+        await self.check_client_reply("vendor/model:free", general=True,
+                                      prompt="Which Hubstaff tasks need a reply today?")
+
+    async def test_clear_task_question_reuses_prefetched_snapshot_in_one_model_call(self):
+        await self.check_client_reply("vendor/model:free", prompt="What tasks are in progress?")
+
+    async def test_credential_output_is_redacted_before_wire_and_persistence(self):
+        await self.check_client_reply("vendor/model:free", reply_text="Hello from AOC.\nPassword: PlainPass123!\nReady for review.")
+
+    async def test_index_tool_round_trip_reaches_the_actual_chatkit_stream(self):
+        await self.check_client_reply("vendor/model:free", prompt="Latest SEO activities?", indexed=True)
+
+    async def check_client_reply(self, model, site_model=None, follow_up=False, legacy=False,
+                                 general=False, prompt="Who are you?", reply_text=None, indexed=False):
         requests = []
         wires = []
 
         def handle(request):
             requests.append(request)
             chunks = [
-                {"index": 0, "delta": {"role": "assistant", "content": f"Hello from AOC. Reply {len(requests)}."}, "finish_reason": None},
+                {"index": 0, "delta": {"role": "assistant", "content": (reply_text or f"Hello from AOC. Reply {len(requests)}.")[:25]}, "finish_reason": None},
+                {"index": 0, "delta": {"content": (reply_text or f"Hello from AOC. Reply {len(requests)}.")[25:]}, "finish_reason": None},
                 {"index": 0, "delta": {}, "finish_reason": "stop"},
             ]
+            if indexed and len(requests) == 1:
+                chunks = [
+                    {"index":0,"delta":{"role":"assistant","tool_calls":[{"index":0,"id":"call_search","type":"function",
+                      "function":{"name":"search_project_tasks","arguments":json.dumps({"query":"SEO OR optimization","order":"recent_activity"})}}]},"finish_reason":None},
+                    {"index":0,"delta":{},"finish_reason":"tool_calls"},
+                ]
             wire = "".join("data: " + json.dumps({
                 "id": "chatcmpl-test", "object": "chat.completion.chunk", "created": 1,
                 "model": "test/free", "choices": [choice],
@@ -84,7 +108,17 @@ class ClientStreamTests(unittest.IsolatedAsyncioTestCase):
         store.load_thread.side_effect = load_thread
         store.load_thread_items.side_effect = load_items
         context = Context(AsyncMock(), "1", "2", "Be helpful.", {"display_name": "Test client"})
-        context.hubstaff = {"workflow": {"columns": []}}
+        context.chat_mode = "general" if general else "work"
+        context.hubstaff = None if general else {"workflow": {"columns": []}}
+        if indexed:
+            context.hubstaff = {"index":{"available":True,"metadataComplete":True}}
+            context.hubstaff_index_binding = "a"*64
+            cursor=AsyncMock()
+            cursor.fetchone.side_effect=[
+                {"metadata_complete":True,"project_url":"https://tasks.hubstaff.com/app/organizations/1/projects/7","metadata_completed_at":None,"checked_at":None},
+                {"authorized":True,"tasks":[{"id":"5","title":"Verified SEO update"}],"total":1,"pending":0,"unresolved_people":0},
+            ]
+            context.db.execute.return_value=cursor
         context.ai_model = site_model
         with patch.dict(os.environ, {"OPENAI_API_KEY": "", "OPENROUTER_API_KEY": "sk-or-v1-test",
                                      "OPENROUTER_MODEL": model}), \
@@ -99,7 +133,7 @@ class ClientStreamTests(unittest.IsolatedAsyncioTestCase):
                     server = PortalChatKitServer(store)
                     stream = await server.process(json.dumps({
                         "type": "threads.create", "params": {"input": {
-                            "content": [{"type": "input_text", "text": "Who are you?"}],
+                            "content": [{"type": "input_text", "text": prompt}],
                             "attachments": [], "inference_options": {}}},
                     }).encode(), context)
                     wire = b"".join([chunk async for chunk in stream]).decode()
@@ -122,12 +156,18 @@ class ClientStreamTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Hello from AOC.", wire)
         self.assertTrue(any(event["type"] == "thread.item.done" and
                             event["item"]["type"] == "assistant_message" for event in events))
-        self.assertEqual(len(requests), 3 if follow_up else 1)
+        self.assertEqual(len(requests), 2 if indexed else 3 if follow_up else 1)
         self.assertEqual(requests[0].url.path, "/api/v1/chat/completions")
         body = json.loads(requests[0].content)
         self.assertEqual(body["model"], site_model or model)
         self.assertTrue(body["stream"])
-        self.assertTrue(body["tools"])
+        if indexed:
+            self.assertIn("search_project_tasks",str(body.get("tools")))
+            self.assertIn("Verified SEO update",str(json.loads(requests[-1].content)["messages"]))
+        else:
+            self.assertFalse(body.get("tools"))
+        if not general:
+            self.assertIn("Current verified, read-only Hubstaff snapshot", str(body["messages"]))
         if follow_up:
             history = json.loads(requests[-1].content)["messages"]
             self.assertTrue(any(message["role"] == "assistant" and "Hello from AOC." in str(message["content"])
@@ -135,13 +175,17 @@ class ClientStreamTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(history[-1]["content"], [{"type": "text", "text": "What did you just say?"}])
 
         saved_replies = [item for item in items if item.type == "assistant_message"]
-        self.assertEqual(len(saved_replies), len(requests) + int(legacy), "Replies must not overwrite earlier history")
+        self.assertEqual(len(saved_replies), len(requests) - int(indexed) + int(legacy), "Replies must not overwrite earlier history")
         if legacy:
             self.assertEqual(saved_replies[0].content[0].text, "Existing reply, preserve me.")
             saved_replies = saved_replies[1:]
+        from sensitive_text import redact_sensitive_text
         self.assertEqual([item.content[0].text for item in saved_replies],
-                         [f"Hello from AOC. Reply {index + 1}." for index in range(len(requests))])
-        self.assertEqual(len({item.id for item in saved_replies}), len(requests))
+                         [redact_sensitive_text(reply_text or f"Hello from AOC. Reply {index + 1}.") for index in range(int(indexed),len(requests))])
+        if reply_text:
+            self.assertNotIn("PlainPass123!", "".join(wires))
+            self.assertNotIn("PlainPass123!", str([item.model_dump() for item in saved_replies]))
+        self.assertEqual(len({item.id for item in saved_replies}), len(requests)-int(indexed))
         self.assertNotIn("__fake_id__", [item.id for item in saved_replies])
         for wire, saved in zip(wires, saved_replies):
             turn_events = [json.loads(part.removeprefix("data: ")) for part in wire.strip().split("\n\n")]

@@ -53,7 +53,8 @@ const hubstaffTimeZone = process.env.HUBSTAFF_REPORT_TIME_ZONE?.trim();
 check(!hubstaffTimeZone || normalizeReportTimeZone(hubstaffTimeZone) === hubstaffTimeZone,
   "Hubstaff reporting timezone", "Use a valid IANA timezone such as Asia/Manila.");
 const hubstaffPatConfigured = Boolean(configured("HUBSTAFF_PAT_REFRESH_TOKEN"));
-if (hubstaffPatConfigured || process.argv.includes("--employee")) {
+const checkInternalUsers = process.argv.includes("--internal-user") || process.argv.includes("--employee");
+if (hubstaffPatConfigured || checkInternalUsers) {
   check((process.env.HUBSTAFF_TOKEN_ENCRYPTION_KEY?.trim().length || 0) >= 32,
     "Hubstaff PAT encryption key",
     "Set HUBSTAFF_TOKEN_ENCRYPTION_KEY to a stable random value containing at least 32 characters.");
@@ -75,7 +76,7 @@ if (configured("DATABASE_URL")) {
       "usage:migrate": ["portal_ai_activity_monthly", "portal_ai_provider_status"],
       "site-ai:migrate": ["portal_site_ai_settings", "portal_ai_credentials", "portal_ai_active_provider"],
       "builder:migrate": ["portal_assistant_configs", "portal_assistant_versions", "portal_assistant_files", "portal_assistant_tool_usage", "portal_assistant_preview_usage"],
-      ...(process.argv.includes("--employee") ? { "employee:migrate": ["portal_employees"] } : {}),
+      ...(checkInternalUsers ? { "internal-user:migrate": ["portal_internal_users"] } : {}),
     };
     for (const [migration, tables] of Object.entries(groups)) {
       const result = await db.query("SELECT name, to_regclass('public.' || quote_ident(name)) IS NOT NULL AS present FROM unnest($1::text[]) AS name", [tables]);
@@ -93,7 +94,7 @@ if (configured("DATABASE_URL")) {
     check(
       false,
       "Database connection",
-      `${detail}. Check DATABASE_URL, network access, and the Neon database status.`,
+      `${detail}. Check DATABASE_URL, network access, and the PostgreSQL provider status.`,
     );
   }
   finally { await db.end().catch(() => {}); }

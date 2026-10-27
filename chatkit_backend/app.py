@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from assistant import PortalChatKitServer
 from security import verify_signature
+from debugger_trace import inline_debug_events, verified_debug_context
 from store import Context, PostgresStore
 from builder_config import load_config
 from database import connect_database
@@ -23,7 +24,7 @@ from preview import router as preview_router
 from uploads import (MAX_ATTACHMENTS, MAX_FILE_BYTES, UPLOAD_ID, PrivateAttachmentStore,
                      UploadError, load_upload, upload_file, uploads_enabled)
 from ai_provider import provider_config
-from provider_settings import load_provider_settings
+from provider_settings import load_provider_settings, ProviderSettingsError
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(preview_router)
@@ -36,13 +37,25 @@ MUTATE = GENERATE | {"threads.update", "threads.delete", "attachments.delete"}
 ALLOWED = MUTATE | {"threads.list", "threads.get_by_id", "items.list"}
 
 
+class SourceReference(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(max_length=500)
+    revision: str = Field(pattern=r"^[0-9]{1,40}$")
+    text: str = Field(max_length=2000)
+    citation: str = Field(pattern=r"^SRC-[A-Za-z0-9_-]{12}$")
+    excerpt: bool
+
+
 class Envelope(BaseModel):
     model_config = ConfigDict(extra="forbid")
     client_id: str = Field(pattern=r"^[1-9][0-9]{0,18}$")
     user_id: str = Field(pattern=r"^[1-9][0-9]{0,18}$")
-    instructions: str = Field(max_length=20_000)
+    instructions: str = Field(max_length=30_000)
     portal_origin: str = Field(default="", max_length=300)
     hubstaff: dict | None = None
+    hubstaff_index_binding: str = Field(default="", pattern=r"^(?:[0-9a-f]{64})?$")
+    chat_mode: str = Field(default="work", pattern=r"^(work|general)$")
+    source_references: list[SourceReference] = Field(default_factory=list, max_length=4)
     payload: dict
 
 
@@ -132,6 +145,13 @@ async def cleanup(db, context, token):
         except Exception as error:
             logger.error("ChatKit lease cleanup failed: %s", type(error).__name__)
         finally:
+            if getattr(context, "debug_trace", None):
+                for client in (getattr(context, "ai_client", None), getattr(context, "hosted_client", None)):
+                    if client is not None:
+                        try:
+                            await client.close()
+                        except Exception:
+                            pass
             await db.close()
 
 
@@ -148,7 +168,7 @@ async def chatkit(request: Request):
     body = bytearray()
     async for chunk in request.stream():
         body.extend(chunk)
-        if len(body) > 150_000:
+        if len(body) > 250_000:
             return JSONResponse({"error": "Request too large"}, status_code=413, headers=NO_STORE)
     if not verify_signature(bytes(body), request.headers.get("x-chatkit-timestamp", ""),
                             request.headers.get("x-chatkit-signature", ""), secret):
@@ -169,15 +189,22 @@ async def chatkit(request: Request):
         db = await connect_database(os.environ["DATABASE_URL"])
         client = await load_client(db, envelope)
         context = Context(db, envelope.client_id, envelope.user_id, envelope.instructions, client)
-        context.config = await load_config(db, client)
+        context.debug_trace = verified_debug_context(request.headers)
+        context.chat_mode = envelope.chat_mode
+        context.source_references = [reference.model_dump() for reference in envelope.source_references]
+        # History and conversation-management requests do not use assistant
+        # settings. Fetch them only when a reply will be generated.
+        if parsed.type in GENERATE:
+            context.config = await load_config(db, client)
         context.portal_origin = envelope.portal_origin.rstrip("/")
-        context.hubstaff = envelope.hubstaff
+        context.hubstaff = envelope.hubstaff if envelope.chat_mode == "work" else None
+        context.hubstaff_index_binding = envelope.hubstaff_index_binding if envelope.chat_mode == "work" else ""
         if parsed.type in MUTATE:
             token = uuid4().hex
             await acquire_lease(context, token)
         thread_id = getattr(parsed.params, "thread_id", None)
-        if thread_id:
-            await store.load_thread(thread_id, context)
+        # The SDK's Store calls verify the scoped thread as each operation is
+        # processed; preloading it here added a duplicate database query.
         if parsed.type == "threads.retry_after_item":
             item = await store.load_item(thread_id, parsed.params.item_id, context)
             if not isinstance(item, UserMessageItem):
@@ -204,7 +231,7 @@ async def chatkit(request: Request):
             async def events():
                 try:
                     async with asyncio.timeout(95):
-                        async for event in result:
+                        async for event in inline_debug_events(result, context.debug_trace):
                             yield event
                 except asyncio.CancelledError:
                     raise
@@ -217,6 +244,10 @@ async def chatkit(request: Request):
             streaming = True
             return StreamingResponse(events(), media_type="text/event-stream", headers=NO_STORE)
         return Response(result.json, media_type="application/json", headers=NO_STORE)
+    except ProviderSettingsError as error:
+        logger.error("ChatKit provider configuration failed: %s", error.code)
+        return JSONResponse({"code": error.code, "error": "The assistant needs an administrator configuration update."},
+                            status_code=503, headers=NO_STORE)
     except UploadError as error:
         return JSONResponse({"code": error.code}, status_code=error.status, headers=NO_STORE)
     except NotFoundError:

@@ -24,8 +24,9 @@ function errorResponse(error) {
 
 export async function GET(request) {
   try {
+    const mode = new URL(request.url).searchParams.get("mode") || "work";
     return Response.json(
-      { conversations: await listPortalConversations(request.headers) },
+      { conversations: await listPortalConversations(request.headers, mode) },
       { headers: noStore },
     );
   } catch (error) {

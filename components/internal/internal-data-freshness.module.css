@@ -1,0 +1,4 @@
+.note { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 3px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.dot { display: inline-block; width: 6px; height: 6px; flex: 0 0 6px; margin-right: 3px; border-radius: 50%; }
+.cached { background: #9aa9ba; }
+.hubstaff { background: #4eaa85; }

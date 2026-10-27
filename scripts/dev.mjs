@@ -63,7 +63,21 @@ function run(command, args, cwd = root) {
 }
 
 run(process.execPath, [path.join(root, "node_modules/next/dist/bin/next"), "dev", "-H", "127.0.0.1", "-p", "3000"]);
+// Optional, isolated Drive worker: failure must not stop either portal or the Python service.
+if (env.LOCAL_SOURCE_SYNC === "true" && env.GOOGLE_DRIVE_CLIENT_ID && env.GOOGLE_DRIVE_ROOT_FOLDER_ID) {
+  const worker = spawn(process.execPath, ["--conditions=react-server", path.join(root, "scripts/sync-prepared-sources.mjs"), "--watch"],
+    { cwd: root, env, stdio: ["ignore", "inherit", "inherit"], windowsHide: true });
+  children.push(worker);
+  worker.on("error", () => console.warn("Optional Drive source worker could not start. Chat services remain running."));
+}
 process.on("SIGINT", () => stop());
+// Optional index worker is isolated from both portals; a sync error never stops chat.
+if (env.LOCAL_HUBSTAFF_INDEX_SYNC === "true") {
+  const worker = spawn(process.execPath, ["--conditions=react-server", path.join(root,"scripts/sync-hubstaff-search.mjs"),"--watch"],
+    {cwd:root,env,stdio:["ignore","inherit","inherit"],windowsHide:true});
+  children.push(worker);
+  worker.on("error",() => console.warn("Optional Hubstaff index worker could not start. Chat services remain running."));
+}
 process.on("SIGTERM", () => stop());
 // Own terminal input instead of allowing either child to consume Ctrl+C.
 if (process.stdin.isTTY) {

@@ -1,13 +1,12 @@
 import { Writable } from "node:stream";
 import { createInterface } from "node:readline/promises";
 
-import { neon } from "@neondatabase/serverless";
-
 import {
   closeAuthDatabase,
   createPortalAuth,
   isPortalAuthConfigured,
 } from "../lib/auth.js";
+import { databaseSql } from "../lib/postgres.js";
 
 function fail(message) {
   console.error(`\nAccount was not created: ${message}`);
@@ -89,7 +88,7 @@ async function main() {
     console.warn("\nWarning: this predictable password is suitable only for local testing. Change it before inviting a real client.");
   }
 
-  const sql = neon(process.env.DATABASE_URL);
+  const sql = databaseSql;
   const schema = await sql`
     SELECT
       to_regclass('public.portal_clients') IS NOT NULL AS has_clients,
@@ -98,7 +97,7 @@ async function main() {
   `;
 
   if (!schema[0]?.has_clients || !schema[0]?.has_users || !schema[0]?.has_memberships) {
-    fail("The portal schema is missing. Run database/schema.sql in the Neon SQL Editor first.");
+    fail("The portal schema is missing. Run npm run portal:migrate first.");
     return;
   }
 
@@ -137,13 +136,19 @@ async function main() {
             display_name = EXCLUDED.display_name,
             updated_at = NOW()
       RETURNING id
+    ),
+    membership_row AS (
+      INSERT INTO portal_memberships (client_id, user_id, role)
+      SELECT client_row.id, user_row.id, 'client_admin'
+      FROM client_row, user_row
+      ON CONFLICT (client_id, user_id) DO UPDATE
+        SET role = EXCLUDED.role,
+            updated_at = NOW()
+      RETURNING client_id,user_id,role
     )
-    INSERT INTO portal_memberships (client_id, user_id, role)
-    SELECT client_row.id, user_row.id, 'client_admin'
-    FROM client_row, user_row
-    ON CONFLICT (client_id, user_id) DO UPDATE
-      SET role = EXCLUDED.role,
-          updated_at = NOW()
+    INSERT INTO portal_client_access_audit
+      (client_id,target_user_id,action,source,next_role)
+    SELECT client_id,user_id,'admin_grant','terminal',role FROM membership_row
   `;
 
   console.log(`\nCreated ${displayName}`);

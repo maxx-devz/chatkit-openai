@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch, sentinel
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from ai_provider import ProviderConfig, agent_model, provider_config, supports_openai_hosted_tools
-from provider_settings import unseal_provider_key, load_provider_settings, close_provider_clients
+from provider_settings import unseal_provider_key, load_provider_settings, close_provider_clients, ProviderSettingsError
 
 SECRET = "unit-test-secret-32-characters-long"
 # Produced by the actual Node sealProviderKey implementation; not a real credential.
@@ -15,6 +15,15 @@ SEALED = "v1.CrnVeIm5o3xNqbtJ.jRwa9o3G-g_BuiJd2HgsBQ.P5NoD9Cy26qf-vgPCChpXkQqLRG
 
 
 class ProviderSettingsTests(unittest.IsolatedAsyncioTestCase):
+    async def test_missing_encryption_secret_is_a_safe_actionable_configuration_error(self):
+        db = AsyncMock()
+        db.execute.return_value.fetchall.return_value = [{"provider": "openrouter", "encrypted_key": SEALED, "model": "x", "active": True}]
+        with patch.dict(os.environ, {"PROVIDER_SETTINGS_SECRET": ""}):
+            with self.assertRaises(ProviderSettingsError) as raised:
+                await load_provider_settings(db)
+            self.assertEqual(raised.exception.code, "provider_encryption_missing")
+            self.assertNotIn(SEALED, str(raised.exception))
+
     def test_node_encryption_is_readable_by_python(self):
         self.assertEqual(unseal_provider_key("openrouter", SEALED, SECRET), "sk-or-v1-unit-test-only")
         for provider, secret in [("openai", SECRET), ("openrouter", SECRET + "x")]:
