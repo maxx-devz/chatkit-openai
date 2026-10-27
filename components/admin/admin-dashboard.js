@@ -1,13 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import aocIcon from "@/aoc-icon.png";
-import aocLogo from "@/aoc-logo.png";
 import SignOutButton from "@/components/auth/sign-out-button";
 import AdminAssistant from "@/components/admin/admin-assistant";
+import AdminSidebar from '@/components/admin/admin-sidebar';
 import PortalUsage from "@/components/admin/portal-usage";
 import ProviderSettings from "@/components/admin/provider-settings";
 import styles from "./admin-dashboard.module.css";
@@ -346,6 +345,7 @@ export default function AdminDashboard({ initialData }) {
           </div>
         </div>
       </aside>
+      <AdminSidebar admin={initialData.admin} />
 
       <div className={styles.main}>
         <header className={styles.topbar}>

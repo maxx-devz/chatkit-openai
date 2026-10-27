@@ -15,7 +15,7 @@ export default async function FixtureInternalUserPage({ searchParams, workspace 
   const permissions = ['work.overview.read', 'work.tasks.read', 'work.activity.read',
     'hubstaff.connection.read', 'people.directory.read', 'account.password.change'];
   const dashboard = <InternalUserDashboard name="Fixture Internal User" username="fixture.user" position={position} panelAccess={panels}
-      workspace={workspace} connected={connected}>
+      workspace={workspace} connected={connected} hubstaffOAuthConfigured={params?.oauth === 'true'}>
     {workspace === 'settings' ? <HubstaffConnection connected={connected} /> : null}
   </InternalUserDashboard>;
   if (embedded) return dashboard;

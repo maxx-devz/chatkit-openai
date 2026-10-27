@@ -93,6 +93,7 @@ Existing accounts, client records, conversations, and administrator tools are re
 | `npm run setup:check` | Check local configuration and database tables without displaying secrets |
 | `npm run setup:check -- --internal-user` | Also check the optional internal user schema and encryption key |
 | `npm run internal-user:migrate` | Add/update internal user access, position, panel policy, and encrypted connection storage |
+| `npm run internal-hubstaff-oauth:migrate` | Add per-user Hubstaff connection method; preserve existing PAT connections ([setup](docs/INTERNAL_HUBSTAFF_OAUTH.md)) |
 | `npm run internal-user:create -- USERNAME "DISPLAY NAME" APPROVED_HUBSTAFF_USER_ID` | Privately provision internal-user-only access; password is prompted |
 | `npm run test:internal-user` | Internal user authorization, Hubstaff isolation, credential safety, and real Better Auth login tests |
 | `npm run test:internal-user:database` | Internal user SQL checks in rolled-back temporary tables |
@@ -104,6 +105,10 @@ Existing accounts, client records, conversations, and administrator tools are re
 | `npm start` | Serve a production build; configure a running HTTPS Python backend separately |
 | `npm run auth:migrate` | Better Auth schema |
 | `npm run portal:migrate` | Client, membership, and earlier-history schema |
+| `npm run client-access:migrate -- --dry-run` | Validate per-client roles and audit schema without keeping changes |
+| `npm run client-access:migrate` | Enable Viewer memberships and audited client access changes; run before deploying this branch |
+| `npm run admin-audit:migrate -- --dry-run` | Validate the Client/AOC Admin audit and AI usage migration without retaining changes |
+| `npm run admin-audit:migrate` | Enable Client/AOC Admin audit logs and per-action AI usage ([setup](docs/CLIENT_AND_AOC_ADMIN_AUDIT.md)) |
 | `npm run admin:migrate` | Staff access, monthly usage, client integrations, and encrypted PAT storage |
 | `npm run chatkit:migrate` | ChatKit conversations and request leases |
 | `npm run uploads:migrate` | Conversation attachment storage and limits |
@@ -111,7 +116,8 @@ Existing accounts, client records, conversations, and administrator tools are re
 | `npm run builder:migrate` | Assistant configuration, tools, and generated files |
 | `npm run usage:migrate` | Anonymous AI activity totals, independent of allowance resets |
 | `npm run admin:create -- USERNAME "DISPLAY NAME"` | Create a staff login; password is prompted privately |
-| `npm run client:create -- USERNAME "DISPLAY NAME"` | Create a client login |
+| `npm run client:create -- USERNAME "DISPLAY NAME"` | Create a new client workspace and its first Client Administrator login |
+| `npm run client:admin -- grant\|revoke CLIENT_SLUG USERNAME` | Owner-controlled Client Administrator changes for an existing member |
 | `npm run list:client` | List current client accounts |
 | `npm run hubstaff:check -- PROJECT_URL` | Safely verify Hubstaff project access and summary data |
 | `npm run client:delete -- USERNAME --confirm-delete` | Permanently remove the specified client |
@@ -119,6 +125,11 @@ Existing accounts, client records, conversations, and administrator tools are re
 Create clients through **Add client** in `/admin` or the command above. Existing
 users do not need to be recreated. Migration commands use `.env.local`; they do
 not run automatically during Vercel builds.
+
+Client Administrators can create Viewer and Member logins for their own client
+under **Members & Access** after the client-access migration and deployment.
+See the [Client Portal access matrix](docs/CLIENT_PORTAL_ACCESS_MATRIX.md) for
+scope, protected grants, temporary-password handling, and staging checks.
 
 ## Deployment
 

@@ -183,7 +183,7 @@ Authentication proves who the user is. Authorization determines what that user m
 
 The current client, administrator, and internal user account boundaries remain in place while the internal role model is designed. Internal user position and UI panel access do not by themselves authorize sensitive data. The Phase 0 authorization matrix must define domain and field permissions for Leadership, HR/Admin, PM, Sales, Marketing, Development, Billing, internal users, and client users.
 
-The [Internal Portal Role and Permission Matrix](INTERNAL_ACCESS_MATRIX.md) records the proposed four-layer model and internal-user grants. Its planned business permissions remain unavailable until their scopes, fields, and sources are approved and implemented. Client account permissions require a separate matrix.
+The [Internal Portal Role and Permission Matrix](INTERNAL_ACCESS_MATRIX.md) records the proposed four-layer model and internal-user grants. Its planned business permissions remain unavailable until their scopes, fields, and sources are approved and implemented. The separate [Client Portal access matrix](CLIENT_PORTAL_ACCESS_MATRIX.md) defines per-client roles without expanding AOC Admin or Internal Portal access.
 
 The [Phase 0 entity relationship model](PHASE_0_DATA_MODEL.md) separates implemented account/access tables from proposed integration and read-only domain relationships. The [Phase 0 closeout record](PHASE_0_CLOSEOUT.md) tracks source owners, access paths, policy approvals, and staging evidence; neither document alone authorizes new ingestion or data grants.
 

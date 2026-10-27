@@ -39,7 +39,8 @@ test("global selection rejects unverified, missing, or tool-incompatible models"
 test("write uses parameterized values and records the authenticated admin", async () => {
   const sql = async (strings, ...values) => {
     assert.match(strings.join("?"), /ON CONFLICT \(provider\) DO UPDATE/);
-    assert.deepEqual(values, ["openrouter", "vendor/tool:free", "7"]);
+    assert.deepEqual(values, ["openrouter", "vendor/tool:free", "7", "7", "openrouter"]);
+    assert.match(strings.join("?"), /INSERT INTO portal_audit_events/);
     return [{ model: values[1], updated_at: "now" }];
   };
   assert.deepEqual(await writeSiteModel(sql, provider, "vendor/tool:free", "7"), {

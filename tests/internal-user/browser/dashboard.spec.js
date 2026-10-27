@@ -364,6 +364,48 @@ test('token entry is a native password POST with no browser storage or URL token
   expect(await page.content()).not.toContain(synthetic);
 });
 
+test('personal Settings panels have spacing and a readable status on desktop and mobile', async ({ page }) => {
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/internal/settings?connected=false');
+    const account = await page.locator('#account-security').boundingBox();
+    const hubstaff = await page.locator('#hubstaff-connection').boundingBox();
+    expect(account).not.toBeNull();
+    expect(hubstaff).not.toBeNull();
+    expect(hubstaff.y - (account.y + account.height)).toBeGreaterThanOrEqual(20);
+    await expect(page.locator('#hubstaff-connection').getByText('Setup needed')).toHaveCSS('white-space', 'nowrap');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+});
+
+test('My Work offers Hubstaff sign-in only while the personal connection is missing', async ({ page }) => {
+  await page.goto('/?connected=false&oauth=true');
+  const connect = page.getByRole('button', { name: 'Connect Hubstaff', exact: true });
+  await expect(connect).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'My Assigned Tasks' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Time & Activity' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Recent task activity' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'To Do' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Team', exact: true })).toBeVisible();
+  await page.route('**/api/internal/hubstaff/oauth/start', async route => {
+    expect(route.request().method()).toBe('POST');
+    await route.fulfill({ status: 303, headers: { location: '/internal/settings?connected=false' } });
+  });
+  await connect.click();
+  await expect(page).toHaveURL(/\/internal\/settings\?connected=false$/);
+
+  await page.goto('/?connected=true&oauth=true');
+  await expect(connect).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'My Assigned Tasks' })).toBeVisible();
+  await page.goto('/?connected=false&no_hubstaff=true&oauth=true');
+  await expect(connect).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'My Work needs Hubstaff access' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'My Assigned Tasks' })).toHaveCount(0);
+  await page.goto('/?connected=false');
+  await expect(page.getByRole('link', { name: 'Set up Hubstaff' }))
+    .toHaveAttribute('href', '/internal/settings#hubstaff-connection');
+});
+
 test('Internal Settings can toggle Team and shows HR permissions without exposing the protected role', async ({ page }) => {
   await page.goto('/role-settings');
   await expect(page.getByRole('heading', { name: 'My Workspace & permissions' })).toBeVisible();

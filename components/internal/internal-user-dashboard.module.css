@@ -69,6 +69,10 @@
 .teamFreshness { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--line); }
 .primary, .connectionForm button { background: var(--accent); color: white; border: 0; border-radius: 9px; padding: 12px 16px; font-weight: 600; }
 .primary:disabled { opacity: .55; }
+.connectPrompt { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+.connectPrompt p { margin-bottom: 0; }
+.connectPrompt .primary { display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; text-decoration: none; cursor: pointer; font: inherit; font-weight: 600; }
+.connectPrompt form { margin: 0; }
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 24px; }
 .stats button { text-align: left; border: 1px solid var(--line); border-radius: 14px; background: white; color: var(--ink); padding: 20px 22px; }
 .stats button[aria-pressed=true] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
@@ -93,7 +97,10 @@
 .attentionLoading i { height: 44px; border-radius: 8px; background: linear-gradient(90deg, #f5f6f8, #e9edf3, #f5f6f8); }
 .grid { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(280px, 1fr); gap: 24px; align-items: start; }
 .singleColumnGrid { grid-template-columns: minmax(0, 1fr); }
+.settingsStack { display: grid; gap: 24px; }
 .settingsPanel { max-width: 760px; }
+.settingsPanel .connectionReady,
+.settingsPanel .connectionPending { flex-shrink: 0; white-space: nowrap; }
 .passwordForm { display: grid; gap: 8px; margin-top: 18px; max-width: 430px; }
 .passwordForm label { color: var(--ink); font-size: 12px; font-weight: 700; }
 .passwordForm input { width: 100%; min-height: 40px; padding: 9px 11px; border: 1px solid #d5e0e9; border-radius: 8px; background: #fbfdff; color: var(--ink); font: inherit; }
@@ -228,6 +235,9 @@
 .connectionForm summary { font-size: 13px; cursor: pointer; font-weight: 600; }
 .connectionForm form { display: grid; gap: 10px; margin-bottom: 12px; }
 .connectionForm button { font-size: 12px; }
+.unlinkConnection { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.connectionForm .unlinkButton { justify-self: start; border: 1px solid var(--danger); background: transparent; color: var(--danger); cursor: pointer; }
+.connectionForm .unlinkButton:hover { background: var(--danger-soft); }
 .activity li { display: flex; justify-content: space-between; gap: 16px; border-top: 1px solid var(--line); padding: 16px 0; font-size: 12px; }
 .activity li > div { min-width: 0; }
 .activity strong { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px; }
@@ -291,6 +301,8 @@
   .internalUserNav .pmCompactLink { display: flex; }
 }
 @media (max-width: 720px) {
+  .connectPrompt { align-items: stretch; flex-direction: column; }
+  .connectPrompt .primary { width: 100%; }
   .shell { display: block; }
   .portalSidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 60; width: min(320px, 88vw); height: 100dvh; min-height: 0; padding: 24px 16px 18px; visibility: hidden; transform: translateX(-100%); transition: transform 180ms ease, visibility 180ms ease; }
   .portalSidebar.mobileOpen { visibility: visible; transform: translateX(0); }
