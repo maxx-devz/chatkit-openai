@@ -299,6 +299,17 @@ domain registration, or deployment health. Those need a real client test.
   tool. Instructions alone do not enable it.
 - **Reply/image fails:** check API billing and access to the configured models.
   Image generation is separately billed and can exceed the bounded request time.
+  In **Work questions**, an explicit request such as "Generate image of cat"
+  advertises the `create_image` tool only when that client's published Image
+  generation setting and a saved OpenAI credential permit it. The chat model
+  stays selected; the tool uses `OPENAI_IMAGE_MODEL` on the Python backend.
+  Downloads are emitted only after OpenAI returns usable image data and the
+  private file is stored. Image failures go directly to ChatKit's error event,
+  not back through the AI as a generic tool result. The error includes a safe
+  category, the actual HTTP status and OpenAI request ID when available; raw
+  provider text, credentials and request contents are never forwarded. Quota
+  and policy failures do not offer an immediate retry. **General chat** keeps
+  generation tools disabled; switch to Work questions for image generation.
 - **Attachments:** follow [the upload guide](UPLOADS_SETUP.md). Run
   `npm run uploads:migrate` once against the shared database and deploy both
   projects. No scanner key, OpenAI Admin key, or storage service is required.

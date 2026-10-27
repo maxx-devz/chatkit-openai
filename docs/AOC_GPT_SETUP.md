@@ -5,6 +5,15 @@ uses an independently configured API assistant with ChatKit as its interface.
 Its name can be AOC-GPT, but its instructions, knowledge, and tools must be
 transferred and tested. There is no automatic synchronization with the custom GPT.
 
+A read-only Google Drive connection, private preview and optional private AI test
+are available in AOC Admin at `/admin/sources`. See [Google Drive source setup](GOOGLE_DRIVE_SOURCES.md).
+The separate [prepared chat sources](PREPARED_CHAT_SOURCES.md) feature synchronizes
+eligible Google Docs and Sheets into an encrypted database cache. Administrators
+approve instruction documents and reference folders per audience, and can add
+separate guidance without editing Drive. Client ChatKit and private AOC Admin chat
+use those prepared sources only after publication; continuous updates require the
+background worker or production scheduler. Internal Portal behavior is unchanged.
+
 ## Transfer the approved behavior
 
 1. Have the GPT's owner or an authorized editor open its configuration in ChatGPT.
