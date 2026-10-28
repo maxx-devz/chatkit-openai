@@ -9,6 +9,14 @@ adds durable background preparation, per-audience approval and additional
 instructions for client ChatKit and private AOC Admin chat. Nothing is published
 by merely connecting Drive. Internal Portal code and shared login behavior are unchanged.
 
+For normal client use, choose **All clients + AOC Admin — shared company knowledge**
+in the prepared-source section. Approve the dedicated Company Knowledge parent
+once using the default automatic-parent option, not separately for every client
+or document. Clients do not need Google accounts or Drive logins.
+The preparation reader now also supports stored DOCX and XLSX files via scoped
+media downloads; the historical private-test descriptions below predate that
+addition. See [prepared chat sources](PREPARED_CHAT_SOURCES.md) for current limits.
+
 ## Free test setup
 
 1. Use a company-authorized Google Cloud project. Leave billing unlinked: do not
@@ -52,7 +60,8 @@ The **Private AI source test** panel defaults to **Automatic parent sources**:
 3. Before each answer the server checks current parent/descendant metadata,
    including revisions and content-download restrictions. Reconciliation covers
    additions, edits, moves, removals and visible permission changes. New folders
-   must be eligible `[SOURCE]` trees; archives/workspaces/references stay excluded.
+   inside the dedicated configured parent do not require a `[SOURCE]` name;
+   archives/workspaces/reference-only material stay excluded.
 4. Only new/changed Google Docs and Sheets need exporting while the private memory cache is
    warm. Reconnect, identity/root/client changes, failed synchronization, revoked
    access, ten-minute expiry, capacity eviction, restart or a different serverless
@@ -140,8 +149,8 @@ private prototype does not replace those approvals.
   Internal Portal accounts cannot use its credentials or management endpoints.
   Client chat can use only explicitly published prepared content through the
   separate audience-scoped cache; it cannot access this connection directly.
-- Discovery follows direct `[SOURCE]` folders under the configured parent and
-  eligible descendants, plus root files. Archives, legacy, workspace and
+- Discovery follows eligible descendants of the configured dedicated parent,
+  including ordinary folder names and root files. Archives, legacy, workspace and
   reference-only trees, deleted items and shortcuts are excluded. A folder name
   never makes a source automatically approved for client use.
 - Pagination, request/file/depth bounds and incomplete-search checks prevent a
@@ -152,7 +161,8 @@ private prototype does not replace those approvals.
   for parsing limits. Other formats are listed as unsupported.
 - Render source text and test replies as escaped plain text, never executable
   HTML. The private test treats source text as lower-priority input. Prepared chat
-  uses only explicitly approved mandatory documents as business instructions.
+  supports approved mandatory documents or automatic relevant company guidance
+  under fixed application rules; see the prepared-source guide.
 - The API's `source-connections` path uses the debugger's existing sensitive-path
   exclusion. Tokens and raw Google error bodies are never deliberately logged
   or returned to the browser.
@@ -165,7 +175,7 @@ private prototype does not replace those approvals.
 ## Prepared chat integration and remaining deployment work
 
 The prepared-source guide documents the encrypted persistent cache, background
-reconciliation worker, protected scheduler endpoint, per-client approval and
+reconciliation worker, protected scheduler endpoint, shared parent approval and
 chat integration. These are separate from the private simulation described here.
 Production scheduling/deployment, live AI behavior evaluations, Google webhook
 subscriptions and all-format parsing are not automatically configured. Separate

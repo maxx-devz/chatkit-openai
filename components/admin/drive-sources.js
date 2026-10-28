@@ -9,7 +9,7 @@ import styles from "./drive-sources.module.css";
 const results = {
   connected: "Google Drive connected. Discover sources to verify folder access.",
   cancelled: "Google authorization was cancelled. Nothing was published.",
-  wrong_account: "Use the configured Jaymark test account and grant read-only Drive access.",
+  wrong_account: "Use the configured Google account and grant read-only Drive access.",
   failed: "Google authorization could not finish. Check the client, callback URL, consent permissions and test-user settings, then reconnect.",
 };
 
@@ -89,15 +89,15 @@ export default function DriveSources() {
   return (
     <main className={styles.page}>
       <header className={styles.heading}>
-        <div><Link href="/admin">← AOC Admin</Link><p className={styles.eyebrow}>SOURCE CONNECTIONS · PRIVATE TEST</p><h1>Original source files</h1>
-          <p>Read the approved parent folder using your Google account. Original documents stay in Drive.</p></div>
+        <div><Link href="/admin">← AOC Admin</Link><p className={styles.eyebrow}>COMPANY KNOWLEDGE · ADMIN MANAGED</p><h1>Company knowledge</h1>
+          <p>Connect your company Drive once. Publish shared company knowledge for all clients; original documents stay in Drive.</p></div>
         <span className={styles.badge}>Audience-controlled source access</span>
       </header>
       <section className={styles.card} aria-labelledby="connection-heading">
         <h2 id="connection-heading">Google Drive · read only</h2>
-        <p>This connection is private to your AOC administrator login. Discovery and preview do not alter Drive sharing or send document content to AI. Prepare sources and approve chat audiences below; the private AI test remains separate.</p>
+        <p>You authorize Google as AOC Admin, not as each client. Credentials remain server-only. Publish the shared company pack below so all clients can ask questions without a Google login. Discovery and preview do not alter Drive sharing or send document content to AI; the private AI test remains separate.</p>
         {connection?.setupMessage && <p className={styles.notice}>{connection.setupMessage}</p>}
-        {connection?.configured && <dl><dt>Authorized test account</dt><dd>{connection.allowedEmail}</dd><dt>OAuth callback</dt><dd><code>{connection.redirectUri}</code></dd>
+        {connection?.configured && <dl><dt>Authorized Google account</dt><dd>{connection.allowedEmail}</dd><dt>OAuth callback</dt><dd><code>{connection.redirectUri}</code></dd>
           <dt>Connection</dt><dd>{connection.connected ? "Connected as " + connection.email : "Not connected"}</dd></dl>}
         <div className={styles.actions}>
           <button disabled={Boolean(busy) || !connection?.configured} onClick={() => action("connect")}>{connection?.connected ? "Reconnect Google Drive" : "Connect Google Drive"}</button>
@@ -116,7 +116,7 @@ export default function DriveSources() {
       {inventory && <section className={styles.card} aria-labelledby="inventory-heading">
         <h2 id="inventory-heading">{inventory.rootName} · {inventory.files.length} source candidates</h2>
         <p>Metadata checked {new Date(inventory.checkedAt).toLocaleString()}. This list refreshes every minute while visible. The separate private test checks Drive on demand; normal client/admin chat uses only prepared, audience-approved data.</p>
-        <p className={styles.small}>Archived, legacy, workspace and reference-only folders are excluded. Source placement alone is not approval. Google Docs and Google Sheets support text preparation; unsupported formats are reported explicitly.</p>
+        <p className={styles.small}>Archived, legacy, workspace and reference-only folders are excluded. Source placement alone is not approval. Google Docs, Google Sheets, DOCX and XLSX support text preparation; unsupported formats are reported explicitly.</p>
         <label className={styles.search}>Search sources<input value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} placeholder="Document or folder name" /></label>
         <ul className={styles.files}>{pageFiles.map((file) => <li key={file.id}>
           <div><strong>{file.name}</strong><span>{file.path}</span><small>{file.modifiedTime ? new Date(file.modifiedTime).toLocaleString() : "No modification date"} · Audience approval managed above</small></div>

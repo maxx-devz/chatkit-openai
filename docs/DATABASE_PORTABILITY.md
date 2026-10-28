@@ -31,6 +31,21 @@ compatible with transaction-mode poolers.
 
 ## Current portable data
 
+AI generation options use an additive standard JSONB column on
+`portal_site_ai_settings`, defined in `chatkit_backend/site_ai_schema.sql` and
+applied with `npm run site-ai:migrate`. No provider SDK or extension is involved;
+the migration preserves saved provider keys/models and is safe to rerun.
+
+Shared company knowledge reuses `portal_source_publications` and the encrypted
+prepared-source tables. `database/prepared-source-schema.sql` upgrades the ordinary
+CHECK constraint and adds a partial UNIQUE index for the `clients` audience. No
+publication is enabled by migration, and no provider-specific extension is required.
+
+Client AI spending uses `portal_ai_cost_events` and `portal_ai_cost_state` from
+`database/ai-cost-schema.sql`: ordinary PostgreSQL decimal `NUMERIC(24,12)`, JSONB
+pricing snapshots, UUIDs, timestamps and portable indexes. It requires no external
+billing SDK or database extension and is independent of request-allowance resets.
+
 Portal data uses ordinary PostgreSQL tables, foreign keys, indexes, `BIGSERIAL`,
 `JSONB`, `UUID`, and bounded `BYTEA` values. These can be transferred with normal
 PostgreSQL dump/restore or logical-replication tools. Existing Better Auth tables,

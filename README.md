@@ -23,16 +23,21 @@ approved instructions and knowledge, then test its behavior before publishing.
 
 ## Start locally
 
-Use Node.js 22 and Python 3.13. Keep your existing `.env.local`.
+Install Node.js 22 or newer and Python 3.13 first. From this checkout, run:
 
 ```powershell
-npm ci
-# Only create this environment if .venv does not already exist:
-py -3.13 -m venv .venv
-.venv\Scripts\python.exe -m pip install -r chatkit_backend/requirements.txt
+npm run setup
+# Restore/fill .env.local with your private configuration before continuing.
 npm run setup:check
 npm run dev
 ```
+
+`setup` installs locked Node dependencies, creates or reuses a Python 3.13
+`.venv`, installs `chatkit_backend/requirements.txt`, and checks Python dependencies.
+It creates `.env.local` from `.env.example` only if the local file is missing;
+existing credentials are never overwritten. Stop dev servers before setup.
+Preview without changes with `npm run setup:preview`. Database migrations and
+Vercel environment configuration remain separate, explicit steps.
 
 Open <http://127.0.0.1:3000>. The dev command starts Next.js and the local Python
 service together. Ctrl+C stops both. After editing Python code, restart the dev

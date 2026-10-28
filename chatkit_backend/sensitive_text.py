@@ -3,6 +3,7 @@ import os
 import re
 import unicodedata
 from urllib.parse import urlsplit, parse_qsl
+from source_privacy import redact_source_details
 
 
 def environment_secrets(context=None):
@@ -50,5 +51,7 @@ def sanitize_assistant_item(item, context=None):
     from chatkit.types import AssistantMessageContent
     # Inspect the whole message, including values split across content parts.
     text = redact_sensitive_text("\n".join(part.text for part in item.content), environment_secrets(context))
+    if not getattr(context, "preview", False):
+        text = redact_source_details(text, getattr(context, "source_references", ()))
     # Provider annotations may contain credential-bearing URLs; plain text keeps safe task links.
     return item.model_copy(update={"content": [AssistantMessageContent(text=text)]})

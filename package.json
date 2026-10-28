@@ -1,9 +1,11 @@
 {
   "name": "aoc-gpt-portal-prototype",
-  "version": "0.1.0",
+  "version": "0.1.0", 
   "private": true,
   "type": "module",
   "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "setup:preview": "node scripts/setup.mjs --dry-run",
     "dev": "node scripts/dev.mjs",
     "dev:web": "next dev -H 127.0.0.1 -p 3000",
     "debugger:deep": "node scripts/debugger-deep.mjs",
@@ -23,12 +25,15 @@
     "library:migrate": "node --env-file=.env.local scripts/migrate-library.mjs",
     "builder:migrate": "node --env-file=.env.local scripts/migrate-builder.mjs",
     "usage:migrate": "node --env-file=.env.local scripts/migrate-usage.mjs",
+    "ai-costs:migrate": "node --env-file=.env.local scripts/migrate-ai-costs.mjs",
+    "test:ai-costs:database": "node --env-file=.env.local scripts/check-ai-costs-database.mjs",
     "site-ai:migrate": "node --env-file=.env.local scripts/migrate-site-ai.mjs",
     "sources:migrate": "node --env-file=.env.local scripts/migrate-drive-sources.mjs",
     "sources:prepare:migrate": "node --env-file=.env.local scripts/migrate-prepared-sources.mjs",
     "sources:sync": "node --conditions=react-server --env-file=.env.local scripts/sync-prepared-sources.mjs",
     "sources:watch": "node --conditions=react-server --env-file=.env.local scripts/sync-prepared-sources.mjs --watch",
     "test:sources": "node --conditions=react-server --test tests/drive-sources/*.test.mjs",
+    "test:sources:database": "node --conditions=react-server --env-file=.env.local scripts/check-shared-sources-database.mjs",
     "test:builder": "node --test tests/builder-config.test.mjs",
     "test:chatkit": "node --test tests/chatkit-security.test.mjs",
     "test:hubstaff": "node --conditions=react-server --test tests/hubstaff-api/*.test.mjs",
@@ -70,6 +75,7 @@
     "node": ">=22"
   },
   "dependencies": {
+    "mammoth": "1.13.0",
     "@openai/chatkit-react": "1.6.1",
     "better-auth": "^1.7.2",
     "google-auth-library": "^11.3.1",

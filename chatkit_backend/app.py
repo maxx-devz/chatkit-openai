@@ -5,6 +5,7 @@ import json
 import logging
 import os
 from uuid import uuid4
+from typing import Literal
 
 import anyio
 from chatkit.server import StreamingResult
@@ -44,6 +45,7 @@ class SourceReference(BaseModel):
     text: str = Field(max_length=2000)
     citation: str = Field(pattern=r"^SRC-[A-Za-z0-9_-]{12}$")
     excerpt: bool
+    usage: Literal["reference", "company_guidance"] = "reference"
 
 
 class Envelope(BaseModel):

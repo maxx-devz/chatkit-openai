@@ -28,6 +28,7 @@ class Context:
     hubstaff: dict | None = None
     thread_id: str | None = None
     artifacts: list = field(default_factory=list)
+    cost_events: list = field(default_factory=list)
     tool_calls: int = 0
     request_attachment_ids: list = field(default_factory=list)
     ai_model: str | None = None
@@ -39,6 +40,7 @@ class Context:
     response_query: str = ""
     hubstaff_inlined: bool = False
     hubstaff_index_binding: str = ""
+    source_references: list = field(default_factory=list, repr=False)
 
     @property
     def scope(self):

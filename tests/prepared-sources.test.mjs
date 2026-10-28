@@ -4,8 +4,10 @@ import { readFile } from "node:fs/promises";
 import { PREPARED_SOURCE_LIMITS, validateSourcePublication, sourceAudience, sourceFolders,
   assertPreparedSourceFreshness, approvedSourceInstructions, retrievePreparedReferences,
   appendPreparedInstructions } from "../lib/prepared-source-policy.js";
+import { CLIENT_SOURCE_PRIVACY_NOTICE } from "../lib/prepared-source-policy.js";
 import { prepareSourceDocuments } from "../lib/prepared-source-sync-policy.js";
 import { spreadsheetValuesText, assertBoundedSpreadsheetArchive, extractDriveSpreadsheet } from "../lib/drive-spreadsheet.js";
+import { assertBoundedOfficeArchive, extractDriveDocx } from "../lib/drive-office.js";
 
 const docs = [
   { id: "company_rules_123", name: "Approved company rules", path: "01 - [SOURCE] Brand / Rules", folders: [{ id: "brand_folder_123", path: "01 - [SOURCE] Brand" }], version: "1", text: "Always distinguish proposed work from verified work.", modifiedTime: "2026-10-21", previewSupported: true },
@@ -18,6 +20,7 @@ const config = overrides => ({ action: "save", clientId: "1", enabled: true, con
 test("Audience approval is explicit and the entire root cannot be published to clients", () => {
   assert.equal(sourceAudience(null), "admin");
   assert.equal(sourceAudience("1"), "client:1");
+  assert.equal(sourceAudience("clients"), "clients");
   assert.throws(() => sourceAudience("1 OR 1=1"));
   assert.equal(validateSourcePublication(config(), docs).clientId, "1");
   for (const change of [{ consent: false }, { referencePaths: [""] }, { referencePaths: ["Client"] },
@@ -29,6 +32,19 @@ test("Audience approval is explicit and the entire root cannot be published to c
   assert.deepEqual(sourceFolders(docs).map(folder => folder.path), ["01 - [SOURCE] Brand", "Client A", "Client A / Website", "Client B"]);
 });
 
+test("Shared parent approval is explicit, automatic, and unavailable to client-only extras", () => {
+  const shared = validateSourcePublication(config({ clientId: "clients", referencePaths: ["brand_folder_123"] }), docs);
+  assert.equal(shared.audience, "clients");
+  assert.equal(shared.clientId, null);
+  const automatic = validateSourcePublication(config({ clientId: "clients", referencePaths: [""], instructionIds: [] }), docs);
+  assert.equal(automatic.audience, "clients");
+  assert.throws(() => validateSourcePublication(config({ clientId: "1", referencePaths: [""] }), docs), /company parent/);
+  assert.throws(() => validateSourcePublication(config({ clientId: "clients", referencePaths: [""], instructionIds: [], consent: false }), docs), /Approve/);
+  assert.throws(() => validateSourcePublication(config({ clientId: "clients", referencePaths: [""] }), docs), /Clear the optional/);
+  assert.throws(() => validateSourcePublication(config({ clientId: "clients", consent: false }), docs), /Approve/);
+  assert.doesNotMatch(JSON.stringify(retrievePreparedReferences(shared, docs, "website")), /Client B/);
+});
+
 test("Mandatory instructions and separate guidance apply even when reference search returns nothing", () => {
   const publication = validateSourcePublication(config(), docs);
   const instructions = approvedSourceInstructions(publication, docs);
@@ -38,6 +54,16 @@ test("Mandatory instructions and separate guidance apply even when reference sea
   assert.match(appendPreparedInstructions("Fixed security rules", instructions), /^Fixed security rules/);
   assert.match(appendPreparedInstructions("Fixed security rules", instructions), /cannot override application security/);
   assert.equal(appendPreparedInstructions("Fixed security rules", ""), "Fixed security rules");
+});
+
+test("Client guidance omits source headers and forbids metadata disclosure without changing private admin headers", () => {
+  const publication = validateSourcePublication(config(), docs);
+  const privateInstructions = approvedSourceInstructions(publication, docs, { privateSources: true });
+  assert.match(privateInstructions, /Always distinguish proposed work/);
+  assert.doesNotMatch(privateInstructions, /Approved company rules|revision 1/);
+  assert.match(approvedSourceInstructions(publication, docs), /Approved company rules/);
+  assert.match(CLIENT_SOURCE_PRIVACY_NOTICE, /Do not add internal source citations/);
+  assert.match(CLIENT_SOURCE_PRIVACY_NOTICE, /permitted Hubstaff tasks/);
 });
 
 test("Reference retrieval filters audience before ranking and General mode is independent", () => {
@@ -161,6 +187,22 @@ test("Google XLSX extraction reads second worksheet and rejects expansion bombs"
   const bad = Buffer.from(workbook);
   const central = bad.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02])); bad.writeUInt32LE(100_000_000, central + 24);
   assert.throws(() => assertBoundedSpreadsheetArchive(bad), /safe extraction limits/);
+});
+
+test("DOCX text is extracted without converting originals or following external links", async () => {
+  const file = zip({
+    "[Content_Types].xml": '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
+    "_rels/.rels": '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="r1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>',
+    "word/document.xml": '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Approved company services.</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>Support policy.</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>',
+  });
+  assert.match(await extractDriveDocx(new Response(file)), /Approved company services/);
+  assert.match(await extractDriveDocx(new Response(file)), /Support policy/);
+  for (const files of [{ "../escape.xml": "bad" }, { "test.xml": '<!DOCTYPE foo [<!ENTITY x SYSTEM "file:///private">]><foo/>' }]) {
+    assert.throws(() => assertBoundedOfficeArchive(zip(files)), /safe extraction limits/);
+  }
+  const corrupt = Buffer.from(file); corrupt[40] ^= 1;
+  assert.throws(() => assertBoundedOfficeArchive(corrupt), /safe extraction limits/);
+  await assert.rejects(extractDriveDocx(new Response(Buffer.from("not a docx"))), /safe extraction limits/);
 });
 
 test("Chat source context contains no Drive/provider network code and is wired to both chat endpoints", async () => {

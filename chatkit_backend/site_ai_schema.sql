@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS portal_site_ai_settings (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE portal_site_ai_settings ADD COLUMN IF NOT EXISTS generation_options JSONB NOT NULL DEFAULT '{}'::jsonb;
+
 CREATE TABLE IF NOT EXISTS portal_ai_credentials (
     provider TEXT PRIMARY KEY CHECK (provider IN ('openai', 'openrouter')),
     encrypted_key TEXT NOT NULL,

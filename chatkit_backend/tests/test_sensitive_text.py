@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sensitive_text import redact_sensitive_text, sanitize_assistant_item
 from streaming import sanitized_message_events
 from store import Context, PostgresStore
+from source_privacy import redact_source_details
 from chatkit.types import (AssistantMessageItem, AssistantMessageContent, ThreadItemAddedEvent,
                            ThreadItemDoneEvent, ThreadItemUpdatedEvent, AssistantMessageContentPartTextDelta)
 
@@ -19,6 +20,41 @@ def message(text):
 
 
 class SensitiveTextTests(unittest.IsolatedAsyncioTestCase):
+    def test_private_source_metadata_is_removed_but_client_task_links_survive(self):
+        name = "Company Knowledge - Company Identity, Brand & Services"
+        task = "https://tasks.hubstaff.com/app/organizations/14952/projects/346902/tasks/5426464"
+        context = Context(AsyncMock(), "1", "2", "Test", {}, source_references=[{"name": name}])
+        original = message(f"AOC builds ecommerce stores. [{name}, SRC-cvQM42FYbWGw]\n"
+                           f"{name}\n[Private source](https://docs.google.com/document/d/private-id/edit)\n"
+                           f"https://drive.google.com/drive/folders/private-folder\nTask: {task}\n"
+                           "Public page: https://example.com/services")
+        safe = sanitize_assistant_item(original, context).content[0].text
+        for private in (name, "SRC-", "private-id", "private-folder", "google.com"):
+            self.assertNotIn(private, safe)
+        self.assertIn("AOC builds ecommerce stores.", safe)
+        self.assertIn(task, safe)
+        self.assertIn("https://example.com/services", safe)
+        self.assertIn(name, original.content[0].text)
+        self.assertIn("cannot share private source details", redact_source_details("[SRC-abcdefghijkl]"))
+
+    async def test_citation_split_across_stream_chunks_and_old_history_is_hidden(self):
+        citation = "Company Knowledge - Company Identity, Brand & Services, SRC-cvQM42FYbWGw"
+        async def source():
+            yield ThreadItemAddedEvent(item=message("AOC builds stores. [Company Knowledge"))
+            yield ThreadItemUpdatedEvent(item_id="msg_1", update=AssistantMessageContentPartTextDelta(
+                content_index=0, delta=" - Company Identity, Brand & Services, SRC-cvQM42FYbWGw]"))
+            yield ThreadItemDoneEvent(item=message("AOC builds stores. [" + citation + "]"))
+        events = [event async for event in sanitized_message_events(source())]
+        self.assertNotIn("SRC-", str([event.model_dump() for event in events]))
+        self.assertNotIn("Company Identity", str([event.model_dump() for event in events]))
+        self.assertIn("AOC builds stores.", events[-1].item.content[0].text)
+        db = AsyncMock()
+        db.execute.return_value.fetchone.return_value = {"data": message("AOC builds stores. [" + citation + "]").model_dump(mode="json")}
+        context = Context(db, "1", "2", "Test", {})
+        old = await PostgresStore().load_item("thr_1", "msg_1", context)
+        self.assertNotIn("SRC-", old.content[0].text)
+        self.assertNotIn("Company Identity", old.content[0].text)
+
     def test_common_and_known_secrets_are_redacted_and_task_links_survive(self):
         link = "https://tasks.hubstaff.com/app/organizations/14952/projects/346902/tasks/5426464"
         secrets = ["PlainPass123!", "sk-proj-abcdefghijklmnop123456", "eyJabcdefghijk.abcdefghijkl.signature", "known-custom-secret"]

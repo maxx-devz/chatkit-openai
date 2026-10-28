@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { randomUUID } from 'node:crypto';
 import { resolveAiProvider } from "@/lib/ai-provider";
 import { getRuntimeProvider } from "@/lib/provider-settings";
+import { runtimeGenerationOptions } from "@/lib/provider-generation-options";
 import { recordAdminUsage } from "@/lib/portal-usage";
 import { databasePool } from '@/lib/database';
 import { startIntegrationRun, finishIntegrationRun } from '@/lib/integration-run-audit';
@@ -276,6 +277,7 @@ export async function POST(request) {
       result = await openai.responses.create(
         {
           model,
+          ...runtimeGenerationOptions(provider),
           instructions: appendPreparedInstructions(`${ADMIN_ASSISTANT_INSTRUCTIONS}\n\n${clientContext}`, prepared.instructions),
           input,
           max_output_tokens: MAX_OUTPUT_TOKENS,

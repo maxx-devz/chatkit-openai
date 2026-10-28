@@ -58,7 +58,7 @@ test("Source discovery does not treat archives/workspaces/shortcuts as sources",
   for (const name of ["Archived Do not use", "90 - [LEGACY] old", "07 - [WORKSPACE] Generated", "06 - [REFERENCE ONLY] Templates", "[SOURCE] Superseded"]) {
     assert.equal(sourceCandidate(folder("excluded_folder_1", name), true), false);
   }
-  assert.equal(sourceCandidate(folder("unapproved_folder_1", "Unmarked new folder"), true), false);
+  assert.equal(sourceCandidate(folder("unapproved_folder_1", "Unmarked new company folder"), true), true);
   assert.equal(sourceCandidate(doc("document_id_1", "Overview"), true), true);
   assert.equal(sourceCandidate({ mimeType: "application/vnd.google-apps.shortcut", name: "[SOURCE] Shortcut" }), false);
   assert.equal(sourceCandidate({ ...doc("document_id_1", "Active"), trashed: true }), false);
@@ -99,7 +99,8 @@ test("Preview revalidates ancestry, allows eligible descendants and rejects outs
   };
   const read = async (id) => metadata[id];
   assert.equal((await assertDriveFileScope("document_id_1", rootId, read)).name, "Brand");
-  for (const id of ["outside_file_1", "archived_file_1", "unmarked_file_1"]) await assert.rejects(assertDriveFileScope(id, rootId, read), /not in an accessible/);
+  assert.equal((await assertDriveFileScope("unmarked_file_1", rootId, read)).id, "unmarked_file_1");
+  for (const id of ["outside_file_1", "archived_file_1"]) await assert.rejects(assertDriveFileScope(id, rootId, read), /not in an accessible/);
   metadata.document_id_1.parents = [];
   await assert.rejects(assertDriveFileScope("document_id_1", rootId, read), /not in an accessible/);
 });

@@ -1,5 +1,9 @@
 # Portal AI request capacity
 
+Admin also shows a separate **Client API spending · USD** ledger. See
+[cost tracking and billing limitations](AI_COST_TRACKING.md). Request allowances
+remain independent of money totals; resetting an allowance never clears costs.
+
 Open `/admin` and select **AI usage**. The panel refreshes every 15 seconds while
 visible, when the browser regains focus, after an admin reply, or when **Refresh
 usage** is selected.

@@ -1,5 +1,6 @@
 import { synchronizeAllPreparedSources } from "../lib/prepared-source-sync.js";
 import { databasePool } from "../lib/postgres.js";
+import { summarizeSync, syncFailureMessage } from "./dev-log-format.mjs";
 
 const watch = process.argv.includes("--watch");
 let stopping = false;
@@ -13,9 +14,9 @@ try {
     controller = new AbortController();
     try {
       const result = await synchronizeAllPreparedSources({ signal: AbortSignal.any([controller.signal, AbortSignal.timeout(110_000)]) });
-      console.log("Prepared-source sync:", JSON.stringify(result));
+      console.log(summarizeSync(result));
     } catch (error) {
-      if (!stopping) console.error("Prepared-source sync unavailable", { code: error?.code || "sync_failed" });
+      if (!stopping) console.error(syncFailureMessage(error));
       if (!watch) process.exitCode = 1;
     }
     if (watch && !stopping) await new Promise(resolve => {

@@ -1,0 +1,31 @@
+{
+  "version": "2026-10-28-standard-v2",
+  "verifiedAt": "2026-10-28",
+  "reviewAfter": "2026-11-27",
+  "source": "https://developers.openai.com/api/docs/models/gpt-6-luna",
+  "currency": "USD",
+  "decisions": {
+    "gpt-6-luna": {
+      "inputPerMillion": "0.10",
+      "cachedPerMillion": "0.01",
+      "cacheWritePerMillion": "0.125",
+      "outputPerMillion": "0",
+      "longContextThreshold": 272000,
+      "longInputMultiplier": "2",
+      "longOutputMultiplier": "1",
+      "assumptions": "Decisions standard input/cache pricing; outputs not charged. No regional uplift, taxes or discounts."
+    }
+  },
+  "models": {
+    "gpt-6-luna": {
+      "inputPerMillion": "0.10",
+      "cachedPerMillion": "0.01",
+      "cacheWritePerMillion": "0.125",
+      "outputPerMillion": "0.50",
+      "longContextThreshold": 272000,
+      "longInputMultiplier": "2",
+      "longOutputMultiplier": "1.5",
+      "assumptions": "Standard text inference, provider-default cache retention, no regional uplift, taxes, discounts or paid tools."
+    }
+  }
+}

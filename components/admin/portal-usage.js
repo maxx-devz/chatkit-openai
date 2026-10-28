@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import styles from "./portal-usage.module.css";
 import { providerBillingUrl, providerStatus } from "@/lib/openai-issues";
+import AiSpending from "./ai-spending";
 
 const number = value => new Intl.NumberFormat().format(Number(value) || 0);
 
@@ -140,6 +141,7 @@ export default function PortalUsage() {
         <p className={styles.note}>These progress bars represent request limits configured inside this portal, not the provider account&apos;s cash or free-request balance. Requests can use different models, tools, and amounts of work.</p>
         <p className={styles.updated}>Updated {new Date(data.fetchedAt).toLocaleTimeString()}. Refreshes every 15 seconds while visible. Other applications using the same {providerLabel} account are not part of these portal allowances.</p>
       </>}
+      <AiSpending />
     </section>
   );
 }

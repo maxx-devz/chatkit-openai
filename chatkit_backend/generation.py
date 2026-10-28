@@ -118,8 +118,11 @@ async def create_image_artifact(context, title, prompt, emit=None):
     try:
         # The hosted client may have been reused by a different tool earlier in
         # this reply. Override retry policy on this image call as well.
+        image_model = os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-2").strip() or "gpt-image-2"
+        if hasattr(context, "cost_events"):
+            context.cost_events.append({"provider": "openai", "model": image_model, "kind": "image"})
         result = await api.with_options(timeout=75, max_retries=0).images.generate(
-            model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-2").strip() or "gpt-image-2",
+            model=image_model,
             prompt="Approved client instructions:\n" + context.config["instructions"]
                 + "\n\nRequested image:\n" + prompt,
             n=1, size="1024x1024", quality="medium", output_format="webp",

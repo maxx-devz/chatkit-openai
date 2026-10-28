@@ -31,7 +31,7 @@ def unseal_provider_key(provider, value, secret):
 
 async def load_provider_settings(db):
     try:
-        cursor = await db.execute("""SELECT c.provider,c.encrypted_key,s.model,(a.provider=c.provider) AS active
+        cursor = await db.execute("""SELECT c.provider,c.encrypted_key,s.model,to_jsonb(s)->'generation_options' AS generation_options,(a.provider=c.provider) AS active
             FROM portal_ai_credentials c LEFT JOIN portal_site_ai_settings s ON s.provider=c.provider
             LEFT JOIN portal_ai_active_provider a ON a.id=1""")
         rows = await cursor.fetchall()
@@ -53,7 +53,8 @@ async def load_provider_settings(db):
     router = active["provider"] == "openrouter"
     return ProviderConfig(active["provider"], "OpenRouter" if router else "OpenAI", keys[active["provider"]],
                           OPENROUTER_BASE_URL if router else None, active["model"],
-                          {"X-OpenRouter-Title": "Always Open Commerce Portal"} if router else {}, keys.get("openai", ""))
+                          {"X-OpenRouter-Title": "Always Open Commerce Portal"} if router else {}, keys.get("openai", ""),
+                          active.get("generation_options") or {})
 
 
 async def close_provider_clients(context):

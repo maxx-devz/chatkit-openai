@@ -618,7 +618,6 @@ export default function AdminAssistant({ clients }) {
               ))}
             </select>
           </label>
-          <a className={styles.applyModel} href="#ai-provider-settings">Provider settings</a>
         </div>
       </header>
       <p className={styles.modelStatus}>Active: {savedModel || "Configure a provider above"}</p>

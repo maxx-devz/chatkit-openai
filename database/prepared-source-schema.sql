@@ -22,11 +22,20 @@ CREATE TABLE IF NOT EXISTS portal_source_publications (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY(owner_id, audience),
   CONSTRAINT portal_source_audience CHECK (
-    (audience='admin' AND client_id IS NULL) OR
+    (audience IN ('admin','clients') AND client_id IS NULL) OR
     (client_id IS NOT NULL AND audience='client:' || client_id::text)
   ),
   CONSTRAINT portal_source_additional_limit CHECK (length(additional_instructions)<=4000)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS portal_source_client_publication_idx
   ON portal_source_publications(client_id) WHERE client_id IS NOT NULL;
+-- Upgrade existing installations without rewriting publications or enabling content.
+ALTER TABLE portal_source_publications DROP CONSTRAINT IF EXISTS portal_source_audience;
+ALTER TABLE portal_source_publications ADD CONSTRAINT portal_source_audience CHECK (
+  (audience IN ('admin','clients') AND client_id IS NULL) OR
+  (client_id IS NOT NULL AND audience='client:' || client_id::text)
+);
+-- One accountable publisher for the shared company pack; no last-writer-wins takeover.
+CREATE UNIQUE INDEX IF NOT EXISTS portal_source_shared_publication_idx
+  ON portal_source_publications(audience) WHERE audience='clients';
 COMMIT;

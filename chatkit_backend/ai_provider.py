@@ -1,9 +1,12 @@
 """Resolve OpenAI versus OpenRouter without exposing provider credentials."""
 import os
+import re
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
 from agents import set_default_openai_api, set_default_openai_client
+from agents import ModelSettings
+from openai.types.shared import Reasoning
 from agents.models.openai_provider import OpenAIProvider
 from openai import AsyncOpenAI
 from debugger_trace import debug_http_options
@@ -31,6 +34,7 @@ class ProviderConfig:
     model: str
     default_headers: dict[str, str]
     openai_key: str = field(default="", repr=False)
+    generation_options: dict = field(default_factory=dict)
 
 
 def provider_config(context=None):
@@ -102,6 +106,20 @@ def configure_agents():
 
 def supports_openai_hosted_tools(context=None):
     return provider_config(context).name == "openai"
+
+
+def agent_model_settings(context=None):
+    """Only validated, model-bound admin settings; never client-supplied options."""
+    config = provider_config(context)
+    options = config.generation_options
+    effort = options.get("reasoningEffort") if isinstance(options, dict) else None
+    kwargs = {}
+    if isinstance(options, dict) and options.get("model") == config.model and effort in ("low", "medium", "high"):
+        if config.name == "openai" and re.fullmatch(r"gpt-6-luna(?:-\d{4}-\d{2}-\d{2})?", config.model):
+            kwargs["reasoning"] = Reasoning(effort=effort)
+        elif config.name == "openrouter" and not config.model.startswith("openrouter/"):
+            kwargs["extra_body"] = {"reasoning": {"effort": effort}}
+    return ModelSettings(max_tokens=5000, parallel_tool_calls=False, store=False, preserve_raw_usage=True, **kwargs)
 
 
 def agent_model(model=None, context=None):

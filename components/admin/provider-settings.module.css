@@ -27,6 +27,7 @@
 .actions strong { color: #24486a; }
 .notice, .error { padding: 12px 14px; border-radius: 8px; font-size: 12px; line-height: 1.6; }
 .notice { background: #eaf8f3; color: #126f57; }
+.testDisclosure { font-size: 11px; line-height: 1.7; color: #627b96; margin: -8px 0 18px; }
 .error { background: #fff2ed; color: #a2391c; }
 .database { display: flex; gap: 12px; border-top: 1px solid #e6edf5; padding-top: 19px; }
 .database strong { font-size: 12px; }

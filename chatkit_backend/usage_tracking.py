@@ -8,13 +8,13 @@ logger = logging.getLogger(__name__)
 
 
 async def record_ai_usage_event(db, *, client_id, user_id, action, provider, model,
-                                status, started_at, usage=None):
+                                status, started_at, usage=None, request_id=None):
     """Record one user action and its provider run without prompt or reply text."""
     if action not in {"client_ai.reply", "builder.preview"} or status not in {"succeeded", "failed", "cancelled"}:
         raise ValueError("Invalid AI usage event")
     reported = usage is not None and usage.requests > 0
     counts = (usage.input_tokens, usage.output_tokens, usage.total_tokens) if reported else (None, None, None)
-    request_id = str(uuid4())
+    request_id = request_id or str(uuid4())
     area = "client_portal" if action == "client_ai.reply" else "aoc_admin"
     with anyio.CancelScope(shield=True):
         try:

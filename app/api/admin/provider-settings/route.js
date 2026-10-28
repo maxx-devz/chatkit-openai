@@ -4,16 +4,19 @@ import { publicProviderSettings, getRuntimeProvider, providerFromKey, saveProvid
 import { validateProvider, validateProviderKey } from "@/lib/provider-secrets";
 import { getModelCatalog } from "@/lib/openai-models";
 import { validateSiteModel } from "@/lib/site-ai-repository";
+import { missingProviderSchemaMessage } from "@/lib/provider-configuration";
+import { validateGenerationOptions } from "@/lib/provider-generation-options";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 const headers = { "Cache-Control": "private, no-store" };
 
 function failure(error) {
   if (error?.publicDetails) return adminErrorResponse(error);
   return requestSecurityErrorResponse(error) || Response.json({ error:
-    error?.code === "42P01" ? "Run npm run site-ai:migrate before configuring providers."
-      : "Could not verify or save this configuration. Check the key, provider access, and server encryption setup." },
+    missingProviderSchemaMessage(error)
+      || "Could not verify or save this configuration. Check the key, provider access, and server encryption setup." },
   { status: 400, headers });
 }
 
@@ -28,6 +31,8 @@ async function configure(request, save) {
   try {
     assertTrustedOrigin(request.headers);
     const { admin } = await resolveAdminContext(request.headers);
+    const settings = await publicProviderSettings();
+    if (!settings.ready) return Response.json({ error: settings.setupMessage }, { status: 503, headers });
     const body = await readJsonRequest(request, 4000);
     const id = validateProvider(body.provider);
     const key = body.apiKey ? validateProviderKey(id, body.apiKey) : "";
@@ -41,13 +46,17 @@ async function configure(request, save) {
       await checked.body?.cancel();
       if (!checked.ok) return Response.json({ error: "OpenRouter could not verify this API key." }, { status: 400, headers });
     }
-    const catalog = await getModelCatalog(provider, { fresh: Boolean(key) || save });
+    const catalog = await getModelCatalog(provider, { fresh: true });
     if (save) {
-      let model;
-      try { model = validateSiteModel(body.model, catalog); }
+      let model, generationOptions;
+      try {
+        model = validateSiteModel(body.model, catalog);
+        generationOptions = validateGenerationOptions(id, catalog.models.find(item => item.id === model), body.generationOptions);
+      }
       catch (error) { return Response.json({ error: error.message }, { status: 400, headers }); }
-      await saveProviderConfiguration(id, key, model, admin.id);
-      return Response.json(await publicProviderSettings(), { headers });
+      if (request.signal.aborted) return Response.json({ error: "Saving was cancelled." }, { status: 409, headers });
+      await saveProviderConfiguration(id, key, model, admin.id, generationOptions);
+      return Response.json({ ...await publicProviderSettings(), activation: { provider: id, id: model, generationOptions, generationTested: false } }, { headers });
     }
     return Response.json({ ...catalog, savedModel: provider.model }, { headers });
   } catch (error) { return failure(error); }

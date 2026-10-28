@@ -63,6 +63,9 @@ ISSUES = {
 ALIASES = {
     "billing_hard_limit_reached": "insufficient_quota",
     "billing_not_active": "insufficient_quota",
+    "organization_spend_limit_exceeded": "insufficient_quota",
+    "project_spend_limit_exceeded": "insufficient_quota",
+    "organization_usage_limit_exceeded": "insufficient_quota",
     "invalid_api_key": "authentication_failed",
     "model_not_found": "model_unavailable",
 }
@@ -93,7 +96,7 @@ def provider_issue(error: Exception) -> ProviderIssue:
                 "matching your guardrail restrictions and data policy",
             ))):
         return ISSUES["provider_policy_restricted"]
-    code = error.code
+    code = "insufficient_quota" if body.get("type") == "insufficient_quota" else error.code
     if isinstance(code, str):
         code = ALIASES.get(code, code)
         if code in ISSUES:

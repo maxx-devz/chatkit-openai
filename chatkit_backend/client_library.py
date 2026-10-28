@@ -193,6 +193,8 @@ async def save_attachment(context, *, filename, title, description="", period_st
         client = openai_hosted_client(context)
         if client is None:
             raise LibraryError("Semantic indexing requires a separate OpenAI API key")
+        if hasattr(context, "cost_events"):
+            context.cost_events.append({"provider": "openai", "model": "vector-store-indexing", "kind": "indexing"})
         indexed = await client.vector_stores.files.upload_and_poll(
             vector_store_id=store_id,
             file=upload,

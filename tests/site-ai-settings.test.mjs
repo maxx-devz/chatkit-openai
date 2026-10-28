@@ -36,6 +36,12 @@ test("global selection rejects unverified, missing, or tool-incompatible models"
   assert.throws(() => validateSiteModel("vendor/tool:free", { ...catalog, verified: false }));
 });
 
+test("server validation rejects display text and returns the exact catalog model ID", () => {
+  const catalog = { verified: true, models: [{ id: "gpt-6-luna", label: "GPT 6 luna", supportsTools: true }] };
+  assert.equal(validateSiteModel("gpt-6-luna", catalog), "gpt-6-luna");
+  assert.throws(() => validateSiteModel("GPT 6 luna", catalog), /Refresh the model list/);
+});
+
 test("write uses parameterized values and records the authenticated admin", async () => {
   const sql = async (strings, ...values) => {
     assert.match(strings.join("?"), /ON CONFLICT \(provider\) DO UPDATE/);

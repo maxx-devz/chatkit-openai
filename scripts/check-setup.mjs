@@ -75,7 +75,14 @@ if (configured("DATABASE_URL")) {
       "library:migrate": ["portal_client_library"],
       "usage:migrate": ["portal_ai_activity_monthly", "portal_ai_provider_status"],
       "site-ai:migrate": ["portal_site_ai_settings", "portal_ai_credentials", "portal_ai_active_provider"],
+      "integration-audit:migrate": ["portal_integration_runs"],
+      "admin-audit:migrate": ["portal_audit_events", "portal_ai_usage_events"],
+      "ai-costs:migrate": ["portal_ai_cost_state", "portal_ai_cost_events"],
       "builder:migrate": ["portal_assistant_configs", "portal_assistant_versions", "portal_assistant_files", "portal_assistant_tool_usage", "portal_assistant_preview_usage"],
+      ...(configured("GOOGLE_DRIVE_CLIENT_ID") ? {
+        "sources:migrate": ["portal_drive_source_connections", "portal_drive_source_oauth_states"],
+        "sources:prepare:migrate": ["portal_prepared_source_indexes", "portal_source_publications"],
+      } : {}),
       ...(checkInternalUsers ? { "internal-user:migrate": ["portal_internal_users"] } : {}),
     };
     for (const [migration, tables] of Object.entries(groups)) {

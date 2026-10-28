@@ -134,6 +134,21 @@ npm run dev
 Open <http://127.0.0.1:3000>. Next.js uses port 3000; Python uses port 8000.
 Ctrl+C stops both. Restart this command after Python or environment changes.
 
+`npm run dev` combines local output into timestamped `WEB`, `CHAT`, `DRIVE` and
+`INDEX` lines. Services, methods and statuses use padded, bold badges with explicit
+contrasting text/background colors. GET uses black on bright cyan; POST uses black
+on bright magenta (not blue text). Status badges use black on bright green for
+2xx, black on bright cyan for redirects, black on bright yellow for 4xx and white
+on red for 5xx. Labels such as `200 OK`, `401 AUTH` and `500 ERROR` convey meaning
+without relying on color. Each badge resets its colors. Web request durations are
+aligned; `--` means the Python access log did not provide a duration (not zero).
+Query strings are omitted from recognized request lines. Sync workers print
+counts rather than raw JSON/owner IDs. Errors and multiline tracebacks remain
+visible. This changes terminal presentation only, not requests or polling.
+Colors are automatic in an interactive terminal; `NO_COLOR=1` or `FORCE_COLOR=0`
+turns them off, and `FORCE_COLOR=1` enables them for a redirected terminal.
+Production logging and `npm run dev:web` keep their existing behavior.
+
 Sign in as staff, open **Assistant settings** from `/admin`, and select a client:
 
 1. Paste approved AOC-GPT behavior into **Instructions**.
