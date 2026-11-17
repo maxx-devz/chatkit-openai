@@ -31,6 +31,14 @@ compatible with transaction-mode poolers.
 
 ## Current portable data
 
+Client Website Insights uses four additive tables from
+`database/website-insights.sql`: websites, report jobs/history, encrypted Google
+connections and expiring OAuth states. They use standard PostgreSQL UUID, JSONB,
+foreign keys, timestamps and partial indexes. Runtime access uses `lib/database.js`;
+the migration and TEMP-fixture database tests use short-lived `pg` clients. No
+provider SDK, extension, auth migration or existing admin/internal-table change
+is required. Run `npm run website-insights:migrate` against the portal database.
+
 AI generation options use an additive standard JSONB column on
 `portal_site_ai_settings`, defined in `chatkit_backend/site_ai_schema.sql` and
 applied with `npm run site-ai:migrate`. No provider SDK or extension is involved;
@@ -84,6 +92,11 @@ PostgreSQL generated `tsvector` columns, GIN/B-tree indexes and parameterized SQ
 It requires no vector extension or provider-specific service. Runtime access uses
 `lib/database.js`; the CLI migration uses a short-lived `pg` client. Rebuild these
 derived indexes after a database move if they were not included in the migration.
+
+Unattended Hubstaff scheduling adds nullable attempt/success/retry timestamps and
+a bounded integer failure counter to the same index table using rerunnable
+`ALTER TABLE ... ADD COLUMN IF NOT EXISTS` statements in that migration.
+No scheduler-specific service, SDK or PostgreSQL extension is required.
 
 Current Supabase references:
 

@@ -15,3 +15,9 @@
 .grid button:disabled { opacity:.6; cursor:wait; }
 .grid button:focus-visible { outline:3px solid #70bfff; outline-offset:3px; }
 .error { background:#fff0ee; color:#ad2820; padding:16px; border-radius:10px; }
+.controls { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; }
+.controls button { background:#086bca; border:0; color:white; padding:11px 16px; border-radius:9px; cursor:pointer; }
+.controls button:focus-visible { outline:3px solid #70bfff; outline-offset:3px; }
+.batch { display:grid; gap:6px; background:#f1f8ff; border:1px solid #d2e6fa; border-radius:10px; padding:14px; margin:16px 0; line-height:1.6; }
+.batch strong { font-size:14px; }
+.main small { line-height:1.6; }

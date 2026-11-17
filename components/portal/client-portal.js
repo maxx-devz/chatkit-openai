@@ -1,4 +1,7 @@
 import Image from "next/image";
+import Link from "next/link";
+import WebsiteInsights from "./website-insights";
+import { clientNavigation, clientView } from "@/lib/client-navigation";
 
 import AiAssistantPanel from "@/components/ai-assistant/ai-assistant-panel";
 import AccountControls from "@/components/portal/account-controls";
@@ -18,17 +21,6 @@ import aocLogo from "@/aoc-logo.png";
 import { PORTAL_CONFIG } from "@/config/portal";
 import { CLIENT_PERMISSIONS } from "@/lib/client-permissions";
 import styles from "./client-portal.module.css";
-
-const NAV_ITEMS = [
-  ["dashboard", "Dashboard", "#dashboard"],
-  ["sparkles", "AOC AI", "#ai-assistant", CLIENT_PERMISSIONS.AI_USE],
-  ["clock", "Monthly Time", "#monthly-time"],
-  ["chart", "Project Status", "#project-status"],
-  ["folder", "Documents", "#client-documents", CLIENT_PERMISSIONS.DOCUMENTS_READ],
-  ["users", "Members & Access", "#client-members", CLIENT_PERMISSIONS.MEMBERS_MANAGE],
-  ["clipboard", "Audit Log", "#client-audit", CLIENT_PERMISSIONS.ACCESS_AUDIT_READ],
-  ["user", "Account", "#account-security"],
-];
 
 const ICON_PATHS = {
   dashboard: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z",
@@ -61,16 +53,17 @@ function PortalSidebar({ portal }) {
       </div>
 
       <nav className={styles.portalNav} aria-label="Client portal">
-        {NAV_ITEMS.filter(([, , , permission]) => !permission || portal.permissions.includes(permission))
-          .map(([icon, label, href], index) => (
-          <a
-            className={index === 0 ? styles.activeNav : undefined}
+        {clientNavigation(portal.permissions).map(({ icon, label, href, view }) => (
+          <Link
+            className={view === portal.view ? styles.activeNav : undefined}
+            aria-current={view === portal.view ? "page" : undefined}
+            prefetch={false}
             href={href}
             key={label}
           >
             <PortalIcon name={icon} />
             <span>{label}</span>
-          </a>
+          </Link>
         ))}
       </nav>
 
@@ -127,7 +120,7 @@ function QuickQuestions({ questions }) {
         <h2 id="quick-questions-title">Quick Questions</h2>
       </header>
       {questions.map((question) => (
-        <a href="#ai-assistant" key={question}>
+        <a href="/?view=ai" key={question}>
           <span>{question}</span>
           <b aria-hidden="true">›</b>
         </a>
@@ -146,7 +139,22 @@ function clientInitials(name) {
     .toUpperCase() || "AOC";
 }
 
-export default function ClientPortal({ portalContext }) {
+function PortalData({ portal, children }) {
+  if (!["dashboard", "time", "projects", "ai"].includes(portal.view)) return children;
+  return <HubstaffProvider clientName={portal.clientName} key={portal.client.slug}
+    projectConfigured={Boolean(portal.client.hubstaffProjectUrl)}>{children}</HubstaffProvider>;
+}
+
+function MobileNavigation({ portal }) {
+  const items = clientNavigation(portal.permissions);
+  return <details className={styles.mobileNavigation}>
+    <summary>Menu · {items.find(item => item.view === portal.view)?.label}</summary>
+    <nav aria-label="Mobile client portal">{items.map(item => <Link key={item.view} href={item.href}
+      prefetch={false} aria-current={item.view === portal.view ? "page" : undefined}>{item.label}</Link>)}</nav>
+  </details>;
+}
+
+export default function ClientPortal({ portalContext, requestedView, initialWebsite, connectionResult }) {
   const portal = {
     ...PORTAL_CONFIG,
     clientName: portalContext.client.name,
@@ -156,6 +164,7 @@ export default function ClientPortal({ portalContext }) {
     memberships: portalContext.memberships,
     permissions: portalContext.permissions,
     user: portalContext.user,
+    view: clientView(requestedView, portalContext.permissions),
   };
   const quickQuestions = [
     `How many hours does ${portal.clientName} have left this month?`,
@@ -171,17 +180,14 @@ export default function ClientPortal({ portalContext }) {
       <PortalSidebar portal={portal} />
       <div className={styles.portalMain}>
         <PortalHeader portal={portal} />
-        <HubstaffProvider
-          clientName={portal.clientName}
-          key={portal.client.slug}
-          projectConfigured={Boolean(portal.client.hubstaffProjectUrl)}
-        >
+        <MobileNavigation portal={portal} />
+        <PortalData portal={portal}>
           <main className={styles.dashboard} id="dashboard">
-            <section className={styles.metrics} aria-label="Account overview">
+            {portal.view === "dashboard" && <section className={styles.metrics} aria-label="Account overview">
               <HubstaffMetrics />
-            </section>
+            </section>}
 
-            {canUseAi ? <ResizableDashboardGrid clientId={portalContext.client.id}
+            {portal.view === "dashboard" && (canUseAi ? <ResizableDashboardGrid clientId={portalContext.client.id}
               left={<div className={styles.leftColumn}>
                 <div className={styles.overviewColumn}>
                   <div id="monthly-time"><HubstaffMonthGlance /></div>
@@ -202,17 +208,25 @@ export default function ClientPortal({ portalContext }) {
             /> : <div className={styles.viewerOverview}>
               <div id="monthly-time"><HubstaffMonthGlance /></div>
               <div id="project-status"><HubstaffProjectProgress /></div>
-            </div>}
+            </div>)}
+            {portal.view === "ai" && <AiAssistantPanel clientId={portalContext.client.id} clientName={portalContext.client.name}
+              userId={portalContext.user.id} height="78vh" minHeight={600} />}
+            {portal.view === "time" && <HubstaffMonthGlance />}
+            {portal.view === "projects" && <HubstaffProjectProgress />}
+            {portal.view === "website-insights" && <WebsiteInsights key={portalContext.client.id} clientId={portalContext.client.id}
+              initialWebsite={initialWebsite} connectionResult={connectionResult}
+              canWrite={portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_CONTRIBUTE)}
+              canManage={portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_MANAGE)} />}
           </main>
-        </HubstaffProvider>
-        <ClientDocumentsPanel key={`documents:${portalContext.client.id}`} clientId={portalContext.client.id}
-          canContribute={portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_CONTRIBUTE)} />
-        {portal.permissions.includes(CLIENT_PERMISSIONS.MEMBERS_MANAGE)
+        </PortalData>
+        {portal.view === "documents" && <ClientDocumentsPanel key={`documents:${portalContext.client.id}`} clientId={portalContext.client.id}
+          canContribute={portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_CONTRIBUTE)} />}
+        {portal.view === "members" && portal.permissions.includes(CLIENT_PERMISSIONS.MEMBERS_MANAGE)
           ? <ClientMembersPanel key={`members:${portalContext.client.id}`} clientId={portalContext.client.id}
             currentUserId={portalContext.user.id} /> : null}
-        {portal.permissions.includes(CLIENT_PERMISSIONS.ACCESS_AUDIT_READ)
+        {portal.view === "audit" && portal.permissions.includes(CLIENT_PERMISSIONS.ACCESS_AUDIT_READ)
           ? <ClientAuditPanel key={`audit:${portalContext.client.id}`} clientId={portalContext.client.id} /> : null}
-        <ClientPasswordSettings username={portalContext.user.username} />
+        {portal.view === "account" && <ClientPasswordSettings username={portalContext.user.username} />}
         <footer className={styles.footer}>
           <span>© 2026 Always Open Commerce. Prototype client portal.</span>
           <span>Privacy Policy <i /> Terms of Service</span>

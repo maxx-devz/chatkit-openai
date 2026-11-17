@@ -33,4 +33,12 @@
 .database strong { font-size: 12px; }
 .database p { font-size: 11px; color: #6b8197; line-height: 1.7; margin: 5px 0 0; max-width: 780px; }
 .dot { background: #2fa888; border-radius: 50%; width: 7px; height: 7px; margin-top: 5px; flex-shrink: 0; }
+.setup { border: 1px solid #cddfed; border-radius: 12px; background: #f4faff; padding: 16px; font-size: 12px; line-height: 1.7; }
+.setup p { margin: 8px 0; }
+.setup summary { cursor: pointer; color: #075c9f; font-weight: 700; }
+.setup a { color: #075c9f; text-decoration: underline; }
+.modelFilters { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 0 0 10px; }
+.field .check { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 500; white-space: nowrap; }
+.field .check input { width: 17px; height: 17px; padding: 0; }
+.modelFilters > input { flex: 1; min-width: 200px; }
 @media (max-width: 760px) { .header, .body { padding: 20px; } .providers { grid-template-columns: 1fr; } .header, .actions, .inputRow { flex-direction: column; } .primary { width: 100%; } }

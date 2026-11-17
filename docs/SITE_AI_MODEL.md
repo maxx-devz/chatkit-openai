@@ -39,6 +39,28 @@ results no longer override the model catalog. Retired/account-policy-excluded
 and tool-incompatible entries remain disabled to preserve portal functionality.
 Only curated error reasons are exposed, never raw provider errors or keys.
 
+## Credential failure isolation
+
+Chat decrypts the selected provider's saved key, not every saved provider key.
+An unreadable inactive OpenRouter key cannot block a readable active OpenAI key.
+For OpenRouter chat, the separate OpenAI key is optional: if it is unreadable,
+OpenAI-hosted tools remain unavailable without blocking ordinary router chat.
+A broken selected key still fails closed with `provider_credentials_unreadable`;
+the application never silently changes provider, model, account or environment key.
+
+The usage dashboard reads stored allowances/activity even when the selected key
+cannot be decrypted. It explicitly reports credential attention needed and does
+not reuse another key's recorded API status or claim that generation is working.
+Database/query failures still surface as failures, not invented zero usage.
+
+Verified locally on November 5, 2026: the selected OpenAI key was readable while
+an inactive OpenRouter record was not. The repaired Python loader and usage
+loader both passed against the current database without data writes or provider
+generation requests. All 326 Node tests, 26 source tests, 12 focused Python tests
+and the production build passed. `.env.local` and saved credentials were unchanged.
+The local Python development process does not auto-reload: restart `npm run dev`
+to load this fix. Re-enter an unreadable inactive provider key before reusing it.
+
 ## Simple reasoning controls
 
 Auto omits optional reasoning parameters and preserves provider defaults. Low,

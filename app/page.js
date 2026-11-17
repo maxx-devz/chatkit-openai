@@ -16,7 +16,8 @@ import { DEBUGGER_PORTAL_HEADER, debuggerPortalPath } from "@/lib/debugger/routi
 export const dynamic = "force-dynamic";
 
 export default async function HomePage({ searchParams }) {
-  if ((await searchParams)?.debugger === "true") {
+  const params = await searchParams;
+  if (params?.debugger === "true") {
     if (!debuggerEnabled()) notFound();
     const requestHeaders = await headers();
     const access = await debuggerAccess(requestHeaders);
@@ -64,5 +65,5 @@ export default async function HomePage({ searchParams }) {
     );
   }
 
-  return <ClientPortal portalContext={portalContext} />;
+  return <ClientPortal portalContext={portalContext} requestedView={params?.view} initialWebsite={params?.site} connectionResult={params?.connection} />;
 }

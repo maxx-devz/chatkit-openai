@@ -20,8 +20,17 @@ test("OpenRouter choices follow model metadata, dynamic routers keep provider de
   assert.deepEqual(modelReasoningEfforts("openrouter", model), ["auto", "medium", "high"]);
   assert.throws(() => validateGenerationOptions("openrouter", model, { reasoningEffort: "low" }));
   assert.deepEqual(runtimeGenerationOptions({ id: "openrouter", model: model.id,
-    generationOptions: validateGenerationOptions("openrouter", model, { reasoningEffort: "medium" }) }), { reasoning: { effort: "medium" } });
+    generationOptions: validateGenerationOptions("openrouter", model, { reasoningEffort: "medium" }) }), {
+    provider: { max_price: { prompt: 0, completion: 0, request: 0, image: 0 } }, reasoning: { effort: "medium" } });
   assert.deepEqual(modelReasoningEfforts("openrouter", { id: "openrouter/free" }), ["auto"]);
+});
+
+test("free inference has a zero-price cap even without reasoning settings; paid models are not changed", () => {
+  for (const model of ["openrouter/free", "vendor/model:free"]) {
+    assert.deepEqual(runtimeGenerationOptions({ id: "openrouter", model }),
+      { provider: { max_price: { prompt: 0, completion: 0, request: 0, image: 0 } } });
+  }
+  assert.deepEqual(runtimeGenerationOptions({ id: "openrouter", model: "vendor/paid" }), {});
 });
 
 test("temporary throttling never locks a listed model; real incompatibility remains blocked", () => {

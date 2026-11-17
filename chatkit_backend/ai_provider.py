@@ -114,11 +114,18 @@ def agent_model_settings(context=None):
     options = config.generation_options
     effort = options.get("reasoningEffort") if isinstance(options, dict) else None
     kwargs = {}
+    extra_body = {}
+    if config.name == "openrouter" and (config.model == "openrouter/free" or config.model.endswith(":free")):
+        # A free selection must not become paid inference if routing/prices
+        # change. This does not bypass account privacy or enable paid plugins.
+        extra_body["provider"] = {"max_price": {"prompt": 0, "completion": 0, "request": 0, "image": 0}}
     if isinstance(options, dict) and options.get("model") == config.model and effort in ("low", "medium", "high"):
         if config.name == "openai" and re.fullmatch(r"gpt-6-luna(?:-\d{4}-\d{2}-\d{2})?", config.model):
             kwargs["reasoning"] = Reasoning(effort=effort)
         elif config.name == "openrouter" and not config.model.startswith("openrouter/"):
-            kwargs["extra_body"] = {"reasoning": {"effort": effort}}
+            extra_body["reasoning"] = {"effort": effort}
+    if extra_body:
+        kwargs["extra_body"] = extra_body
     return ModelSettings(max_tokens=5000, parallel_tool_calls=False, store=False, preserve_raw_usage=True, **kwargs)
 
 

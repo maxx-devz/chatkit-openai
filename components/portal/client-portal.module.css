@@ -107,7 +107,7 @@
   stroke-width: 1.75;
 }
 
-.portalNav a:nth-child(2) svg {
+.portalNav a[href="/?view=ai"] svg {
   fill: currentColor;
   stroke: none;
 }
@@ -1342,7 +1342,25 @@
   }
 }
 
+.mobileNavigation { display: none; }
+
 @media (max-width: 720px) {
+  .mobileNavigation {
+    display: block;
+    margin: 12px 10px 0;
+    border: 1px solid #cddfed;
+    border-radius: 10px;
+    background: #fff;
+    color: #17324e;
+    font-size: 13px;
+  }
+
+  .mobileNavigation summary { padding: 13px 15px; cursor: pointer; color: #0862a8; font-weight: 700; }
+  .mobileNavigation nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; padding: 0 10px 10px; }
+  .mobileNavigation a { padding: 11px; border-radius: 7px; color: #325b7f; text-decoration: none; }
+  .mobileNavigation a[aria-current="page"] { background: #e4f0ff; color: #075da8; font-weight: 700; }
+  .mobileNavigation :focus-visible { outline: 3px solid #63baff; outline-offset: 2px; }
+
   .portalShell {
     display: block;
   }

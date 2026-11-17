@@ -10,6 +10,11 @@ import path from "node:path";
 import { attachDevOutput, formatDevLine, summarizeSync, supportsLogColor, syncFailureMessage } from "../scripts/dev-log-format.mjs";
 
 const now = new Date(2026, 9, 28, 14, 32, 7);
+test("Resumable indexing deadlines are not reported as provider failures",()=>{
+  const line=summarizeSync({results:[{clientId:"PRIVATE",code:"batch_interrupted"}]},"index");
+  assert.match(line,/1 paused for next batch/);
+  assert.doesNotMatch(line,/failed|PRIVATE/);
+});
 const plain = (line, source = "WEB") => formatDevLine(line, { source, now });
 
 test("Next.js access logs become aligned route/status/duration lines", () => {

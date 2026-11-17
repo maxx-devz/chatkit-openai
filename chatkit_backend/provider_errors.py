@@ -24,7 +24,8 @@ ISSUES = {
     "provider_policy_restricted": ProviderIssue(
         "provider_policy_restricted",
         "The AI provider's privacy or routing policy blocks the selected model. "
-        "An AOC administrator needs to select an allowed site-wide model or review the provider settings.",
+        "An AOC administrator must review OpenRouter privacy/guardrail settings or choose another allowed model in AI provider settings. "
+        "Retrying the same request will not resolve this policy restriction.",
         False,
     ),
     "credit_balance_exhausted": ProviderIssue(
@@ -94,6 +95,7 @@ def provider_issue(error: Exception) -> ProviderIssue:
             and any(marker in message.lower() for marker in (
                 "zdr violation", "no endpoints found matching your data policy",
                 "matching your guardrail restrictions and data policy",
+                "free model training", "data policy (free model publication)",
             ))):
         return ISSUES["provider_policy_restricted"]
     code = "insufficient_quota" if body.get("type") == "insufficient_quota" else error.code

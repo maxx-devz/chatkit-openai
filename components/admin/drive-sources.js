@@ -26,6 +26,13 @@ export default function DriveSources() {
   const [autoRefreshing, setAutoRefreshing] = useState(false);
   const actionInProgress = useRef(false);
 
+  const applyConnectionFailure = useCallback(payload => {
+    if (["reconnect_required", "not_connected", "drive_token_unreadable", "google_client_rejected", "root_unavailable"].includes(payload.code)) {
+      setConnection(previous => previous ? { ...previous, connected: false, accessVerified: false,
+        state: payload.code, connectionMessage: payload.error } : previous);
+    }
+  }, []);
+
   const loadStatus = useCallback(async () => {
     const response = await fetch("/api/admin/source-connections", { cache: "no-store" });
     const payload = await response.json();
@@ -54,7 +61,7 @@ export default function DriveSources() {
         const response = await fetch("/api/admin/source-connections", { method: "POST", cache: "no-store",
           signal: controller.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "discover" }) });
         const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "Automatic folder check failed.");
+        if (!response.ok) { if (active) applyConnectionFailure(payload); throw new Error(payload.error || "Automatic folder check failed."); }
         if (active) { setInventory(payload); setError(""); }
       } catch (failure) { if (active && !controller.signal.aborted) setError(failure.message); }
       finally { inFlight = false; if (active) setAutoRefreshing(false); }
@@ -64,7 +71,7 @@ export default function DriveSources() {
     const onVisible = () => { if (!document.hidden) refresh(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { active = false; controller?.abort(); clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); };
-  }, [connection?.connected]);
+  }, [connection?.connected, applyConnectionFailure]);
 
   async function action(name, fileId) {
     if (busy) return;
@@ -73,9 +80,10 @@ export default function DriveSources() {
     if (name === "discover" || name === "disconnect") { setInventory(null); setPreview(null); setPreviewedVersions({}); }
     if (name === "preview") setPreview(null);
     try {
+      if (name === "check") { setConnection(await loadStatus()); return; }
       const response = await fetch("/api/admin/source-connections", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: name, fileId }) });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "The source request could not finish.");
+      if (!response.ok) { if (name === "discover") applyConnectionFailure(payload); throw new Error(payload.error || "The source request could not finish."); }
       if (name === "connect") { window.location.assign(payload.authorizationUrl); return; }
       if (name === "discover") { setInventory(payload); setPage(0); }
       if (name === "preview") { setPreview(payload); setPreviewedVersions(previous => ({ ...previous, [payload.id]: String(payload.version) })); }
@@ -98,9 +106,12 @@ export default function DriveSources() {
         <p>You authorize Google as AOC Admin, not as each client. Credentials remain server-only. Publish the shared company pack below so all clients can ask questions without a Google login. Discovery and preview do not alter Drive sharing or send document content to AI; the private AI test remains separate.</p>
         {connection?.setupMessage && <p className={styles.notice}>{connection.setupMessage}</p>}
         {connection?.configured && <dl><dt>Authorized Google account</dt><dd>{connection.allowedEmail}</dd><dt>OAuth callback</dt><dd><code>{connection.redirectUri}</code></dd>
-          <dt>Connection</dt><dd>{connection.connected ? "Connected as " + connection.email : "Not connected"}</dd></dl>}
+          <dt>Connection</dt><dd>{connection.connected && connection.accessVerified ? "Connected as " + connection.email
+            : connection.hasAuthorization ? "Saved authorization - access not verified" : "Not connected"}</dd></dl>}
+        {connection?.connectionMessage && <p className={styles.notice} role="status">{connection.connectionMessage}</p>}
         <div className={styles.actions}>
-          <button disabled={Boolean(busy) || !connection?.configured} onClick={() => action("connect")}>{connection?.connected ? "Reconnect Google Drive" : "Connect Google Drive"}</button>
+          <button disabled={Boolean(busy) || !connection?.configured} onClick={() => action("connect")}>{connection?.hasAuthorization ? "Reconnect Google Drive" : "Connect Google Drive"}</button>
+          <button disabled={Boolean(busy) || !connection?.configured} onClick={() => action("check")}>Check connection</button>
           <button disabled={Boolean(busy) || !connection?.connected} onClick={() => action("discover")}>Discover / refresh sources</button>
           {connection?.connected && <button className={styles.secondary} disabled={Boolean(busy)} onClick={() => {
             if (window.confirm("Disconnect this private Drive test and revoke its Google authorization?")) action("disconnect");

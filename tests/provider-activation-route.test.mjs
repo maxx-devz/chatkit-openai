@@ -6,6 +6,7 @@ import { validateSiteModel } from "../lib/site-ai-repository.js";
 import { activateModelAfterAccessTest, createModelAccessStore } from "../lib/provider-model-access.js";
 import { missingProviderSchemaMessage } from "../lib/provider-configuration.js";
 import { validateGenerationOptions } from "../lib/provider-generation-options.js";
+import { OpenRouterSetupError } from "../lib/openrouter-setup.js";
 
 // Exercise the actual route with isolated dependency bindings: no database,
 // credentials, provider network traffic, or experimental Node flags required.
@@ -16,6 +17,8 @@ async function harness({ access = "available", blocked = false, authenticated = 
   const state = () => ({ ready, setupMessage: ready ? "" : "Missing migration", activeProvider: "openai",
     providers: [{ id: "openai", model: saved ? "gpt-6-luna" : "old-model", configured: true }] });
   const mocks = {
+    OpenRouterSetupError,
+    checkOpenRouterAccount: async () => { throw new Error("OpenAI metadata must not use OpenRouter credentials."); },
     resolveAdminContext: async () => { if (!authenticated) throw { publicDetails: true }; return { admin: { id: 7 } }; },
     adminErrorResponse: () => Response.json({ error: "Unauthorized" }, { status: 401 }),
     assertTrustedOrigin: headers => { if (headers.get("origin") !== "https://portal.example") throw new Error("Untrusted origin"); },

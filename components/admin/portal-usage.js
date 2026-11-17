@@ -72,7 +72,9 @@ export default function PortalUsage() {
   const { data, error } = snapshot;
   const provider = data?.provider === "openrouter" ? "openrouter" : "openai";
   const providerLabel = data?.providerLabel || (provider === "openrouter" ? "OpenRouter" : "OpenAI");
-  const apiStatus = providerStatus(data?.apiStatus?.code, provider);
+  const apiStatus = data?.providerCredentialReady === false
+    ? { code: "credential_unreadable", title: "Saved provider key needs attention", message: data.providerCredentialMessage }
+    : providerStatus(data?.apiStatus?.code, provider);
   const enabledClients = data?.clients.filter(client => client.enabled) || [];
   const combinedAllowance = enabledClients.reduce((sum, client) => sum + client.allowance, 0);
   const combinedRemaining = enabledClients.reduce((sum, client) => sum + client.remaining, 0);

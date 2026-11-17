@@ -6,6 +6,7 @@ import { getModelCatalog } from "@/lib/openai-models";
 import { validateSiteModel } from "@/lib/site-ai-repository";
 import { missingProviderSchemaMessage } from "@/lib/provider-configuration";
 import { validateGenerationOptions } from "@/lib/provider-generation-options";
+import { checkOpenRouterAccount, OpenRouterSetupError } from "@/lib/openrouter-setup";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +14,7 @@ export const maxDuration = 60;
 const headers = { "Cache-Control": "private, no-store" };
 
 function failure(error) {
+  if (error instanceof OpenRouterSetupError) return Response.json({ error: error.message }, { status: error.status, headers });
   if (error?.publicDetails) return adminErrorResponse(error);
   return requestSecurityErrorResponse(error) || Response.json({ error:
     missingProviderSchemaMessage(error)
@@ -38,14 +40,7 @@ async function configure(request, save) {
     const key = body.apiKey ? validateProviderKey(id, body.apiKey) : "";
     const provider = key ? providerFromKey(id, key) : await getRuntimeProvider(id);
     if (!provider.apiKey) return Response.json({ error: "Enter an API key for this provider." }, { status: 400, headers });
-    if (id === "openrouter") {
-      const checked = await fetch("https://openrouter.ai/api/v1/key", {
-        headers: { Authorization: `Bearer ${provider.apiKey}` }, cache: "no-store", redirect: "error",
-        signal: AbortSignal.timeout(10000),
-      });
-      await checked.body?.cancel();
-      if (!checked.ok) return Response.json({ error: "OpenRouter could not verify this API key." }, { status: 400, headers });
-    }
+    const account = id === "openrouter" ? await checkOpenRouterAccount(provider) : undefined;
     const catalog = await getModelCatalog(provider, { fresh: true });
     if (save) {
       let model, generationOptions;
@@ -56,9 +51,10 @@ async function configure(request, save) {
       catch (error) { return Response.json({ error: error.message }, { status: 400, headers }); }
       if (request.signal.aborted) return Response.json({ error: "Saving was cancelled." }, { status: 409, headers });
       await saveProviderConfiguration(id, key, model, admin.id, generationOptions);
-      return Response.json({ ...await publicProviderSettings(), activation: { provider: id, id: model, generationOptions, generationTested: false } }, { headers });
+      return Response.json({ ...await publicProviderSettings(), account,
+        activation: { provider: id, id: model, generationOptions, generationTested: false } }, { headers });
     }
-    return Response.json({ ...catalog, savedModel: provider.model }, { headers });
+    return Response.json({ ...catalog, account, savedModel: provider.model }, { headers });
   } catch (error) { return failure(error); }
 }
 

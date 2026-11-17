@@ -47,13 +47,26 @@ async def load_provider_settings(db):
     if len(secret) < 32:
         raise ProviderSettingsError("provider_encryption_missing")
     try:
-        keys = {row["provider"]: unseal_provider_key(row["provider"], row["encrypted_key"], secret) for row in rows}
+        active_key = unseal_provider_key(active["provider"], active["encrypted_key"], secret)
     except Exception as error:
         raise ProviderSettingsError("provider_credentials_unreadable") from error
     router = active["provider"] == "openrouter"
-    return ProviderConfig(active["provider"], "OpenRouter" if router else "OpenAI", keys[active["provider"]],
+    # Only the selected provider is required for chat. An old inactive key must
+    # not prevent a readable active key from being used. Never substitute an
+    # environment key or another provider when the selected credential fails.
+    openai_key = active_key if not router else ""
+    if router:
+        hosted = next((row for row in rows if row["provider"] == "openai"), None)
+        if hosted:
+            try:
+                openai_key = unseal_provider_key("openai", hosted["encrypted_key"], secret)
+            except Exception:
+                # Hosted-only tools already check has_openai_hosted_key and
+                # remain unavailable; ordinary OpenRouter chat can continue.
+                openai_key = ""
+    return ProviderConfig(active["provider"], "OpenRouter" if router else "OpenAI", active_key,
                           OPENROUTER_BASE_URL if router else None, active["model"],
-                          {"X-OpenRouter-Title": "Always Open Commerce Portal"} if router else {}, keys.get("openai", ""),
+                          {"X-OpenRouter-Title": "Always Open Commerce Portal"} if router else {}, openai_key,
                           active.get("generation_options") or {})
 
 

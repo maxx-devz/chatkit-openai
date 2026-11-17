@@ -12,7 +12,7 @@ const SYNC_CODES = new Set([
   "source_index_limit", "source_outside_scope", "source_sync_failed", "prepared_sources_unreadable",
   "inventory_timeout", "inventory_limit", "incomplete_inventory", "empty_document", "document_too_large",
   "office_archive_limit", "office_unreadable", "docx_unreadable", "spreadsheet_limit", "spreadsheet_unreadable",
-  "sync_failed", "access_denied",
+  "sync_failed", "access_denied", "batch_interrupted", "rate_limited", "recent_or_running", "no_assigned_project",
 ]);
 const METHOD_PATTERN = Object.keys(METHODS).join("|");
 const NEXT_REQUEST = new RegExp(`^\\s*(${METHOD_PATTERN})\\s+(\\S+)\\s+([1-5]\\d{2})\\s+in\\s+([\\d,.]+)\\s*(ms|s)(?=\\s|$)`, "i");
@@ -114,9 +114,10 @@ export function syncFailureMessage(error, kind = "drive") {
 
 export function summarizeSync(result, kind = "drive") {
   const rows = Array.isArray(result?.results) ? result.results : result && typeof result === "object" ? [result] : [];
-  let ready = 0, skipped = 0, failed = 0, unknown = 0;
+  let ready = 0, skipped = 0, failed = 0, unknown = 0, resumed = 0;
   for (const row of rows) {
     if (row?.skipped === true) skipped++;
+    else if (row?.code === "batch_interrupted") resumed++;
     else if (row?.ready === false || row?.code) failed++;
     else if (row?.ready === true || (kind === "index" && typeof row?.metadataComplete === "boolean")) ready++;
     else unknown++;
@@ -125,6 +126,7 @@ export function summarizeSync(result, kind = "drive") {
   const incomplete = rows.filter(row => row?.metadataComplete === false).length;
   const state = failed || unknown || incomplete ? "WARN" : "INFO";
   const progress = [`${ready} ready`, ...(skipped ? [`${skipped} skipped`] : []),
+    ...(resumed ? [`${resumed} paused for next batch`] : []),
     ...(failed ? [`${failed} failed`] : []), ...(unknown ? [`${unknown} unknown`] : [])].join(" | ");
   const counts = kind === "index"
     ? `${sum("syncedTasks")} tasks synced | ${sum("syncedComments")} comments synced${incomplete ? ` | ${incomplete} histories incomplete` : ""}`
@@ -132,7 +134,7 @@ export function summarizeSync(result, kind = "drive") {
       + (sum("removedDocuments") ? ` | ${sum("removedDocuments")} removed` : "")
       + (sum("unsupportedFiles") ? ` | ${sum("unsupportedFiles")} unsupported` : "");
   const interval = validCount(result?.intervalSeconds);
-  const failures = [...new Set(rows.filter(row => row?.ready === false || (row?.code && !row?.skipped))
+  const failures = [...new Set(rows.filter(row => row?.ready === false || (row?.code && !row?.skipped && row?.code !== "batch_interrupted"))
     .map(row => syncCode(row?.code)))];
   // Only counts and fixed labels: no owner/client IDs, folder titles, document
   // contents, revision hashes or credentials from the worker result object.

@@ -50,6 +50,30 @@ addition. See [prepared chat sources](PREPARED_CHAT_SOURCES.md) for current limi
    Doc or Sheet. Compare the content and modification time with Drive. A live read must
    pass before claiming this connection works.
 
+## Connection status and reconnection
+
+The admin connection-status endpoint verifies token refresh and access to the
+configured company-knowledge root before displaying **Connected as**. A saved
+account record alone is not proof of current Google access. The **Check connection**
+button repeats this read-only check without starting a new consent flow.
+
+Google `invalid_grant` is reported as `reconnect_required`, not a generic server
+error. The UI stops automatic discovery after a terminal authorization failure
+and offers explicit reconnection. Encryption, OAuth-client and transient-network
+failures have separate safe messages; raw tokens, codes and Google error bodies
+are never returned. Existing saved authorization and prepared sources are not
+deleted by a failed check. OAuth consent must still be completed by the user.
+
+Prepared-source binding checks remain metadata-only. The new admin live check
+does not add Google requests to normal client chat/context retrieval or change
+publication, tenant, folder or consent boundaries.
+
+Verified locally on November 5, 2026: the current saved authorization and root
+access passed the live check. Mocked tests cover rejected/expired grants, token
+decryption failures, root access, safe errors and route authorization. No Google
+sharing permissions, saved credentials, environment files or published sources
+were changed. Browser UI verification was not performed.
+
 ## Private AI source test
 
 The **Private AI source test** panel defaults to **Automatic parent sources**:

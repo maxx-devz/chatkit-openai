@@ -21,7 +21,7 @@ function failure(error) {
 export async function GET(request) {
   try {
     const { admin } = await resolveAdminContext(request.headers);
-    return Response.json(await driveConnectionStatus(admin.id), { headers });
+    return Response.json(await driveConnectionStatus(admin.id, { verifyAccess: true, signal: request.signal }), { headers });
   } catch (error) { return failure(error); }
 }
 

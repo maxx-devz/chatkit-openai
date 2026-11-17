@@ -108,6 +108,7 @@ test("Connection status is owner-scoped and never returns encrypted token materi
   });
   const status = await driveConnectionStatus(ownerId);
   assert.equal(status.connected, true);
+  assert.equal(status.accessVerified, false, "metadata binding alone is not a live access check");
   assert.equal(JSON.stringify(status).includes("must-not-be-returned"), false);
 });
 
@@ -160,4 +161,78 @@ test("Cancelled source read never exports or requests a Google access token", as
   const controller = new AbortController(); controller.abort();
   await assert.rejects(previewConnectedSource(ownerId, "test_document_123", { expectedVersion: "42", signal: controller.signal }), /abort/i);
   assert.equal(getToken.mock.callCount(), 0);
+});
+
+function storedConnection(t, { badToken = false } = {}) {
+  const queries = [];
+  t.mock.method(databasePool, "query", async (sql, values) => {
+    queries.push(sql); assert.deepEqual(values, [ownerId]);
+    return { rows: [{ google_email: email, root_folder_id: rootId, oauth_client_id: clientId,
+      connected_at: "2026-10-21", encrypted_refresh_token: badToken ? "broken" : sealDriveValue("mock-refresh", "refresh:" + ownerId + ":" + clientId + ":" + rootId, secret) }] };
+  });
+  return queries;
+}
+
+test("admin live status requires successful authorization and root-folder access", async t => {
+  storedConnection(t);
+  t.mock.method(OAuth2Client.prototype, "getAccessToken", async () => ({ token: "mock-access-token" }));
+  const read = t.mock.method(globalThis, "fetch", async value => {
+    assert.equal(new URL(value).pathname, "/drive/v3/files/" + rootId);
+    return Response.json({ id: rootId, name: "Company Knowledge", mimeType: DRIVE_FOLDER });
+  });
+  const status = await driveConnectionStatus(ownerId, { verifyAccess: true });
+  assert.equal(status.connected, true); assert.equal(status.accessVerified, true);
+  assert.equal(status.state, "ready"); assert.equal(read.mock.callCount(), 1);
+  assert.equal(JSON.stringify(status).includes("mock-access-token"), false);
+  assert.equal(JSON.stringify(status).includes("mock-refresh"), false);
+});
+
+test("invalid_grant requires reconnect without changing env, deleting saved grants or reading files", async t => {
+  const queries = storedConnection(t);
+  t.mock.method(OAuth2Client.prototype, "getAccessToken", async () => {
+    throw Object.assign(new Error("sensitive token details"), { response: { data: { error: "invalid_grant" }, status: 400 } });
+  });
+  const fetch = t.mock.method(globalThis, "fetch", async () => { throw new Error("must not read Google files"); });
+  const status = await driveConnectionStatus(ownerId, { verifyAccess: true });
+  assert.equal(status.connected, false); assert.equal(status.accessVerified, false);
+  assert.equal(status.hasAuthorization, true); assert.equal(status.state, "reconnect_required");
+  assert.match(status.connectionMessage, /Reconnect Google Drive/);
+  assert.equal(JSON.stringify(status).includes("sensitive token"), false);
+  await assert.rejects(discoverConnectedSources(ownerId), error => error.code === "reconnect_required" && error.status === 409);
+  assert.equal(fetch.mock.callCount(), 0); assert.ok(queries.every(sql => sql.startsWith("SELECT")));
+});
+
+test("bad token encryption is reported separately and never reaches Google", async t => {
+  storedConnection(t, { badToken: true });
+  const refresh = t.mock.method(OAuth2Client.prototype, "getAccessToken", async () => { throw new Error("must not refresh"); });
+  const status = await driveConnectionStatus(ownerId, { verifyAccess: true });
+  assert.equal(status.connected, false); assert.equal(status.state, "drive_token_unreadable");
+  assert.equal(refresh.mock.callCount(), 0);
+});
+
+test("Google client rejection and transient network failure do not look connected", async t => {
+  storedConnection(t);
+  let oauthError = "invalid_client";
+  t.mock.method(OAuth2Client.prototype, "getAccessToken", async () => {
+    throw Object.assign(new Error("sensitive OAuth client secret"), { response: { data: { error: oauthError } } });
+  });
+  let status = await driveConnectionStatus(ownerId, { verifyAccess: true });
+  assert.equal(status.connected, false); assert.equal(status.state, "google_client_rejected");
+  oauthError = "network";
+  status = await driveConnectionStatus(ownerId, { verifyAccess: true });
+  assert.equal(status.connected, false); assert.equal(status.state, "google_connection_unavailable");
+  assert.equal(JSON.stringify(status).includes("sensitive OAuth"), false);
+});
+
+test("revoked folder access and ineligible roots cannot yield verified status", async t => {
+  storedConnection(t);
+  t.mock.method(OAuth2Client.prototype, "getAccessToken", async () => ({ token: "mock-access-token" }));
+  let revoked = true;
+  t.mock.method(globalThis, "fetch", async () => revoked ? new Response("private", { status: 401 })
+    : Response.json({ mimeType: "text/plain", name: "not a folder" }));
+  let status = await driveConnectionStatus(ownerId, { verifyAccess: true });
+  assert.equal(status.connected, false); assert.equal(status.state, "reconnect_required");
+  revoked = false;
+  status = await driveConnectionStatus(ownerId, { verifyAccess: true });
+  assert.equal(status.connected, false); assert.equal(status.state, "root_unavailable");
 });

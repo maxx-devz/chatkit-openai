@@ -74,10 +74,11 @@ async function handlePOST(request) {
       ? await loadPreparedSourceContext({ clientId: context.clientId }, chatKitInputText(payload) || conversationContext, mode)
       : { instructions: "", references: [] };
     const hubstaffQuery = mode === "work" ? hubstaffContextQuery(payload, conversationContext) : null;
-    // Database lookup only: no project-history scan on the reply hot path.
+    // Fresh indexes use SQL only; expired access gets a bounded metadata check.
     const indexed = mode === "work" && isReplyRequest(payload)
-      ? await debuggerSpan("Project search index", () => indexedHubstaffSnapshot(context.clientId, context.hubstaffProjectUrl)) : null;
-    const needsLive = hubstaffQuery !== null && (!indexed || hubstaffMetricsRequested(hubstaffQuery)
+      ? await debuggerSpan("Project search index", () => indexedHubstaffSnapshot(context.clientId, context.hubstaffProjectUrl,
+        {verifyAccess:true,signal:request.signal})) : null;
+    const needsLive = hubstaffQuery !== null && (!indexed?.snapshot?.available || hubstaffMetricsRequested(hubstaffQuery)
       || hubstaffActivityAnalyticsRequested(hubstaffQuery) || hubstaffCredentialAuditRequested(hubstaffQuery)
       || hubstaffTaskReferences(hubstaffQuery).length > 0);
     if (needsLive) send("hubstaff");
