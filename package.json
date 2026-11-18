@@ -6,6 +6,7 @@
   "scripts": {
     "agency:plan": "node scripts/migrate-agency-platform.mjs --plan",
     "agency:migrate": "node scripts/migrate-agency-platform.mjs",
+    "agency:jobs": "node scripts/migrate-agency-jobs.mjs",
     "agency:connections": "node scripts/migrate-agency-connections.mjs",
     "agency:sources": "node scripts/migrate-agency-sources.mjs",
     "agency:entrypoints": "node scripts/migrate-agency-entrypoints.mjs",

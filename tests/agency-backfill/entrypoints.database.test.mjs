@@ -206,6 +206,11 @@ test("Stage 06 existing entry points keep four clients isolated", {skip:!process
       await db.query("UPDATE portal_clients SET hubstaff_project_url='https://tasks.hubstaff.com/app/organizations/1/projects/'||id::text WHERE id IN (501,502,601,602)");
       const worker=await import("../../lib/hubstaff-search-sync.js");
       sub.mock.method(globalThis,"fetch",()=>assert.fail("Authorization tests cannot call Hubstaff"));
+      if (!(await db.query("SELECT to_regprocedure('agency_platform.job_scope(text,text,text,text,bigint)') installed")).rows[0].installed) {
+        for (const identity of identities.slice(2)) await assert.rejects(worker.queueHubstaffSearch(identity.client),{code:"42883"});
+        await assert.rejects(worker.synchronizeAllHubstaffSearch(),{code:"42883"});
+        return; // Adopted, partially migrated installations must fail closed. Stage 10 tests positive execution.
+      }
       for(const identity of identities.slice(2)) {
         const queued=await worker.queueHubstaffSearch(identity.client);
         assert.equal(queued.skipped,true);

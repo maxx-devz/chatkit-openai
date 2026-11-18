@@ -589,3 +589,34 @@ Use migration 006's protected Google connection ledger for current agency/resour
 Drive and Search Console disconnect locally. Google Account app revocation is a separate account-holder action because it can affect other grants using the same OAuth app. Stage 08 approvals remain pinned, so a new Drive connection needs later publication approval.
 
 Retain Make's fixed test. Agency workflows and inbound business events require a separately defined destination/payload contract, authentication and durable event deduplication before activation. The inventory records the managed-secret rotation plan and pending live consent checks. Stage 11 stays gated and work stops before Stage 10.
+
+
+## S10-D01 ? Shared job fencing with explicit service ownership
+
+Keep the existing Hubstaff/source cron routes, resource leases and retry/cursor
+logic. Add migration 007's protected ownership/version/lease ledger and narrow
+server functions. Resolve ownership from saved resources at creation/admission,
+then recheck it before provider batches, transactional saves and delivery. Current
+report resumers require live sessions and effective write membership; original
+started_by records remain provenance. No agency ID supplied by a queue is a grant.
+
+Serialize admission per agency and allow at most five active jobs across kinds.
+Keep work bounded, exclude paused/backoff resources before candidate limits and
+schedule oldest attempts first. Pause automatic retries after five failures;
+only an authorized Queue/Sync/Synchronize/Resume request or a changed resource
+version can restart them. User cancellation retains progress. Source/report
+atomic-job timeouts count as failures; Hubstaff's normal deadline slices resume
+from saved cursors. No new queue service, message delivery or payment action.
+
+The dedicated non-login owner needs key-column UPDATE privileges to take the
+PostgreSQL row locks through a final write. The operator grants these explicitly;
+ordinary runtime receives only the checked functions and cannot access job_runs
+directly. Existing legacy backing-table privilege limitations remain documented.
+Pre-adoption compatibility stays; adopted databases without 007 fail closed.
+Apply the reviewed migration before deploying those workers to an approved target.
+
+AOC's private integrations remain AOC-only. Foreign agencies receive no provider
+or knowledge inheritance; per-agency bookkeeping does not open Stage 11 routes.
+Stage 08 approved source revisions and private guidance remain unchanged.
+Live scheduler/provider checks, secret rotation, browser/CDN checks and Stage 20B
+publication approval remain later dependencies. Stop before Stage 11.

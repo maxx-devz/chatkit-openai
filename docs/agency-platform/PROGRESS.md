@@ -960,3 +960,147 @@ The absent/empty operator-only settings are `AGENCY_MIGRATION_DATABASE_URL` and 
 The local PostgreSQL test cluster was stopped and removed. Recreate an approved disposable database and its synthetic fixtures before database tests. The private source-machine `.tmp` runners, test logs, installed dependencies and environment files are excluded from Git. Reuse the versioned migrations, fixture modules and Stage 03/04 runbooks for a fresh setup. The application changes have not been applied to Neon.
 
 Only this progress document is changed by the computer-switch checkpoint. No implementation, environment or temporary file is included. No push, live provider action or Stage 10 work is performed. Work stops here.
+
+
+## Stage 10 ? Background job ownership and recovery
+
+Completed locally in `C:\Users\MY PC\Desktop\AI\portal` on
+`feat/agency-platform`, building on implementation `48a5043` and preserving the
+`50c0ee1` handoff. The starting working tree/index were clean. Read AGENTS,
+CONTEXT, DECISIONS, prior handoff, database portability, installed Next.js
+security guidance and existing job/scheduler code. Prior historical status is
+retained above; this entry supersedes the Stage 09 stop marker.
+
+### Changes and reuse
+
+- Migration 007 and `npm run agency:jobs` add explicit agency/client job bindings,
+  configuration versions, durable tokens, bounded status and retry counters.
+  Protected SECURITY DEFINER functions resolve live resource ownership. They
+  reject suspension, foreign ownership, stale sessions, revoked assignments,
+  effective Viewer access and changed connections before work or output.
+- Reused existing Hubstaff task/comment leases, cursors, generations, upserts,
+  persisted queues and provider backoff. Each provider page and transactional
+  write rechecks access. Saved project mapping and credential bindings remain
+  enforced. Explicit queueing no longer starves older unattempted projects.
+- Reused source owner leases, encrypted corpus/revision reuse and fail-closed
+  failures. Preparation checks the AOC publisher/connection generation before
+  reads and final writes. New prepared bytes do not approve a source revision.
+  Source cron is bounded to three owners/90 seconds, at most 85 seconds per owner.
+- Reused Website Insights browser batches and report lease-token saves. Starting
+  and resuming verify the live permitted client. Crawl requests, result commits
+  and delivery are fenced. The existing Resume button requests an explicit
+  authorized retry. Reports/exports retain existing client privacy protections.
+- Admission allows five active jobs per agency across Hubstaff/source/report
+  kinds, serialized across processes. Existing per-resource leases remain in
+  charge of results. Automatic failures back off and stop at five; explicit
+  authorized retry resets them. User cancellation does not count as failure;
+  atomic source/report timeouts do. Expired/replaced tokens cannot save/release
+  another worker's lease. No outbound report message or inbound event receiver
+  was introduced.
+- AOC-only provider ownership, Stage 08 approved-revision/privacy controls,
+  separate Internal account policy, legacy Admin restrictions and Stage 11 gate
+  remain. New agencies cannot use AOC jobs/connections. Global multi-agency live
+  provider throughput is not verified or enabled.
+
+### Files
+
+| Area | Files |
+| --- | --- |
+| Portable schema/operator | database/agency-platform/007_background_jobs.sql; scripts/migrate-agency-jobs.mjs; package.json |
+| Shared execution contract | lib/background-jobs.js |
+| Existing workers | lib/hubstaff-search-sync.js; lib/prepared-source-sync.js; lib/website-insights/store.js |
+| Existing actions | app/api/admin/hubstaff-index/route.js; app/api/client/website-insights/route.js; components/portal/website-insights.js |
+| Fixtures/regression | tests/agency-backfill/jobs.database.test.mjs; tests/agency-backfill/entrypoints.database.test.mjs; tests/hubstaff-index/scheduler.test.mjs; tests/drive-sources/sync.test.mjs |
+| Handoff/operations | STAGE10_JOBS.md; CONTEXT.md; DECISIONS S10-D01; this progress entry; docs/HUBSTAFF_SCHEDULER.md |
+
+### Actual results
+
+| Check | Actual result |
+| --- | --- |
+| Top-level Node suite | 367 passed, 0 failed, 0 skipped |
+| Drive/source and Hubstaff index suites | 40 passed, 0 failed, 0 skipped |
+| Internal account/OAuth/role/panel suites | 115 passed, 0 failed, 0 skipped; Internal application code unchanged |
+| Full production build | Next.js 16.3.3 Turbopack passed with private environment values shadowed and synthetic unreachable loopback targets |
+| Migration 007 | Applied twice successfully on fresh disposable WSL PostgreSQL 18.3 using separate operator and ordinary runtime logins |
+| Stage 10 database acceptance | Eight scenario groups passed, 9 TAP tests including the parent, 0 failed/skipped |
+| Earlier local regressions | Stage 03 nine real PostgreSQL scenarios; Stage 04 two identical no-write reports/two idempotent applies and 9 application TAP checks; Stage 05 five TAP checks; Stage 06/07 eleven TAP checks; Stage 08 source/tool/stream fixture; Stage 09 six TAP checks all passed |
+| ESLint | All changed server/test JavaScript passed. Full changed-file lint reports two pre-existing react-hooks/set-state-in-effect errors in Website Insights effects at lines 80/87. Running ESLint on the committed baseline source reproduced both; the changed Resume handler adds no lint finding |
+| Whitespace / transfer | Intended Git diff checked; no environment, secret or temporary file included |
+
+The new database scenarios verify foreign and forged client/agency contexts
+(including a busy report), direct ledger denial and ENABLE/FORCE RLS metadata,
+non-login owner, mismatched agency/client FK rejection, atomic five-job admission
+across three kinds, independence from a foreign agency's lease, duplicate claims,
+replacement leases, late-token cleanup, five-failure pause and authorized retry,
+oldest-attempt selection, a reused connection with a forged ambient agency,
+repeated Hubstaff task upserts, mid-processing agency/client suspension and
+mapping changes, source generation changes, provider-denial fixtures, cancellation
+versus timeouts, stale sessions, role/assignment revocation and report connection
+changes. A separate Node process successfully reclaimed an expired lease;
+expiry itself was advanced synthetically. Repeated completion retained one report
+and did not call the provider again.
+
+These are real PostgreSQL rows, role permissions, transactions, lease checks,
+application workers and source encryption. Hubstaff/Drive network methods and
+report Google results were mocked with synthetic data. No live AI/provider call,
+consent, task update, real document upload, message or payment occurred. No actual
+browser/CDN verification or production scheduler delivery was performed.
+
+Initial checks exposed missing owner row-lock privileges and synthetic reports
+inside the existing one-minute limit. The runner now grants the non-login owner
+only the required key-column locking privileges; fixture report timestamps are
+controlled. A numeric mock list key was corrected to match the real string-keyed
+Hubstaff metadata contract. Cancellation assertions were updated to verify rollback
+of an in-flight batch while earlier committed progress survives. Final checks pass
+apart from the independently reproduced baseline lint findings above.
+
+The Stage 06 service fixture now explicitly verifies fail-closed behavior when an
+adopted database has not yet applied migration 007. Positive execution/foreign
+selection is exercised by the Stage 10 fixture after the migration. This is not
+a bypass or an unreported skip of the service authorization requirement.
+
+### Private setup, remaining checks and resume
+
+No new configuration variable was introduced; `.env.example` and all private
+`.env` files are unchanged. Locally absent/empty names are:
+
+- `AGENCY_MIGRATION_DATABASE_URL`: operator-only approved disposable migration
+  shell; never the ordinary Next.js/Python runtime or a browser.
+- `AGENCY_WORKSPACE_TEST_DATABASE_URL`: synthetic fixture administration in that
+  same private test shell. Supply a distinct runtime `DATABASE_URL` for the same
+  local database and synthetic `BETTER_AUTH_URL` / `BETTER_AUTH_SECRET`.
+- `SOURCE_SYNC_SECRET`, `HUBSTAFF_INDEX_SYNC_SECRET`, `CRON_SECRET`: existing
+  Next.js scheduler bearer options; configure the relevant 32+ character secret
+  privately in deployment settings and the external scheduler's Authorization
+  header. The local watcher names are present, but were not started against the
+  configured environment.
+
+The rehearsal generated its private URLs/credentials only in isolated child
+processes and verified the fresh loopback server identity before writes. Neon
+was untouched. The WSL cluster was stopped and its temporary data removed.
+No root Vercel cron config exists; external scheduler registration/delivery and
+deployment protection remain unverified. Existing cron routes/authentication and
+local watchers are reused. Browser-resumed Website Insights is a different path.
+
+See [STAGE10_JOBS](STAGE10_JOBS.md) for resource/owner contracts, privilege limits,
+commands, fixture prerequisites and setup names. On another computer transfer the
+local commit/history, check `feat/agency-platform`, read this handoff and recreate
+synthetic PostgreSQL from the versioned Stage 03?09 runbooks. Apply 007 with
+`npm run agency:jobs -- --confirm-database <disposable-name> --app-role <runtime-login>`
+before running the new job fixture. Adopted databases missing 007 intentionally
+fail closed. No production migration or deployment is part of this task.
+
+Carry forward live AI/provider sign-in, refresh/revocation and scheduler checks,
+managed-secret rotation/restore, **Stage 06 browser verification**, live CDN and
+browser back/forward checks. Google-side revocation still has the next-provider/
+source-check or 15-minute freshness discovery window; already delivered bytes
+cannot be recalled. Stage 20B still supplies publication approval transitions.
+Before a live provider check, name the test account/resources/redirect URLs and
+have the user complete sign-in/consent privately. No production password/token
+belongs in chat.
+
+Stage 10 is complete within this local verification scope. The intended
+implementation and this handoff are saved together in the local Stage 10 commit;
+use `git log -1` to identify it. Nothing is pushed.
+**Stop before Stage 11.** Stage 11 requires its own task/approval; do not enable
+agency routes or alter rollout gates as part of this closeout.

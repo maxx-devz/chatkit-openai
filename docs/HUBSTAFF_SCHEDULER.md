@@ -50,7 +50,7 @@ portal authentication or put bypass secrets into query strings.
 ## What runs
 
 - Each invocation selects up to three eligible projects, ordered by oldest
-  **attempt**, with explicitly queued projects first. **Start syncing** saves a
+  **attempt** before queue priority, so repeated requests cannot starve other clients. **Start syncing** saves a
   queue request without calling Hubstaff or an AI provider. A queue survives closing
   the page; a configured worker/scheduler must be running to process it unattended.
 - It starts work for at most 18 seconds, with 10-second per-project slices and
@@ -93,9 +93,21 @@ a worker inside a Vercel serverless instance.
 401: verify the scheduler header and redeploy after changing environment values.
 503 / access_denied: inspect the configured Hubstaff account's project access.
 503 / sync_failed: inspect provider availability and scheduler/Vercel logs; the
-queue retries automatically. A missing scheduler column means migration step 1
+queue retries automatically up to five consecutive failures after agency migration 007. Use the authorized Queue/Sync control to retry after resolving the problem. A missing scheduler column means migration step 1
 has not run on that deployment's database.
 
 To stop unattended work, disable the external cron job. Existing saved records
 remain, and the permission freshness window still applies. Rotate/remove the
 endpoint secret to revoke scheduler access. No other portal is affected.
+
+
+## Agency migration 007
+
+On an agency-adopted database, apply `npm run agency:jobs` with its reviewed
+operator target and runtime role before deploying these workers. Missing 007
+fails closed. It adds an agency-wide five-active-job ceiling across Hubstaff,
+source synchronization and Website Insights, while retaining existing resource
+leases/cursors. See [the Stage 10 contract](agency-platform/STAGE10_JOBS.md) for
+execution-time ownership/version checks, pause/retry semantics and private setup.
+The Stage 11 rollout gate remains closed; AOC provider access is not inherited by
+new agencies. Deployed scheduler delivery still needs a separate live check.

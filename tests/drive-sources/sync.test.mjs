@@ -21,6 +21,7 @@ test("Sync allows bounded large writes, but unchanged corpora update only metada
   const writes = [];
   t.mock.method(databasePool, "query", async query => {
     const sql = typeof query === "string" ? query : query.text;
+    if (sql.includes("pg_class")) return {rows:[{installed:false}]};
     if (sql.includes("agency_platform.drive_connection_scope")) return {rows:[{agency_id:"100",generation:"0"}]};
     if (/SELECT connected_at/.test(sql)) return {rows:[connection]};
     if (/SELECT google_email/.test(sql)) return { rows: [connection] };

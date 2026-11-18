@@ -83,6 +83,7 @@ async function syncFixture({cancel=false,status,failMetadata=false,abortOnFailur
   };
   const pool={query,connect:async()=>({query,release(){}})};
   const subject=await moduleWithMocks("../../lib/hubstaff-search-sync.js",{
+    checkJobResource:async()=>{},runBackgroundJob:async(_kind,_resource,options,work)=>work({write:apply=>apply(pool),signal:options.signal,check:async()=>{options.signal?.throwIfAborted();}}),
     legacyBackfillInstalled,filterLegacyAocMemberships,randomUUID,databasePool:pool,hubstaffSearchScope,indexTask,indexComment,
     createHubstaffSearchReader:async()=>({metadata:async()=>{
       if(failMetadata) {if(abortOnFailure) controller.abort();throw {publicDetails:{httpStatus:status}};}
@@ -97,7 +98,8 @@ test("Closing the page preserves verified access and committed pages, releases i
   await assert.rejects(f.subject.synchronizeHubstaffSearch("1",{signal:f.controller.signal}));
   const cleanup=f.queries.find(q=>q.sql.includes("failure_code=CASE"));
   assert.equal(cleanup.values[2],true);
-  assert.ok(f.commits.length>=2);
+  assert.ok(f.commits.length>=1);
+  assert.ok(f.queries.some(q=>q.sql==="ROLLBACK"),"Cancellation rolls back the in-flight write and keeps earlier commits");
   assert.match(cleanup.sql,/WHERE client_id=\$1 AND lease_token=\$2/);
   assert.match(cleanup.sql,/WHEN \$3 THEN failure_code/);
 });
@@ -111,6 +113,7 @@ test("Queue requests use the saved mapping, persist without external reads and p
     return {rows:[]};
   };
   const subject=await moduleWithMocks("../../lib/hubstaff-search-sync.js",{
+    checkJobResource:async()=>{},runBackgroundJob:async(_kind,_resource,options,work)=>work({signal:options.signal,check:async()=>{options.signal?.throwIfAborted();}}),
     legacyBackfillInstalled,filterLegacyAocMemberships,randomUUID,databasePool:{connect:async()=>({query,release(){}})},hubstaffSearchScope,indexTask,indexComment,
     createHubstaffSearchReader:()=>assert.fail("Queueing must not call Hubstaff"),
   });
@@ -145,7 +148,7 @@ test("All-client runner rotates by attempt, skips active/backoff leases and cont
   assert.deepEqual(f.seen,["1","2"]);
   assert.deepEqual(result.results.map(r=>r.code),["access_denied","access_denied"]);
   const selection=f.queries.find(q=>q.sql.includes("SELECT p.id FROM"));
-  assert.match(selection.sql,/ORDER BY \(i.queued_at IS NOT NULL\) DESC,i.last_attempt_at/);
+  assert.match(selection.sql,/ORDER BY i.last_attempt_at ASC NULLS FIRST,\(i.queued_at IS NOT NULL\) DESC/);
   assert.match(selection.sql,/i.next_attempt_at<=NOW/);
   assert.match(selection.sql,/i.lease_until<NOW/);
   assert.match(selection.sql,/p.portal_enabled=TRUE AND p.ai_enabled=TRUE/);

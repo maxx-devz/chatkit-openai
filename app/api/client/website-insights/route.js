@@ -14,6 +14,7 @@ export const maxDuration = 120;
 const headers = { "Cache-Control": "private, no-store" };
 function failure(error) {
   if (error instanceof InsightError) return Response.json({ error: error.message, code: error.code }, { status: error.status, headers });
+  if (["job_paused","job_scope_changed"].includes(error?.code)) return Response.json({ error:error.message,code:error.code },{ status:error.status,headers });
   if (error?.code === "42P01") return Response.json({ error: "Website Insights needs its database setup: run npm run website-insights:migrate.", code: "schema_missing" }, { status: 503, headers });
   const response = requestSecurityErrorResponse(error) || portalErrorResponse(error);
   response.headers.set("Cache-Control", "private, no-store"); return response;
@@ -43,7 +44,7 @@ export async function POST(request) {
     if (input.action === "add") return Response.json({ website: await addWebsite(context, input) }, { status: 201, headers });
     if (input.action === "rename") return Response.json({ website: await editWebsite(context, input.site, input) }, { headers });
     if (input.action === "analyze") return Response.json({ report: await getReport(context, await startReport(context, input.site)) }, { headers });
-    if (input.action === "advance") return Response.json({ report: await advanceReport(context, resourceId(input.report), websiteSearchData, request.signal) }, { headers });
+    if (input.action === "advance") return Response.json({ report: await advanceReport(context, resourceId(input.report), websiteSearchData, request.signal, input.retry === true) }, { headers });
     if (["properties", "select-property", "disconnect", "archive"].includes(input.action)) {
       await requireClientPermission(request.headers, CLIENT_PERMISSIONS.DOCUMENTS_MANAGE);
       if (input.action === "properties") return Response.json({ properties: await googleProperties(context, input.site) }, { headers });

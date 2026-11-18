@@ -149,6 +149,10 @@ export default function WebsiteInsights({ clientId, canWrite, canManage, initial
     const data = await action({ action: "add", ...Object.fromEntries(new FormData(event.currentTarget)) });
     if (data) { await reloadSites(); setSiteId(data.website.id); setAdding(false); }
   }
+  async function resumeReport() {
+    const data = await action({ action:"advance",report:reportId,retry:true });
+    if (data) { setReport(data.report); setAuto(true); }
+  }
   async function analyze() { const data = await action({ action: "analyze", site: siteId }); if (data) { setReport(data.report); setPrevious(null); setAuto(true); setTab("overview"); } }
   async function connect() {
     setBusy(true); setError(""); setOauthResult(""); setProperties([]);
@@ -217,7 +221,7 @@ export default function WebsiteInsights({ clientId, canWrite, canManage, initial
         <small>Connected Google reports are shared only with members of this client workspace. No write access to Search Console is requested.</small>
       </aside>
       {running && <div className={styles.progress} role="status"><div><strong>{stages[report.state.stage] || "Preparing analysis"}</strong><span>{result.pages.length} URLs checked · {result.coverage.limit}-URL sample limit. Each finished batch is saved.</span></div>
-        {canWrite ? <button className={styles.secondary} onClick={() => { setError(""); setAuto(!auto); }}>{auto ? "Pause" : "Resume"}</button> : <span>A member can resume this analysis.</span>}
+        {canWrite ? <button className={styles.secondary} onClick={() => { setError(""); if (auto) setAuto(false); else resumeReport(); }}>{auto ? "Pause" : "Resume"}</button> : <span>A member can resume this analysis.</span>}
         <progress max="6" value={({ discovery: 1, crawl: 2, mobile: 3, desktop: 4, search: 5 })[report.state.stage] || 1} /><small>{auto && canWrite ? "Runs while this view is open. Closing it pauses after the current request; saved work can be resumed." : "Analysis paused. Saved batches are retained."}</small></div>}
       {detailLoading ? <p role="status">Loading saved report…</p> : !report && !running ? <div className={styles.empty}><h2>Your first report starts here</h2><p>Analyze this website for real page findings and available Google performance results.</p>{canWrite && <button className={styles.primary} disabled={busy} onClick={analyze}>Run first analysis</button>}</div> : report && <>
         <div className={styles.reportBar}><div><strong>{report.status === "complete" ? "Website analysis" : "Analysis in progress"}</strong><small>{date(report.created_at)} · {report.status === "complete" ? "Saved report" : "Partial results; not a finished report"}</small></div>

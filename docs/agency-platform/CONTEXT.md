@@ -1,5 +1,12 @@
 # Agency Platform context
 
+> Current primary status: Stage 10 is locally implemented and verified on
+> `feat/agency-platform` in `C:\Users\MY PC\Desktop\AI\portal`, following
+> Stage 09 `48a5043` and checkpoint `50c0ee1`. See the latest PROGRESS entry and
+> [Stage 10 job contract](STAGE10_JOBS.md). The source-worktree Stage 04 banners
+> below are historical. Stage 11 remains gated. Neon is unchanged.
+
+
 > Primary project handoff: use `C:\Users\MY PC\Desktop\AI\portal`. The results below were recorded in the AOC source worktree. Stage 03–04 code has not yet been imported into this primary checkout. See [HANDOFF](HANDOFF.md) for exact Git files, local-only verification limits and the Stage 05 stop gate.
 
 Current stage: **04 — completed synthetic local ownership/backfill rehearsal**.

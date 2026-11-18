@@ -42,6 +42,7 @@ export async function POST(request) {
       return Response.json(result,{status:result.skipped ? 409 : 202,headers});
     }
     const result = await synchronizeHubstaffSearch(String(body.clientId), {
+      manual:true,
       signal:AbortSignal.any([request.signal,AbortSignal.timeout(100_000)]),
     });
     return Response.json({...result,completedAt:new Date().toISOString(),retryAfterSeconds:12},{headers});
