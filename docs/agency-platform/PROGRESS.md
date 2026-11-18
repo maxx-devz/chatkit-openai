@@ -1,6 +1,6 @@
 # Agency Platform progress
 
-> Current primary checkout is `C:\Users\MY PC\Desktop\AI\portal` on `feat/agency-platform`. Stage 05 passed local verification. [Stage 05 results and rollout limits](#stage-05-trusted-workspace-context)
+> Current primary checkout is `C:\Users\MY PC\Desktop\AI\portal` on `feat/agency-platform`. Stage 06 passed local verification. [Stage 06 results and rollout limits](#stage-06-server-entry-point-ownership)
 
 Updated November 18, 2026, Asia/Shanghai.
 
@@ -14,7 +14,8 @@ Updated November 18, 2026, Asia/Shanghai.
 | Stage 03 — additive agency schema and database checks | Complete for the approved disposable local target | PostgreSQL 18.3: 9 real scenario groups passed; migration CLI apply/repeat and cleanup verified; no Neon/deployment claim |
 | Stage 04 — existing AOC ownership migration rehearsal | Complete for approved synthetic local data only | Two no-write dry runs, two idempotent applies, preserved history, quarantine and restore verified; [runbook](STAGE04_REHEARSAL.md) |
 | Stage 05 — trusted workspace context | Implemented and verified locally | Real Better Auth sessions, two agencies in PostgreSQL, browser switch and refresh, regression tests and full build. |
-| Stage 06 onward | Awaiting separate authorization | Stage 11 remains the planned gate for public agency routes. |
+| Stage 06 — server entry-point ownership | Implemented and verified locally | Complete route inventory, signed Next.js/Python access checks, four-client denial matrix and migration 004 rehearsal. |
+| Stage 07 onward | Awaiting separate authorization | Stage 11 remains the planned gate for public agency routes. |
 
 Older `docs/PHASE_0_*` files describe a separate historical architecture/closeout
 process with outstanding reviews. This stage does not mark that process complete
@@ -708,4 +709,60 @@ The primary checkout's private `.env.local` contains entries for `DATABASE_URL`,
 
 `AGENCY_MIGRATION_DATABASE_URL` and `AGENCY_WORKSPACE_TEST_DATABASE_URL` are absent or empty in the primary `.env.local`. This did not block local testing. For another rehearsal, set the migration URL privately in the operator's shell, confirm the disposable database name and pass its Stage 04 application login to `npm run agency:context -- --confirm-database <database> --app-role <login>`. For `npm run test:agency:context`, supply the test-only bootstrap URL and the distinct non-owner `DATABASE_URL` for that same synthetic fixture. Load the Better Auth schema and set a private synthetic auth secret and loopback origin first. `AGENCY_WORKSPACE_BROWSER_CHECK=1` additionally exercises Chrome against a built local server on that origin. Keep the bootstrap and migration credentials outside the application runtime. Neither the rehearsal nor Stage 05 requires new provider credentials.
 
-**Stage 06 is the next stage and requires a separate instruction.** Production migration, custom domains, live provider flows and deployment remain unverified.
+**Historical handoff after Stage 05.** Stage 06 was subsequently authorized and is recorded below. Production migration, custom domains, live provider flows and deployment remain unverified.
+
+
+## Stage 06 server entry-point ownership
+
+Worked from `680af5b` in the primary `AI\portal` checkout on `feat/agency-platform`. The starting tree was clean. The [entry-point inventory](STAGE06_ENTRYPOINTS.md) records all 59 Next.js route-handler files, pages/layouts, service and Python routes, searches, pagination, downloads and exports. No server actions were found.
+
+### Changes and reuse
+
+- Reused Stage 05 session, ownership and permission resolution. Stale-document client headers now fail consistently at the client DAL, including reads. Client mutation inputs reject agency, client, owner, user, permission, price and billing overrides. Client-member writes recheck the current agency/client manage grant inside their transaction.
+- Next.js ChatKit and upload proxies sign the trusted agency ID and actual Better Auth session ID. Python independently rechecks that session, expiry, user identity, Internal exclusion, active client membership, role and agency/client assignment. Signed builder preview also enforces the existing platform and all-AOC restrictions before accessing drafts, quotas, providers or files. Existing clients before agency adoption continue through their live membership check. Partial agency setup denies access.
+- Reused the existing client/user predicates in conversation, library, generated file, Website Insights, credits and audit paths. Tests exercise actual files, lists, foreign IDs, pagination scope and JSON/CSV exports. Role-specific fields and protected administrator checks remain server-side.
+- Hubstaff service batches select adopted AOC ownership before pagination and recheck ownership when queueing or applying pages. Existing saved project mapping, lease, backoff and request limits remain in use. Shared Drive guidance keeps its Stage 04 publisher/agency binding and fresh metadata checks.
+- Reused the Stage 04 membership/ownership triggers. The initial review suspected a missing membership synchronization step; inspecting the trigger and exercising actual account creation showed that it was already implemented.
+- Added checksum-tracked migration 004 for newly provisioned legacy AOC clients. Its single privileged function verifies the active platform operator, active AOC agency, transaction-time client creation and all other clients' AOC ownership. The runtime transaction creates the client, adopts its ownership, lets the existing trigger classify it, creates its administrator and writes audit entries. Any failure rolls back those database writes. Existing ambiguous records require the reviewed migration process. The dedicated owner retains SELECT/TRIGGER permissions on legacy tables. Migrations 001–003 were preserved.
+
+### Files
+
+| Area | Paths |
+| --- | --- |
+| Authorization and input | `lib/portal-data.js`, `lib/client-members.js`, `lib/client-library.js`, `lib/client-mutation.js`, `app/api/client/website-insights/route.js` |
+| Signed backend | `app/api/chatkit/route.js`, `app/api/chatkit/upload/route.js`, `app/api/builder/preview/route.js`, `chatkit_backend/app.py`, `chatkit_backend/preview.py`, `chatkit_backend/workspace_access.py` |
+| Worker and provisioning | `lib/hubstaff-search-sync.js`, `lib/admin-data.js`, `database/agency-platform/004_entrypoint_guards.sql`, `scripts/migrate-agency-entrypoints.mjs`, `package.json` |
+| Tests | `tests/agency-backfill/entrypoints.database.test.mjs`, `chatkit_backend/tests/test_stage06_database.py`, `chatkit_backend/tests/test_request_safeguards.py`, `tests/website-insights-route.test.mjs`, `tests/hubstaff-index/{chat-routing,scheduler}.test.mjs` |
+| Documentation | This progress record and `docs/agency-platform/STAGE06_ENTRYPOINTS.md` |
+
+### Verification and actual results
+
+| Check | Result |
+| --- | --- |
+| Full top-level Node suite | 365 passed, 0 failed, 0 skipped. |
+| Focused agency/backfill, permissions, prepared guidance and Hubstaff API suite | 34 passed, 0 failed, 0 skipped. |
+| Extended source and Hubstaff index suites | 40 passed, 0 failed, 0 skipped. |
+| Internal identity, role and panel regression suite | 115 passed, 0 failed, 0 skipped. Internal application code and policy were preserved. |
+| Python unit discovery | 176 tests, 172 passed and 4 skipped. Three opt-in Stage 06 database tests run separately below. The existing opt-in Hubstaff search database suite was skipped. Provider responses use fixtures. |
+| Stage 03/04 disposable PostgreSQL regression | Stage 03's 9 real scenarios passed. Two read-only Stage 04 reports agreed without changing snapshots. First adoption classified 51 records with 7 quarantined. Repeat changed 0 ownership rows. Eight Stage 04 application/SQL groups passed. |
+| Migration 004 | Applied twice on fresh loopback WSL PostgreSQL 18.3 with the designated non-owner runtime login. Both completed. Existing IDs/history were checked before the Stage 06 synthetic mutations. |
+| Stage 05 real-session regression | Four scenario groups passed (5 TAP tests). This run omitted the optional browser scenario. |
+| Stage 06 real database and routes | Nine scenarios passed (10 TAP tests), using four synthetic identities assigned to two clients in each of AOC and fictional Harbor. Covers denied foreign workspace selectors, denied same-agency unassigned clients, platform/Internal denial, exact list/file/report scopes, JSON/CSV downloads, foreign delete/rename/member mutations, ownership/billing/role overrides, signed proxy fields, role differences, account creation, stale client hints, worker selection and atomic new AOC ownership. |
+| Python service against that database | All 3 opt-in tests passed through the Node fixture. Real signed ASGI requests verify signature/payload rejection, scoped thread/item reads and deletion denial. Real SQL verifies active ownership, roles, revoked session IDs and Internal exclusion. The backend connected as the non-owner runtime login; fixture-only Internal account writes used the disposable bootstrap role. |
+| Full build and lint | Next.js 16.3.3 Turbopack production build passed. ESLint passed on changed JavaScript, including the extended tests. |
+
+The broader Hubstaff suite exposed an existing mock missing Stage 05's workspace-cache wrapper. It was updated. Scheduler assertions now find the batching query after its ownership check. Other initial failures involved new fixture expectations, Windows' default async event loop, and the test library name (`httpx2` is installed). These were corrected and the final runs above passed. A provisioning rehearsal also caught the dedicated owner's lack of UPDATE privileges; the runtime now re-saves its own new client in the same transaction.
+
+The tests called real route handlers and PostgreSQL queries with actual Better Auth cookies. Next.js ChatKit's upstream response was an explicit fixture so its signed envelope could be inspected. Python used its ASGI application and real database with no provider generation. Worker checks used real selection SQL with aborted execution and a network-denying fixture. Existing Internal, source and provider unit suites retain their mocks. The Stage 06 browser UI was not exercised; the Stage 05 browser result remains the prior evidence.
+
+### Private configuration and limits
+
+No new production secret is required. `DATABASE_URL`, `BETTER_AUTH_URL` and `BETTER_AUTH_SECRET` remain server-only existing settings. The configured Neon URL was excluded from all test processes.
+
+`AGENCY_MIGRATION_DATABASE_URL` and `AGENCY_WORKSPACE_TEST_DATABASE_URL` remain absent/empty in the primary private environment file. Generated credentials were supplied only through the private test process environment. For another approved rehearsal, set these URLs privately in the test shell, with `DATABASE_URL` pointing to the same disposable fixture as its distinct non-owner application login. Initialize the Stage 03/04 fixture and Better Auth schema, then apply migration 003 followed by `npm run agency:entrypoints -- --confirm-database <database> --app-role <login>`. Run `npm run test:agency:entrypoints` with a synthetic auth secret and loopback origin. The test creates synthetic accounts and business records. It must use its approved fixture. `STAGE06_PYTHON` can select the local Python 3.13 executable when the default `.venv/Scripts/python.exe` is unsuitable.
+
+Apply migration 004 and deploy matching Next.js/Python signed-envelope support only as part of a separately approved deployment. External providers, live Hubstaff/Drive/Make, payments, real messages, production role configuration and production migration remain unverified. The legacy application credential retains direct legacy table privileges. This stage provides application authorization and preserves the separate Stage 03 agency-table RLS design.
+
+Public agency routes remain gated until Stage 11. Harbor's own client portal stays gated too; the matrix verifies foreign denial and positive existing AOC flows. Broad legacy Admin operations remain unavailable in a foreign or ambiguous estate. Provider control retains its narrow platform guard.
+
+The disposable WSL cluster was stopped and removed after verification. **Stop before Stage 07.** No push, production write or next-stage work was performed.

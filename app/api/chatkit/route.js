@@ -95,6 +95,7 @@ async function handlePOST(request) {
     let url;
     let signedHeaders;
     const body = JSON.stringify({
+      agency_id: context.agencyId, auth_session_id: context.authSessionId,
       client_id: context.clientId,
       user_id: context.userId,
       instructions: appendPreparedInstructions(ASSISTANT_INSTRUCTIONS, prepared.instructions),

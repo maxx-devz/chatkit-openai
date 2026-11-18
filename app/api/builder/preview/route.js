@@ -11,7 +11,7 @@ export const maxDuration = 120;
 export async function POST(request) {
   try {
     assertTrustedOrigin(request.headers);
-    const { admin } = await resolveAdminContext(request.headers);
+    const { admin, session } = await resolveAdminContext(request.headers);
     const input = await readJsonRequest(request, 130000);
     if (!/^[1-9][0-9]{0,18}$/.test(input.clientId || "") || !Number.isInteger(input.revision) || input.revision < 1
       || !Array.isArray(input.messages) || input.messages.length < 1 || input.messages.length > 12
@@ -30,7 +30,7 @@ export async function POST(request) {
           query: latestQuestion,
         })
       : null;
-    const body = JSON.stringify({ client_id: input.clientId, user_id: admin.id, revision: input.revision,
+    const body = JSON.stringify({ auth_session_id: session.session?.id || "", client_id: input.clientId, user_id: admin.id, revision: input.revision,
       instructions: ASSISTANT_INSTRUCTIONS, portal_origin: new URL(process.env.BETTER_AUTH_URL).origin,
       hubstaff,
       messages: input.messages.map(({ role, content }) => ({ role, content })) });

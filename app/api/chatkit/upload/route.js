@@ -18,7 +18,8 @@ export async function POST(request) {
     if (!context.aiEnabled) return Response.json({ error: "The AI assistant is paused for this account." }, { status: 403, headers });
     if ((process.env.CHATKIT_UPLOADS_ENABLED || "true").toLowerCase() !== "true") throw new UploadRequestError("uploads_not_configured", 503);
     const payload = await readUpload(request);
-    const body = JSON.stringify({ client_id: context.clientId, user_id: context.userId,
+    const body = JSON.stringify({ agency_id: context.agencyId, auth_session_id: context.authSessionId,
+      client_id: context.clientId, user_id: context.userId,
       instructions: "", payload });
     const url = chatKitBackendUrl(process.env.CHATKIT_BACKEND_URL || "http://127.0.0.1:8000");
     url.pathname = "/chatkit/upload";

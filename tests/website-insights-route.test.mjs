@@ -3,17 +3,19 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { InsightError, resourceId } from "../lib/website-insights/policy.js";
+import { assertClientMutation } from "../lib/client-mutation.js";
 import { reportCsv } from "../lib/website-insights/presentation.js";
 const id = "a010a010-a010-a010-a010-a010a010a010";
 async function endpoint({ role = "member", origin = true, authorized = true } = {}) {
   const key = `insights_${randomUUID()}`, calls = [];
   const context = { client: { id: "1" }, user: { id: "2" } };
   const mocks = {
+    assertClientMutation,
     requireClientPermission: async (_headers, permission) => { calls.push(permission); if (!authorized || (role === "viewer" && permission !== "read") || role === "member" && permission === "manage") throw new InsightError("denied", "Not permitted", 403); return context; },
     CLIENT_PERMISSIONS: { OVERVIEW_READ: "read", DOCUMENTS_CONTRIBUTE: "write", DOCUMENTS_MANAGE: "manage" },
     assertTrustedOrigin: () => { if (!origin) throw new InsightError("origin", "Untrusted origin", 403); },
     readJsonRequest: request => request.json(), requestSecurityErrorResponse: () => null,
-    portalErrorResponse: () => Response.json({ error: "Unexpected request" }, { status: 500 }), InsightError, resourceId, reportCsv,
+    portalErrorResponse: error => Response.json({ error: error?.publicDetails?.message || "Unexpected request" }, { status: error?.publicDetails?.status || 500 }), InsightError, resourceId, reportCsv,
     listWebsites: async ctx => { calls.push({ listClient: ctx.client.id }); return []; },
     addWebsite: async (ctx, input) => { calls.push({ addClient: ctx.client.id, input }); return { id }; },
     getReport: async (ctx, report) => ({ id: resourceId(report), client: ctx.client.id, result: { findings: [] } }),
@@ -39,8 +41,8 @@ test("anonymous, viewer writes and foreign-origin requests stop before feature a
 });
 test("browser-supplied client ID never replaces authenticated membership context", async () => {
   const { route, calls } = await endpoint();
-  assert.equal((await route.POST(request({ action: "add", clientId: "other-client", name: "test", url: "https://example.com" }))).status, 201);
-  assert.equal(calls.find(value => value.addClient).addClient, "1");
+  assert.equal((await route.POST(request({ action: "add", clientId: "other-client", name: "test", url: "https://example.com" }))).status, 400);
+  assert.equal(calls.some(value => value.addClient), false);
 });
 test("only client managers may connect properties, disconnect Google or archive sites", async () => {
   for (const action of ["properties", "select-property", "disconnect", "archive"]) {
@@ -62,6 +64,7 @@ test("batch advancement binds to the authenticated client and rejects arbitrary 
   const { route, calls } = await endpoint();
   assert.equal((await route.POST(request({ action: "advance", report: "not-a-report" }))).status, 400);
   assert.ok(!calls.some(value => value.advancedClient));
-  assert.equal((await route.POST(request({ action: "advance", report: id, clientId: "other" }))).status, 200);
+  assert.equal((await route.POST(request({ action: "advance", report: id, clientId: "other" }))).status, 400);
+  assert.equal((await route.POST(request({ action: "advance", report: id }))).status, 200);
   assert.equal(calls.find(value => value.advancedClient).advancedClient, "1");
 });

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import {randomUUID,timingSafeEqual} from "node:crypto";
+import {legacyBackfillInstalled,filterLegacyAocMemberships} from "../../lib/legacy-agency-compat.js";
 import {hubstaffSearchScope,indexTask,indexComment} from "../../lib/hubstaff-search-policy.js";
 
 const url="https://tasks.hubstaff.com/app/organizations/1/projects/7";
@@ -81,19 +82,19 @@ async function syncFixture({cancel=false,status,failMetadata=false,abortOnFailur
     return {rows:[]};
   };
   const pool={query,connect:async()=>({query,release(){}})};
-  const module=await moduleWithMocks("../../lib/hubstaff-search-sync.js",{
-    randomUUID,databasePool:pool,hubstaffSearchScope,indexTask,indexComment,
+  const subject=await moduleWithMocks("../../lib/hubstaff-search-sync.js",{
+    legacyBackfillInstalled,filterLegacyAocMemberships,randomUUID,databasePool:pool,hubstaffSearchScope,indexTask,indexComment,
     createHubstaffSearchReader:async()=>({metadata:async()=>{
       if(failMetadata) {if(abortOnFailure) controller.abort();throw {publicDetails:{httpStatus:status}};}
       return {members:{},columns:new Map()};
     }}),
   });
-  return {module,controller,queries,seen,commits};
+  return {subject,controller,queries,seen,commits};
 }
 
 test("Closing the page preserves verified access and committed pages, releases its own lease",async()=>{
   const f=await syncFixture({cancel:true});
-  await assert.rejects(f.module.synchronizeHubstaffSearch("1",{signal:f.controller.signal}));
+  await assert.rejects(f.subject.synchronizeHubstaffSearch("1",{signal:f.controller.signal}));
   const cleanup=f.queries.find(q=>q.sql.includes("failure_code=CASE"));
   assert.equal(cleanup.values[2],true);
   assert.ok(f.commits.length>=2);
@@ -109,11 +110,11 @@ test("Queue requests use the saved mapping, persist without external reads and p
     if(sql.includes("INSERT INTO portal_hubstaff_search_indexes"))return {rows:[{queued_at:new Date()}]};
     return {rows:[]};
   };
-  const module=await moduleWithMocks("../../lib/hubstaff-search-sync.js",{
-    randomUUID,databasePool:{connect:async()=>({query,release(){}})},hubstaffSearchScope,indexTask,indexComment,
+  const subject=await moduleWithMocks("../../lib/hubstaff-search-sync.js",{
+    legacyBackfillInstalled,filterLegacyAocMemberships,randomUUID,databasePool:{connect:async()=>({query,release(){}})},hubstaffSearchScope,indexTask,indexComment,
     createHubstaffSearchReader:()=>assert.fail("Queueing must not call Hubstaff"),
   });
-  const result=await module.queueHubstaffSearch("1");
+  const result=await subject.queueHubstaffSearch("1");
   assert.equal(result.queued,true);
   assert.equal(result.clientId,"1");
   const saved=queries.find(q=>q.sql.includes("INSERT"));
@@ -126,24 +127,24 @@ test("Queue requests use the saved mapping, persist without external reads and p
 test("An actual access denial still blocks the index even when a request is cancelled",async()=>{
   for(const status of [401,403,429,500]) {
     const f=await syncFixture({status,failMetadata:true});
-    await assert.rejects(f.module.synchronizeHubstaffSearch("1",{signal:f.controller.signal}));
+    await assert.rejects(f.subject.synchronizeHubstaffSearch("1",{signal:f.controller.signal}));
     const cleanup=f.queries.find(q=>q.sql.includes("failure_code=CASE"));
     assert.equal(cleanup.values[2],false);
     assert.equal(cleanup.values[3],[401,403].includes(status)?"access_denied":"sync_failed");
     assert.equal(cleanup.values[4],status===429);
   }
   const cancelled=await syncFixture({status:403,failMetadata:true,abortOnFailure:true});
-  await assert.rejects(cancelled.module.synchronizeHubstaffSearch("1",{signal:cancelled.controller.signal}));
+  await assert.rejects(cancelled.subject.synchronizeHubstaffSearch("1",{signal:cancelled.controller.signal}));
   const cleanup=cancelled.queries.find(q=>q.sql.includes("failure_code=CASE"));
   assert.equal(cleanup.values[2],false);assert.equal(cleanup.values[3],"access_denied");
 });
 
 test("All-client runner rotates by attempt, skips active/backoff leases and continues after a failed client",async()=>{
   const f=await syncFixture({status:403,failMetadata:true});
-  const result=await f.module.synchronizeAllHubstaffSearch();
+  const result=await f.subject.synchronizeAllHubstaffSearch();
   assert.deepEqual(f.seen,["1","2"]);
   assert.deepEqual(result.results.map(r=>r.code),["access_denied","access_denied"]);
-  const selection=f.queries[0];
+  const selection=f.queries.find(q=>q.sql.includes("SELECT p.id FROM"));
   assert.match(selection.sql,/ORDER BY \(i.queued_at IS NOT NULL\) DESC,i.last_attempt_at/);
   assert.match(selection.sql,/i.next_attempt_at<=NOW/);
   assert.match(selection.sql,/i.lease_until<NOW/);
@@ -153,10 +154,10 @@ test("All-client runner rotates by attempt, skips active/backoff leases and cont
 
 test("A rate limit ends the invocation and an aborted job starts no new clients",async()=>{
   const f=await syncFixture({status:429,failMetadata:true});
-  const result=await f.module.synchronizeAllHubstaffSearch();
+  const result=await f.subject.synchronizeAllHubstaffSearch();
   assert.deepEqual(f.seen,["1"]);assert.equal(result.results[0].code,"rate_limited");
   f.controller.abort();f.seen.length=0;
-  await f.module.synchronizeAllHubstaffSearch({signal:f.controller.signal});
+  await f.subject.synchronizeAllHubstaffSearch({signal:f.controller.signal});
   assert.deepEqual(f.seen,[]);
 });
 

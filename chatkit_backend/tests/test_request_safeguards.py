@@ -2,13 +2,15 @@ import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from fastapi import HTTPException
 from app import load_client, acquire_lease, Envelope, GENERATE
 
 class RequestSafeguardTests(unittest.IsolatedAsyncioTestCase):
-    async def test_access_remains_client_and_member_scoped_after_legacy_limit(self):
+    @patch("workspace_access.session_actor",new_callable=AsyncMock)
+    async def test_access_remains_client_and_member_scoped_after_legacy_limit(self,session):
+        session.return_value=({"external_id":"synthetic-user"},{"ready":False})
         client={"id":1,"monthly_prompt_limit":1,"requests_used":9999}
         cursor=SimpleNamespace(fetchone=AsyncMock(return_value=client))
         db=SimpleNamespace(execute=AsyncMock(return_value=cursor))

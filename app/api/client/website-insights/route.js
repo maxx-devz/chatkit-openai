@@ -1,4 +1,5 @@
 import { requireClientPermission, portalErrorResponse } from "@/lib/portal-data";
+import { assertClientMutation } from "@/lib/client-mutation";
 import { CLIENT_PERMISSIONS } from "@/lib/client-permissions";
 import { assertTrustedOrigin, readJsonRequest, requestSecurityErrorResponse } from "@/lib/request-security";
 import { InsightError, resourceId } from "@/lib/website-insights/policy";
@@ -38,6 +39,7 @@ export async function POST(request) {
     assertTrustedOrigin(request.headers);
     const context = await requireClientPermission(request.headers, CLIENT_PERMISSIONS.DOCUMENTS_CONTRIBUTE);
     const input = await readJsonRequest(request, 3000);
+    assertClientMutation(input);
     if (input.action === "add") return Response.json({ website: await addWebsite(context, input) }, { status: 201, headers });
     if (input.action === "rename") return Response.json({ website: await editWebsite(context, input.site, input) }, { headers });
     if (input.action === "analyze") return Response.json({ report: await getReport(context, await startReport(context, input.site)) }, { headers });

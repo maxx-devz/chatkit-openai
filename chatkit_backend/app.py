@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from assistant import PortalChatKitServer
 from security import verify_signature
+from workspace_access import authorize_client
 from debugger_trace import inline_debug_events, verified_debug_context
 from store import Context, PostgresStore
 from builder_config import load_config
@@ -50,6 +51,8 @@ class SourceReference(BaseModel):
 
 class Envelope(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    agency_id: str | None = Field(default=None, pattern=r"^[1-9][0-9]{0,18}$")
+    auth_session_id: str = Field(default="", max_length=200)
     client_id: str = Field(pattern=r"^[1-9][0-9]{0,18}$")
     user_id: str = Field(pattern=r"^[1-9][0-9]{0,18}$")
     instructions: str = Field(max_length=30_000)
@@ -92,16 +95,7 @@ def validate_payload(payload):
 
 
 async def load_client(db, envelope):
-    cursor = await db.execute("""
-        SELECT client.* FROM portal_clients AS client
-        JOIN portal_memberships AS member ON member.client_id=client.id
-        WHERE client.id=%s AND member.user_id=%s
-          AND client.portal_enabled=TRUE AND client.ai_enabled=TRUE
-    """, (envelope.client_id, envelope.user_id))
-    client = await cursor.fetchone()
-    if not client:
-        raise HTTPException(403, "Assistant access is unavailable")
-    return client
+    return await authorize_client(db, envelope)
 
 
 async def acquire_lease(context, token):

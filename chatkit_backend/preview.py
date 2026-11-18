@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timezone
 
 from agents import Runner, RunConfig
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal
@@ -13,6 +13,7 @@ from assistant import make_agent
 from builder_config import AssistantConfig
 from database import connect_database
 from security import verify_signature
+from workspace_access import authorize_platform
 from store import Context
 from usage_tracking import record_usage, record_ai_usage_event
 from provider_settings import load_provider_settings, close_provider_clients
@@ -29,6 +30,7 @@ class PreviewMessage(BaseModel):
 
 class PreviewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    auth_session_id: str = Field(default="", max_length=200)
     client_id: str = Field(pattern=r"^[1-9][0-9]{0,18}$")
     user_id: str = Field(pattern=r"^[1-9][0-9]{0,18}$")
     revision: int = Field(ge=1)
@@ -57,6 +59,7 @@ async def preview(request: Request):
     try:
         async with asyncio.timeout(95):
             async with await connect_database(os.environ["DATABASE_URL"]) as db:
+                await authorize_platform(db, data)
                 # Verify staff status independently even though Next.js signed this request.
                 cursor = await db.execute("SELECT user_id FROM portal_admins WHERE user_id=%s AND is_active=TRUE", (data.user_id,))
                 if not await cursor.fetchone():
@@ -100,6 +103,8 @@ async def preview(request: Request):
                         started_at=started_at, usage=result.context_wrapper.usage if result else None)
                 from sensitive_text import redact_sensitive_text, environment_secrets
                 return JSONResponse({"text": redact_sensitive_text(str(result.final_output), environment_secrets(context)), "files": context.artifacts}, headers=HEADERS)
+    except HTTPException as error:
+        return JSONResponse({"error": error.detail}, error.status_code, headers=HEADERS)
     except Exception:
         # API/provider/database exceptions can contain prompts or configuration.
         return JSONResponse({"error": "Preview could not finish. Check the Python service, model access and API billing, then try again."}, 503, headers=HEADERS)

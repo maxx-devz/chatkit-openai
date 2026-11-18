@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import {randomUUID} from "node:crypto";
 import {DriveSourceError} from "../../lib/drive-source-policy.js";
+import {inWorkspaceCache} from "../../lib/workspace-cache.js";
 import {streamWithWorkflow} from "../../lib/chatkit-workflow.js";
 
 test("Client Work chat uses a usable index; an unavailable object does not suppress fallback; General gets no index",async t=>{
@@ -12,7 +13,7 @@ test("Client Work chat uses a usable index; an unavailable object does not suppr
   for(const scenario of ["indexed","unavailable","general","sources_unavailable","sources_unavailable_nonstream","sources_revision"]) {
     let indexed=0,live=0,sent;
     const mocks={
-      ASSISTANT_INSTRUCTIONS:"Synthetic rules",DriveSourceError,streamWithWorkflow,
+      ASSISTANT_INSTRUCTIONS:"Synthetic rules",DriveSourceError,streamWithWorkflow,inWorkspaceCache,
       assertTrustedOrigin(){},
       getPortalAiContext:async()=>({clientId:"1",userId:"10",aiEnabled:true,hubstaffProjectUrl:"https://assigned.test"}),
       chatKitThreadId:()=>null,chatKitInputText:()=>"What needs approval?",
