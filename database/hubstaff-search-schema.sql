@@ -27,6 +27,10 @@ ALTER TABLE portal_hubstaff_search_indexes ADD COLUMN IF NOT EXISTS last_attempt
 ALTER TABLE portal_hubstaff_search_indexes ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ;
 ALTER TABLE portal_hubstaff_search_indexes ADD COLUMN IF NOT EXISTS last_batch_at TIMESTAMPTZ;
 ALTER TABLE portal_hubstaff_search_indexes ADD COLUMN IF NOT EXISTS failure_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE portal_hubstaff_search_indexes ADD COLUMN IF NOT EXISTS queued_at TIMESTAMPTZ;
+ALTER TABLE portal_hubstaff_search_indexes ADD COLUMN IF NOT EXISTS last_batch_tasks BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE portal_hubstaff_search_indexes ADD COLUMN IF NOT EXISTS last_batch_comments BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE portal_hubstaff_search_indexes ADD COLUMN IF NOT EXISTS last_batch_counted_at TIMESTAMPTZ;
 CREATE TABLE IF NOT EXISTS portal_hubstaff_search_tasks (
   client_id BIGINT NOT NULL REFERENCES portal_hubstaff_search_indexes(client_id) ON DELETE CASCADE,
   task_id BIGINT NOT NULL,

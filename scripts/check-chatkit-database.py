@@ -16,7 +16,7 @@ from psycopg.rows import dict_row
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "chatkit_backend"))
 
-from app import Envelope, acquire_lease, load_client, reserve_request
+from app import Envelope, acquire_lease, load_client
 from chatkit.server import ChatKitServer
 from chatkit.store import NotFoundError
 from chatkit.types import AssistantMessageContent, AssistantMessageItem, ThreadItemDoneEvent, ThreadMetadata, UserMessageItem
@@ -117,16 +117,15 @@ async def main():
         await acquire_lease(first, "lease-one")
         await must_fail(acquire_lease(first, "lease-two"), HTTPException, 409)
         await acquire_lease(other_client, "independent-lease")
-        await reserve_request(first)
-        await reserve_request(same_client)
-        await must_fail(reserve_request(first), HTTPException, 429)
-        await reserve_request(other_client)
+        await db.execute("INSERT INTO portal_ai_usage_monthly VALUES(1,CURRENT_DATE,9999,0,0,0,NOW())")
+        for user_id in ["1","2"]:
+            await load_client(db,Envelope(client_id="1",user_id=user_id,instructions="",payload={}))
         await db.execute("UPDATE portal_clients SET ai_enabled=FALSE WHERE id=2")
         await must_fail(load_client(db, Envelope(client_id="2", user_id="1", instructions="", payload={})), HTTPException, 403)
         await store.delete_thread(thread.id, first)
         await must_fail(store.load_item(thread.id, "msg_0", first), NotFoundError)
         await db.rollback()
-        print("PASS: ChatKit protocol, persistence, pagination, rename/delete, tenant/user isolation, leases, shared allowance, and disabled access (temporary tables rolled back).")
+        print("PASS: ChatKit protocol, persistence, pagination, rename/delete, tenant/user isolation, leases, uncapped authorized access, and disabled access (temporary tables rolled back).")
 
 
 if __name__ == "__main__":

@@ -21,6 +21,8 @@ import aocLogo from "@/aoc-logo.png";
 import { PORTAL_CONFIG } from "@/config/portal";
 import { CLIENT_PERMISSIONS } from "@/lib/client-permissions";
 import styles from "./client-portal.module.css";
+import HeaderCredits from "@/components/credits/header-credits";
+import PortalPageSearch from "./portal-page-search";
 
 const ICON_PATHS = {
   dashboard: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z",
@@ -87,22 +89,14 @@ function PortalHeader({ portal }) {
         <span>{portal.welcomeMessage}</span>
       </div>
 
-      <label className={styles.search}>
-        <span className="sr-only">Search portal</span>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="11" cy="11" r="6" />
-          <path d="m16 16 4 4" />
-        </svg>
-        <input type="search" placeholder="Search portal..." />
-      </label>
-
-      <button className={styles.notification} type="button" aria-label="Notifications">
-        <span aria-hidden="true">•</span>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
+      <PortalPageSearch items={[...clientNavigation(portal.permissions),{label:"Credits & usage",href:"/credits"}]} />
+      <details className={styles.notificationAvailability}>
+        <summary aria-label="Notification availability"><svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M6 9a6 6 0 0 1 12 0c0 7 3 7 3 7H3s3 0 3-7M10 20h4" />
-        </svg>
-      </button>
-
+        </svg></summary>
+        <p>No notification feed is connected in this prototype.</p>
+      </details>
+<HeaderCredits key={portal.client.id} clientId={portal.client.id} active={portal.view==="credits"} />
       <AccountControls
         client={portal.client}
         memberships={portal.memberships}
@@ -120,10 +114,10 @@ function QuickQuestions({ questions }) {
         <h2 id="quick-questions-title">Quick Questions</h2>
       </header>
       {questions.map((question) => (
-        <a href="/?view=ai" key={question}>
+        <Link href="/?view=ai" prefetch={false} key={question}>
           <span>{question}</span>
           <b aria-hidden="true">›</b>
-        </a>
+        </Link>
       ))}
     </section>
   );
@@ -148,13 +142,13 @@ function PortalData({ portal, children }) {
 function MobileNavigation({ portal }) {
   const items = clientNavigation(portal.permissions);
   return <details className={styles.mobileNavigation}>
-    <summary>Menu · {items.find(item => item.view === portal.view)?.label}</summary>
+    <summary>Menu · {items.find(item => item.view === portal.view)?.label || "Client portal"}</summary>
     <nav aria-label="Mobile client portal">{items.map(item => <Link key={item.view} href={item.href}
       prefetch={false} aria-current={item.view === portal.view ? "page" : undefined}>{item.label}</Link>)}</nav>
   </details>;
 }
 
-export default function ClientPortal({ portalContext, requestedView, initialWebsite, connectionResult }) {
+export default function ClientPortal({ portalContext, requestedView, initialWebsite, connectionResult, standalonePage, children }) {
   const portal = {
     ...PORTAL_CONFIG,
     clientName: portalContext.client.name,
@@ -164,7 +158,7 @@ export default function ClientPortal({ portalContext, requestedView, initialWebs
     memberships: portalContext.memberships,
     permissions: portalContext.permissions,
     user: portalContext.user,
-    view: clientView(requestedView, portalContext.permissions),
+    view: standalonePage==="credits"?"credits":clientView(requestedView, portalContext.permissions),
   };
   const quickQuestions = [
     `How many hours does ${portal.clientName} have left this month?`,
@@ -183,6 +177,11 @@ export default function ClientPortal({ portalContext, requestedView, initialWebs
         <MobileNavigation portal={portal} />
         <PortalData portal={portal}>
           <main className={styles.dashboard} id="dashboard">
+            {!["dashboard","credits"].includes(portal.view) && <header className={styles.pageHeading}>
+              <h1>{clientNavigation(portal.permissions).find(item=>item.view===portal.view)?.label}</h1>
+              <p>{portal.clientName} · your client workspace</p>
+            </header>}
+            {children}
             {portal.view === "dashboard" && <section className={styles.metrics} aria-label="Account overview">
               <HubstaffMetrics />
             </section>}
@@ -191,7 +190,7 @@ export default function ClientPortal({ portalContext, requestedView, initialWebs
               left={<div className={styles.leftColumn}>
                 <div className={styles.overviewColumn}>
                   <div id="monthly-time"><HubstaffMonthGlance /></div>
-                  <div id="project-status"><HubstaffProjectProgress /></div>
+                  <div id="project-status"><HubstaffProjectProgress canUseAi={canUseAi} /></div>
                 </div>
               </div>}
               right={<div className={styles.rightColumn}>
@@ -207,18 +206,16 @@ export default function ClientPortal({ portalContext, requestedView, initialWebs
               </div>}
             /> : <div className={styles.viewerOverview}>
               <div id="monthly-time"><HubstaffMonthGlance /></div>
-              <div id="project-status"><HubstaffProjectProgress /></div>
+              <div id="project-status"><HubstaffProjectProgress canUseAi={canUseAi} /></div>
             </div>)}
             {portal.view === "ai" && <AiAssistantPanel clientId={portalContext.client.id} clientName={portalContext.client.name}
               userId={portalContext.user.id} height="78vh" minHeight={600} />}
-            {portal.view === "time" && <HubstaffMonthGlance />}
-            {portal.view === "projects" && <HubstaffProjectProgress />}
+            {portal.view === "time" && <HubstaffMonthGlance detailed />}
+            {portal.view === "projects" && <HubstaffProjectProgress canUseAi={canUseAi} />}
             {portal.view === "website-insights" && <WebsiteInsights key={portalContext.client.id} clientId={portalContext.client.id}
               initialWebsite={initialWebsite} connectionResult={connectionResult}
               canWrite={portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_CONTRIBUTE)}
               canManage={portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_MANAGE)} />}
-          </main>
-        </PortalData>
         {portal.view === "documents" && <ClientDocumentsPanel key={`documents:${portalContext.client.id}`} clientId={portalContext.client.id}
           canContribute={portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_CONTRIBUTE)} />}
         {portal.view === "members" && portal.permissions.includes(CLIENT_PERMISSIONS.MEMBERS_MANAGE)
@@ -227,9 +224,14 @@ export default function ClientPortal({ portalContext, requestedView, initialWebs
         {portal.view === "audit" && portal.permissions.includes(CLIENT_PERMISSIONS.ACCESS_AUDIT_READ)
           ? <ClientAuditPanel key={`audit:${portalContext.client.id}`} clientId={portalContext.client.id} /> : null}
         {portal.view === "account" && <ClientPasswordSettings username={portalContext.user.username} />}
+          </main>
+        </PortalData>
         <footer className={styles.footer}>
           <span>© 2026 Always Open Commerce. Prototype client portal.</span>
-          <span>Privacy Policy <i /> Terms of Service</span>
+          <div className={styles.policyLinks}>
+            <details><summary>Privacy Policy</summary><p>A portal privacy-policy link has not been configured for this prototype. Ask your AOC contact for the current policy.</p></details>
+            <details><summary>Terms of Service</summary><p>Portal terms have not been configured for this prototype. Ask your AOC contact for the applicable terms.</p></details>
+          </div>
         </footer>
       </div>
     </div>

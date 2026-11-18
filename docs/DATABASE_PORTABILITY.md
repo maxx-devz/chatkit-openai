@@ -31,6 +31,18 @@ compatible with transaction-mode poolers.
 
 ## Current portable data
 
+AI Credits reporting uses `database/ai-credits-schema.sql`: standard PostgreSQL
+NUMERIC, BIGSERIAL, UUID retry keys, transactions and row locks. It reuses the
+existing cost ledger and never changes provider rates, request limits, payments
+or prepaid billing. Runtime routes use `lib/database.js`; migrations and TEMP
+fixtures use short-lived standard pg clients. No provider SDK/extension is added.
+
+Admin adjustment reasons add one nullable standard TEXT column to the same
+versioned credits migration. Old entries are preserved. Read-only admin reports
+use the shared database module and PostgreSQL catalog checks; they do not run
+DDL or create reporting fee/usage entries on a read. The migration remains an
+explicit environment step; local UI tests do not apply it to shared data.
+
 Client Website Insights uses four additive tables from
 `database/website-insights.sql`: websites, report jobs/history, encrypted Google
 connections and expiring OAuth states. They use standard PostgreSQL UUID, JSONB,
@@ -98,7 +110,21 @@ a bounded integer failure counter to the same index table using rerunnable
 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` statements in that migration.
 No scheduler-specific service, SDK or PostgreSQL extension is required.
 
+Per-client indexing controls reuse that migration and add a nullable `queued_at`
+timestamp, two standard BIGINT processed-count columns and a counted-at timestamp
+on the same table. Older workers' batch timestamps do not become fabricated zero
+processed counts; the counted-at marker must match the completed batch.
+Queue requests use a transaction and the current server-owned client mapping;
+there are no provider-specific queue services or database extensions.
+
 Current Supabase references:
 
 - [Connect to PostgreSQL](https://supabase.com/docs/guides/database/connecting-to-postgres)
 - [Migrate an existing PostgreSQL database](https://supabase.com/docs/guides/platform/migrating-to-supabase/postgres)
+
+An authorized AI usage reset now establishes a per-client reporting cutoff.
+`database/ai-usage-controls.sql` (also included in fresh AI cost setup) creates
+`portal_ai_usage_resets` using standard PostgreSQL timestamps, UUIDs, keys and
+parameterized UPSERTs. Credit and cost reads exclude pre-cutoff usage, retaining
+manual allowances, pricing and raw audit evidence. No provider-specific
+extension, browser database access or external billing mutation is introduced.

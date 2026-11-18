@@ -85,6 +85,19 @@ class BuilderTests(unittest.TestCase):
         self.assertEqual(agent_input[-1]["content"][0]["text"], "What tasks?")
         self.assertEqual(hubstaff_tools(context), [])
 
+    def test_work_agent_keeps_all_index_readers_and_specific_availability_guidance(self):
+        context=SimpleNamespace(config=AssistantConfig().model_dump(),instructions="Global",
+            client={"display_name":"Test"},client_id="1",preview=False,chat_mode="work",
+            hubstaff={"index":{"available":True}},hubstaff_index_binding="a"*64,
+            response_route="hubstaff",response_query="What needs approval?")
+        with patch("assistant.supports_openai_hosted_tools",return_value=False):
+            agent=make_agent(context)
+        names=[tool.name for tool in agent.tools]
+        for expected in ["search_project_tasks","get_project_index_summary","read_project_task_comments"]:
+            self.assertIn(expected,names)
+        self.assertIn("empty indexed search is no match",agent.instructions)
+        self.assertIn("newest_completed",agent.instructions)
+
     def test_website_tool_is_restricted_to_the_approved_client_domain(self):
         context = SimpleNamespace(client={"approved_website_url": "https://www.example.com/"})
         with patch("assistant.supports_openai_hosted_tools", return_value=True):

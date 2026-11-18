@@ -35,8 +35,9 @@ ChatKit deployment configured normally; the scheduled endpoint belongs to the po
    A time-sliced run can report `batch_interrupted`; committed pages are retained.
    Transient/access/rate errors return 503, with safe codes and Retry-After.
 9. Close the admin page for a few minutes. Check the scheduler's execution history,
-   then reopen **Project search index**. **Last worker attempt**, **Last completed
-   worker batch**, inventory/access timestamps and saved totals show actual progress.
+   then open **Overview > Client controls**, select a client and look below its
+   Hubstaff project URL. **Last attempt**, **Last completed batch**,
+   access timestamps and saved totals show actual progress.
    Totals may stay the same when existing rows are refreshed. Test a normal Work
    question separately when ready; this setup does not make a paid AI request.
 
@@ -49,7 +50,9 @@ portal authentication or put bypass secrets into query strings.
 ## What runs
 
 - Each invocation selects up to three eligible projects, ordered by oldest
-  **attempt**, so an unhealthy client does not monopolize the queue.
+  **attempt**, with explicitly queued projects first. **Start syncing** saves a
+  queue request without calling Hubstaff or an AI provider. A queue survives closing
+  the page; a configured worker/scheduler must be running to process it unattended.
 - It starts work for at most 18 seconds, with 10-second per-project slices and
   a 20-second abort deadline. Cleanup/SQL can take additional time. The route's
   hosting ceiling is 60 seconds. The free scheduler normally closes requests

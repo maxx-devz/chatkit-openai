@@ -39,6 +39,11 @@ CREATE INDEX IF NOT EXISTS portal_ai_usage_events_time_idx
 CREATE INDEX IF NOT EXISTS portal_ai_usage_events_client_time_idx
   ON portal_ai_usage_events (client_id, started_at DESC, request_id DESC);
 
+ALTER TABLE portal_ai_usage_events
+  ADD COLUMN IF NOT EXISTS cleared_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS cleared_by BIGINT REFERENCES portal_users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS clear_operation UUID;
+
 ALTER TABLE portal_integration_runs
   ADD COLUMN IF NOT EXISTS portal_area TEXT NOT NULL DEFAULT 'internal',
   ADD COLUMN IF NOT EXISTS client_id BIGINT REFERENCES portal_clients(id) ON DELETE SET NULL;

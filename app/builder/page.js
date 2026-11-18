@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { loadBuilder } from "@/lib/builder-data";
 import AssistantBuilder from "@/components/builder/assistant-builder";
 import styles from "@/components/builder/assistant-builder.module.css";
+import AdminShell from "@/components/admin/admin-shell";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "AOC Assistant Settings", robots: { index: false, follow: false } };
 export default async function BuilderPage() {
@@ -16,5 +17,5 @@ export default async function BuilderPage() {
       <p>{missing ? "Run npm run builder:migrate against this deployment’s database, then reload this page." : error?.publicDetails?.message || "The builder could not connect. Please try again shortly."}</p>
       <Link href="/admin">Return to administrator portal</Link></main>;
   }
-  return <AssistantBuilder initialData={data} />;
+  return <AdminShell admin={data.admin} active="builder" title="Assistant Settings" description="Review and publish per-client assistant configuration."><AssistantBuilder initialData={data} embedded/></AdminShell>;
 }

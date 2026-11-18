@@ -1,0 +1,53 @@
+.page { max-width:1250px; margin:0 auto; color:#18324d; }
+.heading { display:flex; justify-content:space-between; gap:20px; align-items:center; flex-wrap:wrap; }
+.heading h1 { font-size:clamp(25px,3vw,34px); margin:4px 0 10px; }
+.heading h2 { margin:0; }
+.adminSummary { padding:20px; border:1px solid #d6e3ef; border-radius:14px; background:#f5faff; color:#234c6d; }
+.adminPage { max-width:none; margin:0; }
+.adminSummary p { font-size:13px; line-height:1.7; }
+.adminSummary .metrics > div { display:grid; gap:8px; padding:12px; background:#fff; border-radius:9px; border:1px solid #e0eaf3; }
+.adminSummary strong { font-size:19px; }
+.adminSummary button { padding:9px 12px; border:1px solid #bfd6e9; border-radius:8px; color:#12639f; background:#fff; cursor:pointer; }
+.adminSummary :focus-visible { outline:3px solid #61b9f7; outline-offset:3px; }
+.pricingWorkspace { display:grid; grid-template-columns:minmax(0,1fr) minmax(260px,.8fr); gap:22px; align-items:start; }
+.previewCard { padding:19px; background:#f1f8ff; border:1px solid #c9def0; border-radius:12px; }
+.previewCard button { margin-top:13px; }
+.previewCard dl { display:grid; gap:12px; }
+.previewCard dl div { display:flex; gap:12px; justify-content:space-between; font-size:13px; }
+.previewCard dd { margin:0; font-weight:750; }
+.auditDetails { margin-top:20px; }
+@media(max-width:980px) { .pricingWorkspace { grid-template-columns:minmax(0,1fr); } }
+.eyebrow { color:#0668b5; font-size:11px; font-weight:800; letter-spacing:.12em; }
+.page p { line-height:1.7; font-size:14px; }
+.notice { padding:15px 18px; border:1px solid #bfd9f1; background:#edf6ff; border-radius:12px; color:#24527a; }
+.error { padding:15px 18px; border:1px solid #e8b6af; background:#fff2f0; border-radius:12px; color:#8f291f; }
+.tabs { display:flex; flex-wrap:wrap; gap:8px; margin:20px 0; }
+.tabs a { padding:10px 13px; background:white; border:1px solid #ccdeed; border-radius:8px; text-decoration:none; color:#12598f; font-size:13px; }
+.section { padding:24px; margin:20px 0; background:#fff; border:1px solid #d7e3ef; border-radius:16px; scroll-margin-top:115px; }
+.section h2 { font-size:19px; }
+.section > summary { color:#17486e; cursor:pointer; font-size:18px; font-weight:750; padding:3px 0; }
+.section[open] > summary { margin-bottom:18px; }
+.section details { padding:12px 0; }
+.badge { display:inline-block; background:#edf5fd; color:#245a81; border:1px solid #c5ddf0; border-radius:20px; font-size:12px; padding:6px 11px; }
+.activity { display:block; margin-top:5px; }
+.page ul { padding-left:22px; line-height:1.8; font-size:14px; }
+.notice p { margin:7px 0; }
+.metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr)); gap:14px; margin-top:18px; }
+.metric { display:grid; gap:10px; align-content:start; padding:18px; border:1px solid #d9e7f2; border-radius:12px; background:#f8fbff; }
+.metric span { font-size:12px; color:#526a82; }
+.metric strong { font-size:clamp(18px,2vw,25px); overflow-wrap:anywhere; }
+.metric small,.page small { color:#526a82; line-height:1.6; font-size:12px; }
+.actions { display:flex; flex-wrap:wrap; align-items:end; gap:12px; }
+.page label { display:grid; gap:7px; font-size:13px; color:#35536e; }
+.page input,.page select { padding:10px; max-width:100%; border:1px solid #bcd4e8; border-radius:8px; background:#fff; color:#183c5e; font:inherit; }
+.page button,.page .button { padding:10px 14px; border:1px solid #c2d7e9; border-radius:8px; background:#edf6ff; color:#075a9b; cursor:pointer; font:inherit; font-size:13px; text-decoration:none; }
+.page button:disabled { opacity:.55; cursor:default; }
+.page .primary { color:white; background:#0871c5; border-color:#0871c5; }
+.page :focus-visible { outline:3px solid #087acb; outline-offset:3px; }
+.table { overflow-x:auto; margin:18px 0; }
+.table table { width:100%; border-collapse:collapse; text-align:left; white-space:nowrap; font-size:13px; }
+.table caption { text-align:left; padding:10px 0; color:#526a82; font-size:12px; }
+.table th,.table td { padding:13px 12px; border-bottom:1px solid #e1eaf3; }
+.table th { color:#405c76; background:#f6faff; }
+.form { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:18px; margin:20px 0; }
+@media(max-width:720px) { .section { padding:17px; scroll-margin-top:15px; } .actions { width:100%; } .actions label { flex:1; } }

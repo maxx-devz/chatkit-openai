@@ -139,6 +139,10 @@ async def select_response_route(context, query, *, previous_queries=(), has_atta
         if choice == "project":
             return "hubstaff" if context.hubstaff else "work"
         if choice == "general":
+            # Work mode's verified index binding must not lose project lookup
+            # tools because an advisory classifier misreads a short work prompt.
+            if re.fullmatch(r"[0-9a-f]{64}", getattr(context, "hubstaff_index_binding", "")):
+                return fallback if fallback != "general" else "work"
             # A referential follow-up must not lose permitted tools just because
             # the classifier thinks a tool result can be answered from memory.
             return "work" if FOLLOW_UP.search(query) else "general"

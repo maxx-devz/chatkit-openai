@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import styles from "./client-access.module.css";
+import {auditActionLabel} from "@/lib/portal-presentation";
 
 const roleNames = { client_viewer: "Viewer", member: "Member", client_admin: "Client Administrator",
   aoc_admin: "Legacy member" };
@@ -77,11 +78,13 @@ export default function ClientMembersPanel({ clientId, currentUserId }) {
   return <section className={styles.panel} id="client-members">
     <h2>Members &amp; Access</h2>
     <p>Manage Viewer and Member accounts for this client only. AOC controls Client Administrator grants.</p>
+    <p><strong>Viewer:</strong> view project and time information, reporting credits and approved documents. <strong>Member:</strong> also use AOC AI and add reference links. Neither role can manage members or change AOC pricing.</p>
     {error ? <p className={styles.error} role="alert">{error}</p> : null}
     {notice ? <p className={styles.success} role="status">{notice}</p> : null}
     <form className={styles.form} onSubmit={createMember}>
       <h3>Create a client login</h3>
       <p>Use a unique username and a temporary password. Existing portal logins cannot be linked here yet.</p>
+      <p>This creates a login, not an email invitation. Share the temporary password securely and ask the new user to change it on the Account page.</p>
       <div className={styles.fields}>
         <label>Name<input name="name" required maxLength={120} autoComplete="off" /></label>
         <label>Username<input name="username" required minLength={3} maxLength={50}
@@ -116,7 +119,7 @@ export default function ClientMembersPanel({ clientId, currentUserId }) {
       <h3>Access history</h3>
       {events.length ? events.map(event => <p className={styles.auditItem} key={event.id}>
         <time dateTime={event.occurredAt}>{new Date(event.occurredAt).toLocaleString()}</time>
-        <span>{event.actorName} · {event.action.replaceAll("_", " ")} · {event.targetName}
+        <span>{event.actorName} · {auditActionLabel(event.action)} · {event.targetName}
           {event.previousRole !== event.nextRole && event.nextRole ? ` → ${roleNames[event.nextRole] || event.nextRole}` : ""}</span>
       </p>) : <p>No access changes recorded yet.</p>}
       {nextCursor ? <button type="button" disabled={Boolean(busy)} onClick={async () => {

@@ -44,6 +44,8 @@ test("Hubstaff, time, and task questions request client-specific context", () =>
     "What work was completed this month?",
     "Are there blockers in project progress?",
     "There was a person assign and followers who was them?",
+    "What are the latest activities?",
+    "Show pending cards on the board",
   ]) {
     assert.equal(hubstaffContextQuery(message(text)), text);
   }
@@ -141,10 +143,25 @@ test("extracts historical Hubstaff task ranges from natural-language dates", () 
 
 test("detects historical activity analytics and bounded ranking sizes", () => {
   assert.equal(hubstaffActivityAnalyticsRequested("Top 5 tasks by tracked hours in 2024"), true);
-  assert.equal(hubstaffActivityAnalyticsRequested("List the lowest 5 tasks in all history"), true);
+  assert.equal(hubstaffActivityAnalyticsRequested("List the lowest 5 tasks by tracked time in all history"), true);
+  assert.equal(hubstaffActivityAnalyticsRequested("Show the most recent tasks from last year"), false);
+  assert.equal(hubstaffActivityAnalyticsRequested("Which tasks were the most urgent last month?"), false);
+  assert.equal(hubstaffMetricsRequested("How many tasks are remaining?"), false);
   assert.equal(hubstaffActivityAnalyticsRequested("Which tasks are in review?"), false);
   assert.equal(hubstaffRankingLimit("Give me the lowest 7 tasks"), 7);
   assert.equal(hubstaffRankingLimit("Give me the top 99 tasks"), 20);
+});
+
+test("Date-only follow-ups retain user-requested time analytics without inheriting assistant operations",()=>{
+  const prior="User: Top 7 tasks by tracked hours in 2024\nAssistant: Some API credentials were omitted.";
+  const query=hubstaffContextQuery(message("What about last year?"),prior);
+  assert.equal(hubstaffMetricsRequested(query),true);
+  assert.equal(hubstaffActivityAnalyticsRequested(query),true);
+  assert.equal(hubstaffRankingLimit(query),7);
+  assert.equal(hubstaffMetricsRequested(hubstaffContextQuery(message("Show remaining tasks"),prior)),false);
+  assert.equal(hubstaffActivityAnalyticsRequested(hubstaffContextQuery(message("Show the comments on that task"),prior)),false);
+  const ordinary=hubstaffContextQuery(message("What about 2024?"),"User: Show completed tasks\nAssistant: Their time budget was unavailable.");
+  assert.equal(hubstaffMetricsRequested(ordinary),false);
 });
 
 test("detects credential audits and task conversation requests", () => {

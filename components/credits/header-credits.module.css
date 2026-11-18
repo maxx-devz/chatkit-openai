@@ -1,0 +1,96 @@
+.root {
+      position: relative;
+      min-width: 0;
+      z-index: 30;
+}
+.control {
+      display: flex;
+      align-items: stretch;
+      border: 1px solid #c7ddef;
+      border-radius: 10px;
+      background: #f4f9ff;
+      white-space: nowrap;
+}
+.balance {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 10px 8px 10px 12px;
+      min-height: 42px;
+      color: #164b78;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 750;
+}
+.control button {
+      min-width: 54px;
+      padding: 8px;
+      border: 0;
+      border-left: 1px solid #d5e5f3;
+      border-radius: 0 9px 9px 0;
+      background: #e8f2fc;
+      color: #154e7d;
+      font-size: 12px;
+      cursor: pointer;
+}
+.dropdown {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      padding: 8px;
+      width: 230px;
+      max-width: calc(100vw - 24px);
+      border: 1px solid #cbdceb;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 15px 35px #16365024;
+}
+.dropdown a {
+      display: block;
+      padding: 11px 12px;
+      border-radius: 7px;
+      color: #214b72;
+      text-decoration: none;
+      font-size: 13px;
+}
+.dropdown a:hover {
+      background: #edf5ff;
+}
+.status {
+      margin: 4px 8px 10px;
+      color: #294d6d;
+      line-height: 1.5;
+      font-size: 12px;
+      white-space: normal;
+}
+.status strong {
+      color: #113c61;
+      font-size: 15px;
+}
+.summary {
+      margin: 8px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #dfebf4;
+      color: #526a82;
+      font-size: 12px;
+      line-height: 1.7;
+}
+.root :focus-visible {
+      outline: 3px solid #087aca;
+      outline-offset: 2px;
+}
+@media (max-width: 720px) {
+      .balance {
+            padding: 9px 8px;
+            font-size: 12px;
+      }
+      .control button {
+            min-width: 44px;
+            min-height: 44px;
+      }
+}
+.balance span:first-child {
+      position: relative;
+      top: -2px;
+      font-size: 19px;
+}

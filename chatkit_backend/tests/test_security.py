@@ -101,11 +101,11 @@ class EndpointTests(unittest.IsolatedAsyncioTestCase):
                 patch("app.load_config", new_callable=AsyncMock, return_value={}), \
                 patch("app.acquire_lease", new_callable=AsyncMock), \
                 patch("app.load_provider_settings", new_callable=AsyncMock, side_effect=ProviderSettingsError("provider_encryption_missing")), \
-                patch("app.reserve_request", new_callable=AsyncMock) as reserve:
+                patch("app.server.process", new_callable=AsyncMock) as process:
             status, response = await post(body, [(b"x-chatkit-timestamp", timestamp), (b"x-chatkit-signature", signature)], include_body=True)
             self.assertEqual(status, 503)
             self.assertEqual(response["code"], "provider_encryption_missing")
-            reserve.assert_not_awaited()
+            process.assert_not_awaited()
             db.close.assert_awaited_once()
 
     async def test_signed_browser_history_request_reaches_sdk_with_bounded_pagination(self):
@@ -118,8 +118,7 @@ class EndpointTests(unittest.IsolatedAsyncioTestCase):
                 patch("app.connect_database", new_callable=AsyncMock, return_value=db), \
                 patch("app.load_client", new_callable=AsyncMock, return_value={}), \
                 patch("app.load_config", new_callable=AsyncMock, return_value={}) as load_config, \
-                patch("app.store.load_threads", new_callable=AsyncMock, side_effect=pages) as load_threads, \
-                patch("app.reserve_request", new_callable=AsyncMock) as reserve:
+                patch("app.store.load_threads", new_callable=AsyncMock, side_effect=pages) as load_threads:
             for after in [None, first[-1].id]:
                 body = json.dumps({"client_id": "1", "user_id": "2", "instructions": "Test",
                                    "portal_origin": "https://example.com", "payload": {
@@ -138,7 +137,6 @@ class EndpointTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(args["limit"], 100)
                 self.assertEqual(args["after"], after)
                 self.assertEqual(args["context"].scope, ("1", "2"))
-            reserve.assert_not_awaited()
             load_config.assert_not_awaited()
             self.assertEqual(db.close.await_count, 2)
 

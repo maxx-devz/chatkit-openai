@@ -2,20 +2,27 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import {randomUUID} from "node:crypto";
+import {DriveSourceError} from "../../lib/drive-source-policy.js";
+import {streamWithWorkflow} from "../../lib/chatkit-workflow.js";
 
 test("Client Work chat uses a usable index; an unavailable object does not suppress fallback; General gets no index",async t=>{
   const previous=process.env.BETTER_AUTH_URL;
   process.env.BETTER_AUTH_URL="https://portal.test";
   t.after(()=>{if(previous===undefined) delete process.env.BETTER_AUTH_URL;else process.env.BETTER_AUTH_URL=previous;});
-  for(const scenario of ["indexed","unavailable","general"]) {
+  for(const scenario of ["indexed","unavailable","general","sources_unavailable","sources_unavailable_nonstream","sources_revision"]) {
     let indexed=0,live=0,sent;
     const mocks={
-      ASSISTANT_INSTRUCTIONS:"Synthetic rules",DriveSourceError:class extends Error {},
+      ASSISTANT_INSTRUCTIONS:"Synthetic rules",DriveSourceError,streamWithWorkflow,
       assertTrustedOrigin(){},
       getPortalAiContext:async()=>({clientId:"1",userId:"10",aiEnabled:true,hubstaffProjectUrl:"https://assigned.test"}),
       chatKitThreadId:()=>null,chatKitInputText:()=>"What needs approval?",
       isReplyRequest:()=>true,readJsonRequest:r=>r.json(),
-      loadPreparedSourceContext:async()=>({instructions:"",references:[]}),
+      loadPreparedSourceContext:async()=>{
+        if(scenario.startsWith("sources_"))
+          throw new DriveSourceError(scenario==="sources_revision"?"source_revision_changed":"prepared_sources_unavailable",
+            "PRIVATE SOURCE DETAILS AND CREDENTIAL DIAGNOSTICS",503);
+        return {instructions:"",references:[]};
+      },
       hubstaffContextQuery:()=>"approval",hubstaffMetricsRequested:()=>false,
       hubstaffActivityAnalyticsRequested:()=>false,hubstaffCredentialAuditRequested:()=>false,
       hubstaffTaskReferences:()=>[],
@@ -38,9 +45,19 @@ test("Client Work chat uses a usable index; an unavailable object does not suppr
       route=await import("data:text/javascript;base64,"+Buffer.from(code).toString("base64"));
     } finally {delete globalThis[key];}
     const response=await route.POST(new Request("https://portal.test/api/chatkit",{
-      method:"POST",headers:{"x-aoc-client":"1","x-aoc-chat-mode":scenario==="general"?"general":"work"},
+      method:"POST",headers:{"x-aoc-client":"1","x-aoc-chat-mode":scenario==="general"?"general":"work",
+        ...(scenario.startsWith("sources_") && scenario!=="sources_unavailable_nonstream"?{"x-aoc-workflow":"1"}:{})},
       body:JSON.stringify({type:"threads.create"}),
     }));
+    if(scenario.startsWith("sources_")) {
+      assert.equal(response.status,scenario==="sources_unavailable_nonstream"?503:200);
+      const wire=await response.text();
+      assert.match(wire,/company guidance/);
+      assert.match(wire,scenario==="sources_revision"?/changed while loading/:/administrator/);
+      assert.doesNotMatch(wire,/PRIVATE SOURCE|CREDENTIAL|connection was interrupted/);
+      assert.equal(indexed,0);assert.equal(live,0);assert.equal(sent,undefined);
+      continue;
+    }
     assert.equal(response.status,200,scenario);
     assert.equal(indexed,scenario==="general"?0:1,scenario);
     assert.equal(live,scenario==="unavailable"?1:0,scenario);

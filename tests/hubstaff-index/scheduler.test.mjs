@@ -101,6 +101,28 @@ test("Closing the page preserves verified access and committed pages, releases i
   assert.match(cleanup.sql,/WHEN \$3 THEN failure_code/);
 });
 
+test("Queue requests use the saved mapping, persist without external reads and preserve current cursors",async()=>{
+  const queries=[];
+  const query=async(sql,values=[])=>{
+    queries.push({sql,values});
+    if(sql.includes("SELECT id,hubstaff_project_url"))return {rows:[{id:"1",hubstaff_project_url:url}]};
+    if(sql.includes("INSERT INTO portal_hubstaff_search_indexes"))return {rows:[{queued_at:new Date()}]};
+    return {rows:[]};
+  };
+  const module=await moduleWithMocks("../../lib/hubstaff-search-sync.js",{
+    randomUUID,databasePool:{connect:async()=>({query,release(){}})},hubstaffSearchScope,indexTask,indexComment,
+    createHubstaffSearchReader:()=>assert.fail("Queueing must not call Hubstaff"),
+  });
+  const result=await module.queueHubstaffSearch("1");
+  assert.equal(result.queued,true);
+  assert.equal(result.clientId,"1");
+  const saved=queries.find(q=>q.sql.includes("INSERT"));
+  assert.equal(saved.values[2],url);
+  assert.match(queries[1].sql,/FOR SHARE/);
+  assert.doesNotMatch(saved.sql,/DELETE|task_cursor|comments_cursor|failure_code=/);
+  assert.equal(queries.at(-1).sql,"COMMIT");
+});
+
 test("An actual access denial still blocks the index even when a request is cancelled",async()=>{
   for(const status of [401,403,429,500]) {
     const f=await syncFixture({status,failMetadata:true});
@@ -122,7 +144,7 @@ test("All-client runner rotates by attempt, skips active/backoff leases and cont
   assert.deepEqual(f.seen,["1","2"]);
   assert.deepEqual(result.results.map(r=>r.code),["access_denied","access_denied"]);
   const selection=f.queries[0];
-  assert.match(selection.sql,/ORDER BY i.last_attempt_at/);
+  assert.match(selection.sql,/ORDER BY \(i.queued_at IS NOT NULL\) DESC,i.last_attempt_at/);
   assert.match(selection.sql,/i.next_attempt_at<=NOW/);
   assert.match(selection.sql,/i.lease_until<NOW/);
   assert.match(selection.sql,/p.portal_enabled=TRUE AND p.ai_enabled=TRUE/);

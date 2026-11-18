@@ -104,26 +104,6 @@ async def load_client(db, envelope):
     return client
 
 
-async def reserve_request(context):
-    # Enforce the same client-wide monthly budget as the existing administrator UI.
-    cursor = await context.db.execute("""
-        INSERT INTO portal_ai_usage_monthly (client_id, period_start, requests_used, updated_at)
-        SELECT id, DATE_TRUNC('month', NOW() AT TIME ZONE 'UTC')::date, 1, NOW()
-        FROM portal_clients WHERE id=%s AND portal_enabled=TRUE AND ai_enabled=TRUE
-          AND monthly_prompt_limit>=1
-        ON CONFLICT (client_id, period_start) DO UPDATE
-          SET requests_used=portal_ai_usage_monthly.requests_used+1, updated_at=NOW()
-          WHERE portal_ai_usage_monthly.requests_used < (
-            SELECT monthly_prompt_limit FROM portal_clients
-            WHERE id=%s AND portal_enabled=TRUE AND ai_enabled=TRUE)
-        RETURNING period_start
-    """, (context.client_id, context.client_id))
-    row = await cursor.fetchone()
-    if not row:
-        raise HTTPException(429, "Monthly allowance reached")
-    context.period_start = row["period_start"]
-
-
 async def acquire_lease(context, token):
     cursor = await context.db.execute("""
         INSERT INTO portal_chatkit_leases (client_id, user_id, token, expires_at)
@@ -159,7 +139,7 @@ async def cleanup(db, context, token):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "aoc-chatkit"}
+    return {"status": "ok", "service": "aoc-chatkit", "monthly_request_cap": False}
 
 
 @app.post("/chatkit")
@@ -224,7 +204,6 @@ async def chatkit(request: Request):
                     attachment = await load_upload(context, identifier)
                     if attachment["thread_id"] is not None and attachment["thread_id"] != thread_id:
                         raise UploadError("upload_already_attached", 409)
-            await reserve_request(context)
         # Strip unused browser metadata before handing the request to the SDK.
         data = parsed.model_dump(mode="json")
         data["metadata"] = {}

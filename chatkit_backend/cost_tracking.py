@@ -38,12 +38,6 @@ def observation(provider, model, raw_usage, *, kind="chat", today=None, api=None
     decision = api == "decisions"
     if decision:
         result["pricing"] = {"endpoint": "/v1/decisions"}
-    if provider == "openrouter" and "cost" in raw:
-        reported = money(raw["cost"])
-        if reported is not None:
-            result.update(basis="reported", amount=reported, reason="provider_reported_charge",
-                          pricing={"source": "OpenRouter usage.cost", "currency": "USD"})
-            return result
     inputs = count(raw.get("input_tokens", raw.get("prompt_tokens")))
     outputs = count(raw.get("output_tokens", raw.get("completion_tokens")))
     details = raw.get("input_tokens_details", raw.get("prompt_tokens_details")) or {}
@@ -54,6 +48,12 @@ def observation(provider, model, raw_usage, *, kind="chat", today=None, api=None
     # in the estimate assumptions, not represented as provider-reported money.
     writes = count(details.get("cache_write_tokens", 0))
     result.update(input_tokens=inputs, output_tokens=outputs, cached_tokens=cached)
+    if provider == "openrouter" and "cost" in raw:
+        reported = money(raw["cost"])
+        if reported is not None:
+            result.update(basis="reported", amount=reported, reason="provider_reported_charge",
+                          pricing={"source": "OpenRouter usage.cost", "currency": "USD"})
+            return result
     if kind != "chat":
         result["reason"] = "usage_not_reported" if kind == "unreported" else "specialized_charge_requires_reconciliation"
         return result

@@ -21,7 +21,6 @@ class Context:
     user_id: str
     instructions: str
     client: dict
-    period_start: object = None
     config: dict = field(default_factory=dict)
     preview: bool = False
     portal_origin: str = ""

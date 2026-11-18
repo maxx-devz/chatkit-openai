@@ -179,6 +179,11 @@ class DecisionRequestTests(unittest.IsolatedAsyncioTestCase):
         route, _, _ = await self.call(context(), response("general"), query="Explain that")
         self.assertEqual(route, "work")
 
+    async def test_advisory_general_classification_cannot_remove_verified_work_index_tools(self):
+        ctx=context(hubstaff_index_binding="a"*64)
+        route,_,_=await self.call(ctx,response("general"),query="Anything needing attention?")
+        self.assertIn(route,["hubstaff","work"])
+
     async def test_all_failures_fall_back_without_retries_or_secret_logs(self):
         query = "What has Vianca been up to?"
         for status in [403, 404, 429, 500, 503]:

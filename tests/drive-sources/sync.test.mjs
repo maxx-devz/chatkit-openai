@@ -2,7 +2,7 @@ import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { OAuth2Client } from "google-auth-library";
 import { databasePool } from "../../lib/database.js";
-import { preparedBinding, encodePreparedDocuments } from "../../lib/prepared-source-store.js";
+import { preparedBinding, encodePreparedDocuments, decodePreparedDocuments } from "../../lib/prepared-source-store.js";
 import { synchronizePreparedSources } from "../../lib/prepared-source-sync.js";
 import { prepareSourceDocuments } from "../../lib/prepared-source-sync-policy.js";
 
@@ -17,7 +17,7 @@ test("Sync allows bounded large writes, but unchanged corpora update only metada
   const binding = preparedBinding(connection);
   const document = { id: "synthetic_doc_123", name: "Company guide", path: "Company guide", folders: [], version: "1", modifiedTime: "2026-10-28", text: "Verified company services.", previewSupported: true };
   const prepared = await prepareSourceDocuments({ rootName: "Company Knowledge", files: [document] }, [document], () => { throw new Error("must reuse"); });
-  let revision;
+  let revision, unreadable = false, exports = 0;
   const writes = [];
   t.mock.method(databasePool, "query", async query => {
     const sql = typeof query === "string" ? query : query.text;
@@ -26,7 +26,7 @@ test("Sync allows bounded large writes, but unchanged corpora update only metada
     if (/INSERT INTO portal_prepared/.test(sql)) {
       assert.equal(query.query_timeout, 45_000);
       return { rows: [{ owner_id: "7", binding,
-        encrypted_documents: encodePreparedDocuments("7", binding, [document]), sync_info: { corpusRevision: revision } }] };
+        encrypted_documents: unreadable ? "unreadable-ciphertext" : encodePreparedDocuments("7", binding, [document]), sync_info: { corpusRevision: revision } }] };
     }
     if (/UPDATE portal_prepared/.test(sql)) { writes.push(query); return { rows: [{ owner_id: "7" }] }; }
     throw new Error("Unexpected SQL");
@@ -45,6 +45,8 @@ test("Sync allows bounded large writes, but unchanged corpora update only metada
   t.mock.method(globalThis, "fetch", async value => {
     const url = new URL(value);
     if (url.pathname.endsWith("/synthetic_root_123")) return Response.json({ id: "synthetic_root_123", name: "Company Knowledge", mimeType: "application/vnd.google-apps.folder" });
+    if (url.pathname.endsWith('/synthetic_doc_123/export')) { exports++; return new Response(document.text); }
+    if (url.pathname.endsWith('/synthetic_doc_123')) return Response.json({...document,parents:['synthetic_root_123'],mimeType:'application/vnd.google-apps.document'});
     assert.equal(url.pathname, "/drive/v3/files");
     return Response.json({ files: [{ ...document, mimeType: "application/vnd.google-apps.document" }] });
   });
@@ -55,4 +57,9 @@ test("Sync allows bounded large writes, but unchanged corpora update only metada
   assert.equal((await synchronizePreparedSources("7")).ready, true);
   assert.equal(writes[1].values[3], null);
   assert.match(writes[1].text, /COALESCE\(\$4,encrypted_documents\)/);
+  unreadable = true;
+  assert.equal((await synchronizePreparedSources("7")).ready, true);
+  assert.equal(exports, 1, 'Unreadable cache must be fetched again through verified Google access');
+  assert.equal(typeof writes[2].values[3], 'string', 'Same source revision must still replace unreadable ciphertext');
+  assert.equal(decodePreparedDocuments({owner_id:'7',binding,encrypted_documents:writes[2].values[3]})[0].text, document.text);
 });

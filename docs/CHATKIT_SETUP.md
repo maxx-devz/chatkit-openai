@@ -340,7 +340,7 @@ domain registration, or deployment health. Those need a real client test.
 - **`429 credit_balance_exhausted`:** add API credits in your API Platform billing
   settings, then retry. Your ChatGPT Business subscription does not fund API
   requests. Increasing a client's portal allowance does not resolve this error.
-- **Allowance reached:** review monthly chat limits in `/admin` and file-attempt
+- **Provider quota reached:** review credits/quota with the selected provider and file-attempt
   limits in Assistant settings. Raising these does not add API billing credit.
 - **Port is busy:** stop the existing dev command. Do not kill unrelated processes.
 - **Rollback:** roll back the frontend deployment in Vercel. Keep the additive

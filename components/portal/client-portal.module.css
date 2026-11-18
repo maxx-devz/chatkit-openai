@@ -82,7 +82,10 @@
   text-decoration: none;
   font-size: 12px;
   font-weight: 620;
-  transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
 }
 
 .portalNav a:hover {
@@ -180,7 +183,7 @@
   align-items: center;
   padding: 13px clamp(18px, 2.2vw, 32px);
   border-bottom: 1px solid #e1e8f0;
-  grid-template-columns: minmax(250px, 1fr) minmax(220px, 310px) auto auto;
+  grid-template-columns: minmax(180px, 1fr) minmax(170px, 260px) auto auto auto;
   gap: 18px;
   background: rgba(255, 255, 255, 0.91);
   backdrop-filter: blur(16px);
@@ -198,7 +201,7 @@
 }
 
 .welcome strong {
-  color: #0757a0;
+  color: #1f8df1;
 }
 
 .welcome span {
@@ -358,10 +361,18 @@
   stroke-width: 1.8;
 }
 
-.blue { color: #176be7; }
-.orange { color: #ff8a00; }
-.purple { color: #6957e8; }
-.green { color: #19a74a; }
+.blue {
+  color: #176be7;
+}
+.orange {
+  color: #ff8a00;
+}
+.purple {
+  color: #6957e8;
+}
+.green {
+  color: #19a74a;
+}
 
 .metricBody {
   min-width: 0;
@@ -395,7 +406,9 @@
   text-overflow: ellipsis;
 }
 
-.metricValue a:hover { text-decoration: underline; }
+.metricValue a:hover {
+  text-decoration: underline;
+}
 
 .purple .metricValue,
 .green .metricValue {
@@ -461,7 +474,9 @@
 }
 
 @media (max-width: 900px) {
-  .viewerOverview { grid-template-columns: 1fr; }
+  .viewerOverview {
+    grid-template-columns: 1fr;
+  }
 }
 
 .assistantExpanded {
@@ -534,7 +549,9 @@
   height: 54px;
   border-radius: 999px;
   background: #b5c8df;
-  transition: background 160ms ease, height 160ms ease;
+  transition:
+    background 160ms ease,
+    height 160ms ease;
 }
 
 .columnDivider:hover span,
@@ -603,7 +620,7 @@
   color: #20855a;
   font-size: 8px;
   font-weight: 760;
-  letter-spacing: .03em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 
@@ -644,7 +661,9 @@
   text-decoration: none;
 }
 
-.liveProjectMeta a:hover { text-decoration: underline; }
+.liveProjectMeta a:hover {
+  text-decoration: underline;
+}
 
 .taskBoard {
   display: grid;
@@ -698,7 +717,7 @@
   overflow: hidden;
   color: #48617a;
   font-size: 10px;
-  letter-spacing: .025em;
+  letter-spacing: 0.025em;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
@@ -729,7 +748,7 @@
   border: 1px solid #e2e9f1;
   border-radius: 9px;
   background: #fff;
-  box-shadow: 0 3px 9px rgba(32, 68, 106, .045);
+  box-shadow: 0 3px 9px rgba(32, 68, 106, 0.045);
 }
 
 .taskCard > div {
@@ -760,10 +779,14 @@
 }
 
 .taskColumn_in_progress .taskStageLabel,
-.taskColumn_in_progress .taskCardIcon { color: #176be7; }
+.taskColumn_in_progress .taskCardIcon {
+  color: #176be7;
+}
 
 .taskColumn_done .taskStageLabel,
-.taskColumn_done .taskCardIcon { color: #208c4d; }
+.taskColumn_done .taskCardIcon {
+  color: #208c4d;
+}
 
 .taskColumnEmpty {
   margin: 16px 5px;
@@ -846,7 +869,9 @@
   white-space: nowrap;
 }
 
-.taskAssistantPrompt a:hover { background: #0e5dce; }
+.taskAssistantPrompt a:hover {
+  background: #0e5dce;
+}
 
 .workflowSkeleton,
 .workflowAccordion {
@@ -866,8 +891,12 @@
 }
 
 @keyframes workflowShimmer {
-  from { background-position: 100% 0; }
-  to { background-position: -100% 0; }
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
 }
 
 .workflowGroup {
@@ -877,7 +906,7 @@
   border: 1px solid #dfe8f1;
   border-radius: 12px;
   background: #fff;
-  box-shadow: 0 3px 12px rgba(30, 66, 102, .035);
+  box-shadow: 0 3px 12px rgba(30, 66, 102, 0.035);
 }
 
 .workflow_todo {
@@ -980,7 +1009,7 @@
   height: 100%;
   border-radius: inherit;
   background: var(--workflow-color);
-  transition: width .28s ease;
+  transition: width 0.28s ease;
 }
 
 .workflowChevron {
@@ -1037,12 +1066,15 @@
   color: inherit;
   grid-template-columns: auto minmax(0, 1fr) auto;
   text-decoration: none;
-  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
 }
 
 .workflowTasks > a:hover {
   border-color: #a9caed;
-  box-shadow: 0 5px 14px rgba(32, 83, 137, .09);
+  box-shadow: 0 5px 14px rgba(32, 83, 137, 0.09);
   transform: translateY(-1px);
 }
 
@@ -1082,10 +1114,26 @@
   line-height: 1.35;
 }
 
-.priority_urgent { border-color: #efb7b7; background: #fff0f0; color: #a92323; }
-.priority_high { border-color: #f0c795; background: #fff6e8; color: #925113; }
-.priority_medium { border-color: #a9c8ed; background: #edf5ff; color: #245f9e; }
-.priority_low { border-color: #c8d1dc; background: #f4f6f8; color: #596879; }
+.priority_urgent {
+  border-color: #efb7b7;
+  background: #fff0f0;
+  color: #a92323;
+}
+.priority_high {
+  border-color: #f0c795;
+  background: #fff6e8;
+  color: #925113;
+}
+.priority_medium {
+  border-color: #a9c8ed;
+  background: #edf5ff;
+  color: #245f9e;
+}
+.priority_low {
+  border-color: #c8d1dc;
+  background: #f4f6f8;
+  color: #596879;
+}
 
 .workflowTasks small {
   margin-top: 2px;
@@ -1147,7 +1195,9 @@
   line-height: 1.45;
 }
 
-.liveLoading { color: #176be7; }
+.liveLoading {
+  color: #176be7;
+}
 
 .liveWarning {
   border-top: 1px solid #f3e2bf;
@@ -1290,7 +1340,6 @@
   .assistantExpanded .expandedToolbar {
     display: none;
   }
-
 }
 
 @media (max-width: 980px) {
@@ -1334,7 +1383,7 @@
   }
 
   .topbar {
-    grid-template-columns: minmax(0, 1fr) minmax(190px, 260px) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(150px, 220px) auto auto auto;
   }
 
   .accountSummary {
@@ -1342,7 +1391,111 @@
   }
 }
 
-.mobileNavigation { display: none; }
+.pageHeading {
+  grid-column: 1 / -1;
+  padding: 0 2px 8px;
+}
+.pageHeading h1 {
+  margin: 0 0 8px;
+  color: #153b5d;
+  font-size: 28px;
+}
+.pageHeading p {
+  margin: 0;
+  color: #56718b;
+  font-size: 13px;
+}
+.notificationAvailability {
+  position: relative;
+  color: #496b89;
+}
+.notificationAvailability summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 9px;
+  border-radius: 8px;
+}
+.notificationAvailability summary::-webkit-details-marker {
+  display: none;
+}
+.notificationAvailability svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+}
+.notificationAvailability p {
+  position: absolute;
+  z-index: 32;
+  top: 100%;
+  right: 0;
+  width: 230px;
+  max-width: calc(100vw - 32px);
+  margin: 0;
+  padding: 15px;
+  border: 1px solid #cbddeb;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 12px 28px #14345120;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.notificationAvailability summary:focus-visible,
+.policyLinks summary:focus-visible {
+  outline: 3px solid #1682ce;
+  outline-offset: 2px;
+}
+.policyLinks {
+  display: flex;
+  gap: 15px;
+  align-items: flex-start;
+}
+.policyLinks summary {
+  cursor: pointer;
+  color: #426b90;
+}
+.policyLinks p {
+  max-width: 280px;
+  line-height: 1.6;
+}
+.usageExplanation {
+  margin: 16px 20px;
+  color: #42627f;
+  line-height: 1.7;
+  font-size: 13px;
+}
+.usageExplanation dl {
+  display: grid;
+  gap: 10px;
+}
+.usageExplanation dl div {
+  padding: 10px 12px;
+  background: #f5f9fd;
+  border: 1px solid #e1ebf4;
+  border-radius: 8px;
+}
+.usageExplanation dt {
+  font-size: 12px;
+}
+.usageExplanation dd {
+  margin: 4px 0 0;
+  color: #153f63;
+  font-weight: 650;
+}
+.reviewNotice {
+  margin: 12px 18px;
+  padding: 15px;
+  background: #f2edff;
+  border: 1px solid #d8ccf7;
+  border-radius: 10px;
+  color: #443078;
+  line-height: 1.7;
+  font-size: 13px;
+}
+.mobileNavigation {
+  display: none;
+}
 
 @media (max-width: 720px) {
   .mobileNavigation {
@@ -1355,11 +1508,33 @@
     font-size: 13px;
   }
 
-  .mobileNavigation summary { padding: 13px 15px; cursor: pointer; color: #0862a8; font-weight: 700; }
-  .mobileNavigation nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; padding: 0 10px 10px; }
-  .mobileNavigation a { padding: 11px; border-radius: 7px; color: #325b7f; text-decoration: none; }
-  .mobileNavigation a[aria-current="page"] { background: #e4f0ff; color: #075da8; font-weight: 700; }
-  .mobileNavigation :focus-visible { outline: 3px solid #63baff; outline-offset: 2px; }
+  .mobileNavigation summary {
+    padding: 13px 15px;
+    cursor: pointer;
+    color: #0862a8;
+    font-weight: 700;
+  }
+  .mobileNavigation nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+    padding: 0 10px 10px;
+  }
+  .mobileNavigation a {
+    padding: 11px;
+    border-radius: 7px;
+    color: #325b7f;
+    text-decoration: none;
+  }
+  .mobileNavigation a[aria-current="page"] {
+    background: #e4f0ff;
+    color: #075da8;
+    font-weight: 700;
+  }
+  .mobileNavigation :focus-visible {
+    outline: 3px solid #63baff;
+    outline-offset: 2px;
+  }
 
   .portalShell {
     display: block;

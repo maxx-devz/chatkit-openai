@@ -4,11 +4,18 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import aocIcon from "@/aoc-icon.png";
-import SignOutButton from "@/components/auth/sign-out-button";
+import Link from "next/link";
+import {useRouter,useSearchParams} from "next/navigation";
+import AdminShell from "./admin-shell";
+import {useAdminDraft} from "./admin-draft-provider";
+import {ADMIN_VIEWS,ADMIN_CLIENT_TABS,adminView,adminClientTab,legacyAdminHash} from "@/lib/admin-navigation";
+import AdminCreditSummary from "@/components/credits/admin-credit-summary";
+import AdminClientWebsites from "./admin-client-websites";
 import AdminAssistant from "@/components/admin/admin-assistant";
-import AdminSidebar from '@/components/admin/admin-sidebar';
+
 import PortalUsage from "@/components/admin/portal-usage";
 import ProviderSettings from "@/components/admin/provider-settings";
+import ClientHubstaffIndex from "@/components/admin/client-hubstaff-index";
 import styles from "./admin-dashboard.module.css";
 
 const ICONS = {
@@ -31,7 +38,7 @@ function Icon({ name }) {
 }
 
 function number(value) {
-  return new Intl.NumberFormat().format(Number(value) || 0);
+  return value==null?"Not available":new Intl.NumberFormat().format(Number(value));
 }
 
 function dateLabel(value) {
@@ -73,7 +80,6 @@ function settingsFromClient(client) {
         name: client.name,
         portalEnabled: client.portalEnabled,
         aiEnabled: client.aiEnabled,
-        monthlyPromptLimit: client.monthlyPromptLimit,
         vectorStoreId: client.vectorStoreId,
         approvedWebsiteUrl: client.approvedWebsiteUrl || "",
         hubstaffProjectUrl: client.hubstaffProjectUrl || "",
@@ -95,13 +101,17 @@ function Metric({ icon, label, value, detail, tone }) {
   );
 }
 
-export default function AdminDashboard({ initialData }) {
+export default function AdminDashboard({ initialData,view="overview" }) {
+  const router=useRouter(),params=useSearchParams();
+  const activeView=adminView(params.get("view") || view),tab=adminClientTab(params.get("tab"));
   const [clients, setClients] = useState(initialData.clients || []);
-  const [selectedSlug, setSelectedSlug] = useState(initialData.clients?.[0]?.slug || "");
+  const selectedSlug=params.get("client") || clients[0]?.slug || "";
+  const setSelectedSlug=slug=>router.push("/admin?"+new URLSearchParams({view:"clients",client:slug,tab}));
   const [query, setQuery] = useState("");
-  const [draft, setDraft] = useState(settingsFromClient(initialData.clients?.[0]));
+
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [feedbackSlug,setFeedbackSlug]=useState("");
   const [busy, setBusy] = useState("");
   const [createError, setCreateError] = useState("");
   const [makeConnection, setMakeConnection] = useState({
@@ -147,8 +157,10 @@ export default function AdminDashboard({ initialData }) {
   }, []);
 
   const selectedClient = clients.find((client) => client.slug === selectedSlug)
-    || clients[0]
     || null;
+  const {value:draft,update:setDraft,clear:clearDraft,clearIfUnchanged,dirty}=useAdminDraft((initialData.admin.id || initialData.admin.username)+":client:"+selectedSlug,settingsFromClient(selectedClient));
+  useEffect(()=>{const legacy=()=>{const target=legacyAdminHash(window.location.hash);if(target)router.replace("/admin?"+new URLSearchParams(target));};
+    legacy();window.addEventListener("hashchange",legacy);return()=>window.removeEventListener("hashchange",legacy);},[router]);
   const filteredClients = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return clients.filter((client) =>
@@ -161,13 +173,11 @@ export default function AdminDashboard({ initialData }) {
     activeClients: clients.filter((client) => client.portalEnabled).length,
     aiEnabledClients: clients.filter((client) => client.aiEnabled).length,
     requestsUsed: clients.reduce((total, client) => total + client.requestsUsed, 0),
-    allowance: clients.reduce((total, client) => total + client.monthlyPromptLimit, 0),
     conversations: clients.reduce((total, client) => total + client.conversationCount, 0),
   }), [clients]);
 
   function selectClient(client) {
     setSelectedSlug(client.slug);
-    setDraft(settingsFromClient(client));
     setStatus("");
     setError("");
   }
@@ -176,7 +186,7 @@ export default function AdminDashboard({ initialData }) {
     setClients((current) => current
       .map((candidate) => candidate.slug === client.slug ? client : candidate)
       .sort((first, second) => first.name.localeCompare(second.name)));
-    setDraft(settingsFromClient(client));
+    clearIfUnchanged(draft);
   }
 
   function updateDraft(field, value) {
@@ -188,6 +198,7 @@ export default function AdminDashboard({ initialData }) {
   async function saveSettings(event) {
     event.preventDefault();
     if (!draft || busy) return;
+    setFeedbackSlug(draft.slug);
     setBusy("save");
     setError("");
     setStatus("");
@@ -211,37 +222,8 @@ export default function AdminDashboard({ initialData }) {
     }
   }
 
-  async function resetUsage() {
-    if (!selectedClient || busy) return;
-    const approved = window.confirm(
-      `Reset ${selectedClient.name}'s current monthly AI request usage to zero?`,
-    );
-    if (!approved) return;
-    setBusy("reset");
-    setError("");
-    setStatus("");
-
-    try {
-      const response = await fetch("/api/admin/usage", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: selectedClient.slug }),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload?.client) {
-        throw new Error(payload?.error || "Monthly usage could not be reset.");
-      }
-      replaceClient(payload.client);
-      setStatus("Monthly request usage reset to zero.");
-    } catch (resetError) {
-      setError(resetError.message || "Monthly usage could not be reset.");
-    } finally {
-      setBusy("");
-    }
-  }
-
   async function testMakeConnection() {
-    if (busy) return;
+    if (busy || !window.confirm("Send a real test event to the configured portal-wide Make scenario? This is separate from Save Client.")) return;
     setBusy("make-test");
     setMakeConnection({ state: "testing", message: "Contacting Make..." });
 
@@ -283,7 +265,6 @@ export default function AdminDashboard({ initialData }) {
           username: form.get("username"),
           name: form.get("name"),
           password: form.get("password"),
-          monthlyPromptLimit: Number(form.get("monthlyPromptLimit")),
           approvedWebsiteUrl: form.get("approvedWebsiteUrl"),
           hubstaffProjectUrl: form.get("hubstaffProjectUrl"),
           hubstaffMonthlyHoursLimit: form.get("hubstaffMonthlyHoursLimit"),
@@ -297,8 +278,9 @@ export default function AdminDashboard({ initialData }) {
       setClients((current) => [...current, payload.client]
         .sort((first, second) => first.name.localeCompare(second.name)));
       setSelectedSlug(payload.client.slug);
-      setDraft(settingsFromClient(payload.client));
+
       setStatus(`${payload.client.name} was created and can sign in now.`);
+      setFeedbackSlug(payload.client.slug);
       formElement.reset();
       createDialogRef.current?.close();
     } catch (creationError) {
@@ -308,348 +290,112 @@ export default function AdminDashboard({ initialData }) {
     }
   }
 
-  const usagePercent = selectedClient
-    ? Math.min(100, (selectedClient.requestsUsed / selectedClient.monthlyPromptLimit) * 100)
-    : 0;
-  const remainingPercent = selectedClient ? Math.max(0, 100 - usagePercent) : 0;
 
-  return (
-    <div className={styles.shell}>
-      <AdminSidebar admin={initialData.admin} />
-
-      <div className={styles.main}>
-        <header className={styles.topbar}>
-          <div>
-            <p>AOC operations</p>
-            <h1>Portal control center</h1>
-            <span>Manage client AI settings and position-based internal user access.</span>
-          </div>
-          <div className={styles.topbarActions}>
-            <span className={styles.secureBadge}><Icon name="shield" />Admin protected</span>
-            <SignOutButton className={styles.signOut} />
-          </div>
-        </header>
-
-        <main className={styles.content} id="overview">
-          <section className={styles.metrics} aria-label="Administrator overview">
-            <Metric
-              icon="clients"
-              label="Client accounts"
-              value={number(summary.totalClients)}
-              detail={`${summary.activeClients} portal enabled`}
-              tone="blue"
-            />
-            <Metric
-              icon="spark"
-              label="AI-enabled clients"
-              value={number(summary.aiEnabledClients)}
-              detail={`${summary.totalClients - summary.aiEnabledClients} paused`}
-              tone="cyan"
-            />
-            <Metric
-              icon="activity"
-              label="Requests this month"
-              value={number(summary.requestsUsed)}
-              detail={`${number(summary.allowance)} combined allowance`}
-              tone="violet"
-            />
-          </section>
-
-          <PortalUsage />
-          <ProviderSettings />
-          <AdminAssistant clients={clients} />
-
-          <section className={styles.workspace} id="clients">
-            <aside className={styles.clientDirectory}>
-              <div className={styles.directoryHeading}>
-                <div>
-                  <p>Accounts</p>
-                  <h2>Clients</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCreateError("");
-                    createDialogRef.current?.showModal();
-                  }}
-                >
-                  <Icon name="plus" /> Add client
-                </button>
-              </div>
-
-              <label className={styles.clientSearch}>
-                <Icon name="search" />
-                <span className="sr-only">Search clients</span>
-                <input
-                  type="search"
-                  placeholder="Search clients..."
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-              </label>
-
-              <div className={styles.clientList}>
-                {filteredClients.map((client) => {
-                  const usedPercent = Math.min(
-                    100,
-                    (client.requestsUsed / client.monthlyPromptLimit) * 100,
-                  );
-                  const remainingPercent = Math.max(0, 100 - usedPercent);
-                  return (
-                    <button
-                      className={client.slug === selectedClient?.slug ? styles.selectedClient : ""}
-                      key={client.slug}
-                      type="button"
-                      onClick={() => selectClient(client)}
-                    >
-                      <span className={styles.clientAvatar}>{initials(client.name)}</span>
-                      <span className={styles.clientCopy}>
-                        <strong>{client.name}</strong>
-                        <small>@{client.slug}</small>
-                        <i
-                          aria-label={`${client.name} monthly requests remaining`}
-                          aria-valuemax={client.monthlyPromptLimit}
-                          aria-valuemin="0"
-                          aria-valuenow={client.requestsRemaining}
-                          role="progressbar"
-                        ><b style={{ width: `${remainingPercent}%` }} /></i>
-                      </span>
-                      <span
-                        className={client.isOnline ? styles.online : styles.offline}
-                        title={presenceTitle(client)}
-                      >
-                        {client.isOnline ? "Online" : "Offline"}
-                      </span>
-                    </button>
-                  );
-                })}
-                {!filteredClients.length ? (
-                  <p className={styles.emptyList}>No matching clients.</p>
-                ) : null}
-              </div>
-            </aside>
-
-            <section className={styles.controlPanel}>
-              {selectedClient && draft ? (
-                <form onSubmit={saveSettings}>
-                  <header className={styles.clientHeader}>
-                    <div className={styles.clientTitle}>
-                      <span>{initials(selectedClient.name)}</span>
-                      <div>
-                        <p>Client workspace</p>
-                        <h2>{selectedClient.name}</h2>
-                        <small>@{selectedClient.slug} · Added {dateLabel(selectedClient.createdAt)}</small>
-                      </div>
-                    </div>
-                    <div className={styles.headerActions}>
-                      <span className={draft.portalEnabled ? styles.enabled : styles.disabled}>
-                        <i /> {draft.portalEnabled ? "Portal active" : "Portal disabled"}
-                      </span>
-                      <button disabled={Boolean(busy)} type="submit">
-                        {busy === "save" ? "Saving..." : "Save changes"}
-                      </button>
-                    </div>
-                  </header>
-
-                  {status ? <p className={styles.success} role="status">{status}</p> : null}
-                  {error ? <p className={styles.error} role="alert">{error}</p> : null}
-
-                  <div className={styles.usageHero} id="ai-controls">
-                    <div className={styles.usageRing} style={{ "--usage": `${remainingPercent * 3.6}deg` }}>
-                      <span>
-                        <strong>{Math.round(remainingPercent)}%</strong>
-                        <small>left</small>
-                      </span>
-                    </div>
-                    <div className={styles.usageOverview}>
-                      <p>Monthly AI allowance</p>
-                      <h3>{number(selectedClient.requestsRemaining)} requests remaining</h3>
-                      <span>
-                        {number(selectedClient.requestsUsed)} of {number(selectedClient.monthlyPromptLimit)} used
-                        · resets {dateLabel(selectedClient.resetsAt)}
-                      </span>
-                      <div
-                        aria-label={`${selectedClient.name} monthly requests remaining`}
-                        aria-valuemax={selectedClient.monthlyPromptLimit}
-                        aria-valuemin="0"
-                        aria-valuenow={selectedClient.requestsRemaining}
-                        role="progressbar"
-                      ><i style={{ width: `${remainingPercent}%` }} /></div>
-                    </div>
-                  </div>
-
-                  <div className={styles.settingsGrid}>
-                    <section className={styles.settingsCard}>
-                      <header>
-                        <span><Icon name="spark" /></span>
-                        <div><h3>AI request controls</h3><p>Limits are enforced by the server.</p></div>
-                      </header>
-                      <div className={styles.fieldGrid}>
-                        <label>
-                          <span>Monthly request limit</span>
-                          <input
-                            type="number"
-                            min="1"
-                            max="100000"
-                            value={draft.monthlyPromptLimit}
-                            onChange={(event) => updateDraft("monthlyPromptLimit", Number(event.target.value))}
-                          />
-                          <small>Total OpenAI requests allowed each UTC month.</small>
-                        </label>
-                      </div>
-                      <button
-                        className={styles.resetButton}
-                        disabled={Boolean(busy) || selectedClient.requestsUsed === 0}
-                        onClick={resetUsage}
-                        type="button"
-                      >
-                        {busy === "reset" ? "Resetting..." : "Reset current monthly usage"}
-                      </button>
-                    </section>
-
-                    <section className={styles.settingsCard} id="security">
-                      <header>
-                        <span><Icon name="shield" /></span>
-                        <div><h3>Access & availability</h3><p>Pause access without deleting data.</p></div>
-                      </header>
-                      <label className={styles.toggleRow}>
-                        <span><strong>Client portal</strong><small>Allow this client to sign in and load its workspace.</small></span>
-                        <input
-                          type="checkbox"
-                          checked={draft.portalEnabled}
-                          onChange={(event) => updateDraft("portalEnabled", event.target.checked)}
-                        />
-                        <i />
-                      </label>
-                      <label className={styles.toggleRow}>
-                        <span><strong>AI assistant</strong><small>Allow new OpenAI requests for this client.</small></span>
-                        <input
-                          type="checkbox"
-                          checked={draft.aiEnabled}
-                          onChange={(event) => updateDraft("aiEnabled", event.target.checked)}
-                        />
-                        <i />
-                      </label>
-                      <label className={styles.nameField}>
-                        <span>Client display name</span>
-                        <input
-                          maxLength="120"
-                          value={draft.name}
-                          onChange={(event) => updateDraft("name", event.target.value)}
-                        />
-                      </label>
-                    </section>
-
-                    <section className={`${styles.settingsCard} ${styles.wideCard}`}>
-                      <header>
-                        <span><Icon name="overview" /></span>
-                        <div><h3>Client integrations</h3><p>Connect approved knowledge, one website, and the client&apos;s Hubstaff project.</p></div>
-                      </header>
-                      <label className={styles.vectorField}>
-                        <span>OpenAI vector store ID</span>
-                        <input
-                          placeholder="vs_..."
-                          value={draft.vectorStoreId}
-                          onChange={(event) => updateDraft("vectorStoreId", event.target.value)}
-                        />
-                        <small>Optional approved file-search knowledge base for this client only.</small>
-                      </label>
-                      <label className={styles.vectorField}>
-                        <span>Approved website URL</span>
-                        <input
-                          type="url"
-                          placeholder="https://www.example.com"
-                          value={draft.approvedWebsiteUrl}
-                          onChange={(event) => updateDraft("approvedWebsiteUrl", event.target.value)}
-                        />
-                        <small>Optional. AOC-GPT web search is restricted to this public domain and its subdomains for this client.</small>
-                      </label>
-                      <label className={styles.vectorField}>
-                        <span>Hubstaff project URL</span>
-                        <input
-                          type="url"
-                          placeholder="https://tasks.hubstaff.com/app/organizations/14952/projects/803599"
-                          value={draft.hubstaffProjectUrl}
-                          onChange={(event) => updateDraft("hubstaffProjectUrl", event.target.value)}
-                        />
-                        <small>Optional. Only this client&apos;s project is queried for monthly hours and task progress.</small>
-                      </label>
-                      <label className={styles.vectorField}>
-                        <span>Monthly Hubstaff hours limit</span>
-                        <input
-                          type="number"
-                          min="0.01"
-                          max="100000"
-                          step="0.01"
-                          placeholder="Use the Hubstaff project budget"
-                          value={draft.hubstaffMonthlyHoursLimit}
-                          onChange={(event) => updateDraft("hubstaffMonthlyHoursLimit", event.target.value)}
-                        />
-                        <small>Optional per-client fallback. A monthly hours budget configured in Hubstaff takes priority.</small>
-                      </label>
-                      <div className={styles.makeConnection}>
-                        <div>
-                          <strong>Make automation</strong>
-                          <small>Send a server-side test event and confirm that the Make scenario executed.</small>
-                          <span
-                            className={styles[`makeConnection_${makeConnection.state}`]}
-                            role={makeConnection.state === "error" ? "alert" : "status"}
-                          >
-                            {makeConnection.message}
-                            {makeConnection.requestId ? ` Request ${makeConnection.requestId}.` : ""}
-                          </span>
-                        </div>
-                        <button
-                          disabled={Boolean(busy)}
-                          onClick={testMakeConnection}
-                          type="button"
-                        >
-                          {busy === "make-test" ? "Testing..." : "Test Make connection"}
-                        </button>
-                      </div>
-                    </section>
-
-                    <section className={`${styles.settingsCard} ${styles.wideCard}`}>
-                      <header>
-                        <span><Icon name="user" /></span>
-                        <div><h3>Workspace overview</h3><p>Read-only operational details for this account.</p></div>
-                      </header>
-                      <div className={styles.accountStats}>
-                        <div><strong>{number(selectedClient.memberCount)}</strong><span>Portal users</span></div>
-                        <div><strong>{number(selectedClient.conversationCount)}</strong><span>Saved conversations</span></div>
-                        <div><strong>{number(selectedClient.approvedKnowledge)}</strong><span>Approved sources</span></div>
-                        <div><strong>{number(selectedClient.pendingKnowledge)}</strong><span>Pending sources</span></div>
-                      </div>
-                      <div className={styles.memberList}>
-                        {selectedClient.members.map((member, index) => (
-                          <div key={`${member.username || member.email}-${index}`}>
-                            <span>{initials(member.name || member.username)}</span>
-                            <p><strong>{member.name || member.username}</strong><small>@{member.username || "portal-user"}</small></p>
-                            <b>{String(member.role || "member").replaceAll("_", " ")}</b>
-                          </div>
-                        ))}
-                        {!selectedClient.members.length ? <p>No login is assigned.</p> : null}
-                      </div>
-                      <p className={styles.lastActivity}>Last workspace activity: {dateLabel(selectedClient.lastActivityAt)}</p>
-                    </section>
-                  </div>
-                </form>
-              ) : (
-                <div className={styles.noClient}>
-                  <Image src={aocIcon} alt="" />
-                  <h2>Create your first client account</h2>
-                  <p>The administrator portal is ready, but there are no client records yet.</p>
-                  <button type="button" onClick={() => createDialogRef.current?.showModal()}>
-                    Add client
-                  </button>
-                </div>
-              )}
+  const page=ADMIN_VIEWS[activeView];
+  return <AdminShell admin={initialData.admin} active={activeView} title={page.title} description={page.description}>
+    {activeView==='overview' && <>
+      <section className={styles.metrics} aria-label="Administrator overview">
+        <Metric icon="clients" label="Client accounts" value={number(summary.totalClients)} detail={summary.activeClients+' portal enabled'} tone="blue"/>
+        <Metric icon="spark" label="AI-enabled clients" value={number(summary.aiEnabledClients)} detail={summary.totalClients-summary.aiEnabledClients+' paused'} tone="cyan"/>
+        <Metric icon="activity" label="Recorded AI chats this UTC month" value={number(summary.requestsUsed)} detail="Activity count; no monthly request cap." tone="violet"/>
+      </section>
+      <section className={styles.settingsCard}><h2>Open an admin workspace</h2><div className={styles.quickLinks}>
+        <Link href="/admin?view=clients" prefetch={false}>Manage clients</Link><Link href="/admin?view=usage" prefetch={false}>Review AI usage</Link>
+        <Link href="/admin/credits" prefetch={false}>AI Pricing & Credits</Link><Link href="/admin/sources" prefetch={false}>Source Connections</Link>
+      </div><p>Credits remain reporting-only. Request ceilings, provider capacity and reporting allowances are separate controls.</p></section>
+    </>}
+    {activeView==='usage' && <PortalUsage/>}
+    {activeView==='assistant' && <AdminAssistant clients={clients}/>}
+    {activeView==='security' && <>
+      <section className={styles.settingsCard}><h2>Client access safeguards</h2><p>Portal and AI access toggles are managed per client. Reporting credit balances do not grant or block access.</p>
+        <Link href="/admin?view=clients&tab=access" prefetch={false}>Open client access controls</Link></section>
+      <ProviderSettings/>
+    </>}
+    {activeView==='clients' && <section className={styles.workspace} id="clients">
+      <aside className={styles.clientDirectory}>
+        <div className={styles.directoryHeading}><div><p>Workspaces</p><h2>Clients</h2></div>
+          <button type="button" onClick={()=>{setCreateError('');createDialogRef.current?.showModal();}}><Icon name="plus"/> Add client</button></div>
+        <label className={styles.clientSearch}><Icon name="search"/><span className="sr-only">Search clients</span>
+          <input type="search" placeholder="Search clients…" value={query} onChange={event=>setQuery(event.target.value)}/></label>
+        <div className={styles.clientList}>{filteredClients.map(client=><button type="button" key={client.slug}
+          aria-pressed={client.slug===selectedClient?.slug} disabled={Boolean(busy)}
+          className={client.slug===selectedClient?.slug?styles.selectedClient:''} onClick={()=>selectClient(client)}>
+          <span className={styles.clientAvatar}>{initials(client.name)}</span><span className={styles.clientCopy}>
+            <strong>{client.name}</strong><small>@{client.slug}</small><small className={styles.clientRequestCount}>{number(client.requestsUsed)} recorded AI chats this month</small></span>
+          <span className={client.isOnline?styles.online:styles.offline} title={presenceTitle(client)}>{client.isOnline?'Online':'Offline'}</span>
+        </button>)}{!filteredClients.length && <p className={styles.emptyList}>No matching clients.</p>}</div>
+      </aside>
+      <section className={styles.controlPanel}>{selectedClient && draft?<form onSubmit={saveSettings}>
+        <div className={styles.clientToolbar}><header className={styles.clientHeader}><div className={styles.clientTitle}><span>{initials(selectedClient.name)}</span>
+          <div><p>Selected client</p><h2>{selectedClient.name}</h2><small>@{selectedClient.slug} · {dirty?'Unsaved changes':'Saved settings'}</small></div></div>
+          <div className={styles.headerActions}><span className={selectedClient.portalEnabled?styles.enabled:styles.disabled}>
+            {selectedClient.portalEnabled?'Portal active':'Portal paused'}</span>
+            {dirty && <button type="button" disabled={Boolean(busy)} onClick={clearDraft}>Discard edits</button>}
+            <button type="submit" disabled={Boolean(busy) || !dirty}>{busy==='save'?'Saving…':'Save client'}</button></div></header>
+        {status && feedbackSlug===selectedSlug && <p className={styles.success} role="status">{status}</p>}{error && feedbackSlug===selectedSlug && <p className={styles.error} role="alert">{error}</p>}
+        <nav className={styles.clientTabs} aria-label="Selected client sections">{ADMIN_CLIENT_TABS.map(([key,label])=><Link key={key}
+          href={'/admin?'+new URLSearchParams({view:'clients',client:selectedClient.slug,tab:key})} prefetch={false} aria-current={tab===key?'page':undefined}>{label}</Link>)}</nav></div>
+        <div className={styles.selectedSections}>
+          {tab==='overview' && <>
+            <AdminCreditSummary key={selectedClient.id} clientId={selectedClient.id}/>
+            <section className={styles.settingsCard}><h3>Client identity</h3>
+              <label className={styles.nameField}><span>Client display name</span><input maxLength="120" value={draft.name} disabled={Boolean(busy)} onChange={event=>updateDraft('name',event.target.value)}/></label>
+              <p>Username: <strong>@{selectedClient.slug}</strong> · Created {dateLabel(selectedClient.createdAt)}</p>
+              <p>Access toggles and provider usage safeguards are in their own sections.</p>
             </section>
-          </section>
-
-        </main>
-      </div>
-
+          </>}
+          {tab==='access' && <section className={styles.settingsCard}><h3>Access & availability</h3><p>Pause access without deleting conversations or history. Save Client applies these changes.</p>
+            <label className={styles.toggleRow}><span><strong>Client portal</strong><small>Allow the client workspace to be accessed.</small></span>
+              <input type="checkbox" checked={draft.portalEnabled} disabled={Boolean(busy)} onChange={event=>updateDraft('portalEnabled',event.target.checked)}/><i/></label>
+            <label className={styles.toggleRow}><span><strong>AI assistant</strong><small>Allow new AI requests through the selected provider, including OpenAI or OpenRouter.</small></span>
+              <input type="checkbox" checked={draft.aiEnabled} disabled={Boolean(busy)} onChange={event=>updateDraft('aiEnabled',event.target.checked)}/><i/></label>
+          </section>}
+          {tab==='usage' && <>
+            <AdminCreditSummary key={selectedClient.id} clientId={selectedClient.id}/>
+            <section className={styles.settingsCard} id="ai-controls"><h3>AI chat usage</h3>
+              <p>{number(selectedClient.requestsUsed)} recorded AI chats this UTC month. There is no portal monthly AI request cap.</p>
+              <Link href={"/admin?view=usage&usageClient="+selectedClient.id} prefetch={false}>Clear this client&apos;s AI chat usage history</Link>
+            </section>
+          </>}
+          {tab==='integrations' && <>
+            <section className={styles.settingsCard}><h3>Approved AI knowledge & web domain</h3>
+              <p>Shared company knowledge is managed in Source Connections. The fields below are optional client-specific settings; saving them does not verify remote access.</p>
+              <Link href="/admin/sources" prefetch={false}>Open Source Connections</Link>
+              <label className={styles.vectorField}><span>Client vector store ID</span><input value={draft.vectorStoreId} placeholder="vs_…" disabled={Boolean(busy)} onChange={event=>updateDraft('vectorStoreId',event.target.value)}/><small>{selectedClient.vectorStoreId?'Saved client knowledge ID · access not checked here':'No client-specific vector store saved'}</small></label>
+              <label className={styles.vectorField}><span>Approved AI web-search domain URL</span><input type="url" value={draft.approvedWebsiteUrl} disabled={Boolean(busy)} placeholder="https://www.example.com" onChange={event=>updateDraft('approvedWebsiteUrl',event.target.value)}/>
+                <small>AI web search remains restricted to this public domain and its subdomains. Website Insights sites do not widen this restriction.</small></label>
+            </section>
+            <AdminClientWebsites key={selectedClient.id} clientId={selectedClient.id}/>
+            <section className={styles.settingsCard}><h3>Hubstaff project</h3><p>{selectedClient.hubstaffProjectUrl?'Project mapping saved. Sync status appears below.':'No project mapping saved. Enter this client’s Hubstaff project and save it before syncing.'}</p>
+              <label className={styles.vectorField}><span>Hubstaff project URL</span><input type="url" value={draft.hubstaffProjectUrl} disabled={Boolean(busy)} placeholder="https://tasks.hubstaff.com/app/organizations/…/projects/…" onChange={event=>updateDraft('hubstaffProjectUrl',event.target.value)}/>
+                <small>Only the mapped project is available to this client. Ownership checks remain enforced by the server.</small></label>
+              <label className={styles.vectorField}><span>Monthly Hubstaff hours fallback</span><input type="number" min="0.01" max="100000" step="0.01" value={draft.hubstaffMonthlyHoursLimit ?? ""} disabled={Boolean(busy)} onChange={event=>updateDraft("hubstaffMonthlyHoursLimit",event.target.value)}/><small>Optional. Used only when Hubstaff provides no hours budget. This does not limit AI chat usage.</small></label>
+            </section>
+            <section className={styles.settingsCard}><h3>Project indexing</h3><p>Queue and sync controls are independent of Save Client. They use the saved project mapping.</p>
+              <ClientHubstaffIndex key={selectedClient.id+':'+selectedClient.hubstaffProjectUrl+':'+selectedClient.portalEnabled+':'+selectedClient.aiEnabled}
+                clientId={selectedClient.id} projectUrl={selectedClient.hubstaffProjectUrl} enabled={selectedClient.portalEnabled && selectedClient.aiEnabled}
+                mappingChanged={draft.hubstaffProjectUrl.trim()!==(selectedClient.hubstaffProjectUrl || '').trim()}/>
+            </section>
+            <section className={styles.settingsCard}><h3>Make automation · portal-wide</h3><p>This is a portal-wide integration, not a saved client mapping. A test sends a real event to the configured Make scenario; Save Client does not run it.</p>
+              <p role={makeConnection.state==='error'?'alert':'status'}>{makeConnection.message}</p>
+              <button type="button" disabled={Boolean(busy)} onClick={testMakeConnection}>{busy==='make-test'?'Testing…':'Send Make connection test'}</button>
+            </section>
+          </>}
+          {tab==='activity' && <section className={styles.settingsCard}><h3>Workspace activity</h3><div className={styles.accountStats}>
+            <div><strong>{number(selectedClient.memberCount)}</strong><span>Workspace logins</span></div><div><strong>{number(selectedClient.conversationCount)}</strong><span>ChatKit conversations</span></div>
+            <div><strong>{number(selectedClient.approvedKnowledge)}</strong><span>Approved client sources</span></div><div><strong>{number(selectedClient.pendingKnowledge)}</strong><span>Pending client sources</span></div></div>
+            <p>Conversation totals include this client’s saved ChatKit threads across all members, in Work and General modes. They exclude the private AOC admin assistant and legacy workspace snapshots. Conversation content is not shown.</p>
+            <p>Latest thread creation or recorded AI request: {selectedClient.lastActivityAt?dateLabel(selectedClient.lastActivityAt):selectedClient.conversationCount==null?'Tracking unavailable':'None recorded'}.</p>
+            <p>Presence is separate: {presenceTitle(selectedClient)}. Activity timestamps are displayed in your browser’s local time.</p>
+            <div className={styles.memberList}>{selectedClient.members.map((member,index)=><div key={index}><span>{initials(member.name || member.username)}</span>
+              <p><strong>{member.name || member.username}</strong><small>@{member.username || 'portal-user'}</small></p><b>{String(member.role || 'member').replaceAll('_',' ')}</b></div>)}</div>
+            <Link href={'/admin/audit?clientId='+selectedClient.id} prefetch={false}>Open this client’s recorded audit activity</Link>
+          </section>}
+        </div>
+      </form>:<div className={styles.noClient}><Image src={aocIcon} alt=""/><h2>{clients.length?'Choose an available client':'Create your first client account'}</h2>
+        <p>{clients.length?'The requested client is not in this list. Select an existing client to continue.':'No client records exist yet.'}</p>
+        <button type="button" onClick={()=>createDialogRef.current?.showModal()}>Add client</button></div>}</section>
+    </section>}
       <dialog className={styles.createDialog} ref={createDialogRef}>
         <form onSubmit={createClient}>
           <header>
@@ -664,7 +410,6 @@ export default function AdminDashboard({ initialData }) {
             <label><span>Client name</span><input name="name" maxLength="120" required placeholder="ChurchBanners" /></label>
             <label><span>Username</span><input name="username" minLength="3" maxLength="50" required pattern="[a-z0-9][a-z0-9._-]{2,49}" placeholder="churchbanners" /></label>
             <label className={styles.dialogWide}><span>Temporary password</span><input name="password" type="password" minLength="12" maxLength="128" required autoComplete="new-password" placeholder="At least 12 characters" /></label>
-            <label className={styles.dialogWide}><span>Monthly requests</span><input name="monthlyPromptLimit" type="number" min="1" max="100000" defaultValue="150" required /></label>
             <label className={styles.dialogWide}>
               <span>Approved website URL</span>
               <input
@@ -682,17 +427,7 @@ export default function AdminDashboard({ initialData }) {
                 placeholder="https://tasks.hubstaff.com/app/organizations/14952/projects/803599"
               />
             </label>
-            <label className={styles.dialogWide}>
-              <span>Monthly Hubstaff hours limit</span>
-              <input
-                name="hubstaffMonthlyHoursLimit"
-                type="number"
-                min="0.01"
-                max="100000"
-                step="0.01"
-                placeholder="Optional when Hubstaff has no monthly budget"
-              />
-            </label>
+            <label className={styles.dialogWide}><span>Monthly Hubstaff hours fallback</span><input name="hubstaffMonthlyHoursLimit" type="number" min="0.01" max="100000" step="0.01"/><small>Optional when Hubstaff has no hours budget. Separate from AI usage.</small></label>
           </div>
           {createError ? <p className={styles.dialogError} role="alert">{createError}</p> : null}
           <footer>
@@ -703,6 +438,5 @@ export default function AdminDashboard({ initialData }) {
           </footer>
         </form>
       </dialog>
-    </div>
-  );
+  </AdminShell>;
 }

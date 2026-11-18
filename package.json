@@ -28,7 +28,15 @@
     "library:migrate": "node --env-file=.env.local scripts/migrate-library.mjs",
     "builder:migrate": "node --env-file=.env.local scripts/migrate-builder.mjs",
     "usage:migrate": "node --env-file=.env.local scripts/migrate-usage.mjs",
+    "usage-controls:migrate": "node --env-file=.env.local scripts/migrate-ai-usage-controls.mjs",
     "ai-costs:migrate": "node --env-file=.env.local scripts/migrate-ai-costs.mjs",
+    "credits:migrate": "node --env-file=.env.local scripts/migrate-ai-credits.mjs",
+    "test:credits:database": "node --env-file=.env.local scripts/check-credits-database.mjs",
+    "test:client-readiness": "node --test tests/client-readiness.test.mjs tests/credits-pricing.test.mjs tests/credits-routes.test.mjs",
+    "test:client-readiness:ui": "playwright test --config tests/client-readiness/playwright.config.mjs",
+    "test:admin-readiness": "node --test tests/admin-readiness.test.mjs tests/credits-routes.test.mjs tests/credits-pricing.test.mjs",
+    "test:admin-readiness:database": "node --env-file=.env.local scripts/check-admin-readiness-database.mjs",
+    "test:admin-readiness:ui": "playwright test --config tests/admin-readiness/playwright.config.mjs",
     "test:ai-costs:database": "node --env-file=.env.local scripts/check-ai-costs-database.mjs",
     "site-ai:migrate": "node --env-file=.env.local scripts/migrate-site-ai.mjs",
     "sources:migrate": "node --env-file=.env.local scripts/migrate-drive-sources.mjs",
@@ -72,7 +80,8 @@
     "test:employee:http": "npm run test:internal-user:http --",
     "test:employee:secrets": "npm run test:internal-user:secrets",
     "test": "node --test \"tests/*.test.mjs\"",
-    "test:http": "node scripts/check-builder-http.mjs"
+    "test:http": "node scripts/check-builder-http.mjs",
+    "test:ai-reset:database": "node --env-file=.env.local scripts/check-ai-fresh-reset-database.mjs"
   },
   "engines": {
     "node": ">=22"

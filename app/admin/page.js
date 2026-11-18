@@ -7,6 +7,7 @@ import AdminDashboard from "@/components/admin/admin-dashboard";
 import SignOutButton from "@/components/auth/sign-out-button";
 import loginStyles from "@/components/auth/login.module.css";
 import { loadAdminDashboard } from "@/lib/admin-data";
+import {adminView} from "@/lib/admin-navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export const metadata = {
   description: "Manage AOC client portal access and AI allowances",
 };
 
-export default async function AdminPage() {
+export default async function AdminPage({searchParams}) {
   let dashboard;
 
   try {
@@ -45,5 +46,6 @@ export default async function AdminPage() {
     );
   }
 
-  return <AdminDashboard initialData={dashboard} />;
+  const params=await searchParams;
+  return <AdminDashboard initialData={dashboard} view={adminView(params?.view)} />;
 }

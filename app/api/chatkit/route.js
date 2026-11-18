@@ -58,6 +58,7 @@ async function handlePOST(request) {
       if (savedMode !== mode) return Response.json({ error: "This conversation belongs to the other chat mode. Reload and try again." }, { status: 409, headers: noStore });
     }
     const run = async (send = () => {}) => {
+    try {
     const needsConversationContext = threadId && ((mode === "work" && hubstaffConversationContextRequested(payload))
       || (isReplyRequest(payload) && !chatKitInputText(payload)));
     if (needsConversationContext) send("context");
@@ -137,7 +138,7 @@ async function handlePOST(request) {
         403: "The assistant is unavailable for this account. Please refresh the page.",
         404: "This conversation is no longer available.",
         409: "A reply is already running in this conversation. Please wait and try again.",
-        429: "Your account has reached its monthly AI allowance. Contact Always Open Commerce.",
+        429: "The AI provider is busy or its quota was reached. Wait a moment and retry, or contact Always Open Commerce.",
       };
       console.error("ChatKit backend request failed", { status: upstream.status });
       return Response.json({ error: uploadMessage || providerMessage || messages[upstream.status] || "The assistant could not connect. Please try again shortly." }, {
@@ -153,13 +154,31 @@ async function handlePOST(request) {
       status: upstream.status,
       headers: { ...noStore, "Content-Type": contentType },
     });
+    } catch (error) {
+      // The workflow starts its response before preparation finishes. Convert
+      // known failures here so SSE and ordinary requests share safe diagnostics.
+      return chatFailureResponse(error);
+    }
     };
     if (request.headers.get("x-aoc-workflow") === "1" && isReplyRequest(payload)) {
       return streamWithWorkflow(run);
     }
     return await run();
   } catch (error) {
-    if (error instanceof DriveSourceError) return Response.json({ error: error.message, code: error.code }, { status: error.status, headers: noStore });
+    return chatFailureResponse(error);
+  }
+}
+
+function chatFailureResponse(error) {
+    if (error instanceof DriveSourceError) {
+      console.warn("ChatKit company guidance unavailable", {code:error.code});
+      const changed=["source_revision_changed","source_connection_changed"].includes(error.code);
+      return Response.json({
+        error:changed ? "The assistant's company guidance changed while loading. Please try again."
+          : "The assistant needs an administrator to restore its company guidance connection. Please contact Always Open Commerce.",
+        code:changed ? "company_guidance_changed" : "company_guidance_unavailable",
+      }, {status:changed ? 409 : 503,headers:noStore});
+    }
     const known = requestSecurityErrorResponse(error)
       || (error?.publicDetails ? portalErrorResponse(error) : null);
     if (known) {
@@ -168,5 +187,4 @@ async function handlePOST(request) {
     }
     console.error("ChatKit proxy failed", { name: error?.name });
     return Response.json({ error: "The assistant connection was interrupted. Please try again." }, { status: 503, headers: noStore });
-  }
 }

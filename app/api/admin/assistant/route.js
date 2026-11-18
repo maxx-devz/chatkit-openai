@@ -94,7 +94,7 @@ function selectedClientContext(client, provider) {
     "Verified portal snapshot from the AOC database:",
     `- Portal access: ${client.portalEnabled ? "enabled" : "disabled"}`,
     `- AI assistant: ${client.aiEnabled ? "enabled" : "disabled"}`,
-    `- Current monthly AI usage: ${client.requestsUsed} of ${client.monthlyPromptLimit} requests (${client.requestsRemaining} remaining)`,
+    `- Recorded AI chat requests this UTC month: ${client.requestsUsed}. No portal monthly request cap is enforced.`,
     `- Portal members: ${client.memberCount}`,
     `- Saved client conversations: ${client.conversationCount}`,
     `- Knowledge records: ${client.approvedKnowledge} approved, ${client.pendingKnowledge} pending`,

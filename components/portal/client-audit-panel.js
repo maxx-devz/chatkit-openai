@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import styles from './audit-view.module.css';
 
-const label = action => String(action || '').replaceAll(/[._]/g, ' ');
+import {auditActionLabel as label} from '@/lib/portal-presentation';
 const tokens = value => value === null || value === undefined ? 'Unknown' : Number(value).toLocaleString();
 const date = value => new Date(value).toLocaleString();
 
@@ -26,7 +26,7 @@ export default function ClientAuditPanel({ clientId }) {
   useEffect(() => { Promise.resolve().then(() => load()); }, [clientId, load]);
   const pagination = data?.pagination;
   return <section className={styles.section} id="client-audit" aria-labelledby="client-audit-title">
-    <h2 id="client-audit-title">Client Admin Audit Log</h2>
+    <h2 id="client-audit-title">Workspace activity</h2>
     <p>Changes and AI usage for this client only. Prompts, responses, and credentials are never shown.</p>
     {error && <p role="alert" className={styles.notice}>{error}</p>}
     {!data && !error && <p role="status">Loading audit history…</p>}
@@ -34,7 +34,7 @@ export default function ClientAuditPanel({ clientId }) {
       <section className={styles.section} aria-labelledby="client-activity-title">
         <h2 id="client-activity-title">Account & document activity</h2>
         <div className={styles.scroll}><table className={styles.table}><thead><tr>
-          <th>When</th><th>User</th><th>Action</th><th>Target</th>
+          <th>When (local time)</th><th>User</th><th>Action</th><th>Target</th>
         </tr></thead><tbody>{data.events.rows.map(event => <tr key={`${event.kind}-${event.id}`}>
           <td>{date(event.occurred_at)}</td><td>{event.actor_name}</td><td>{label(event.action)}</td>
           <td>{event.target_name}</td>
@@ -48,7 +48,7 @@ export default function ClientAuditPanel({ clientId }) {
       <section className={styles.section} aria-labelledby="client-usage-title">
         <h2 id="client-usage-title">AI token usage</h2>
         <div className={styles.scroll}><table className={styles.table}><thead><tr>
-          <th>When</th><th>User</th><th>Action</th><th>Result</th><th>Model</th>
+          <th>When (local time)</th><th>User</th><th>Action</th><th>Result</th><th>Model</th>
           <th>Input</th><th>Output</th><th>Total</th>
         </tr></thead><tbody>{data.usage.rows.map(event => <tr key={event.request_id}>
           <td>{date(event.started_at)}</td><td>{event.actor_name}</td><td>{label(event.action)}</td>

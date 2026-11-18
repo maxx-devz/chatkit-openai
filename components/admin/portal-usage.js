@@ -4,27 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import styles from "./portal-usage.module.css";
 import { providerBillingUrl, providerStatus } from "@/lib/openai-issues";
 import AiSpending from "./ai-spending";
+import ClearAiUsageHistory from "./clear-ai-usage-history";
 
 const number = value => new Intl.NumberFormat().format(Number(value) || 0);
-
-function remainingPercent(remaining, allowance) {
-  const limit = Math.max(0, Number(allowance) || 0);
-  return limit ? Math.min(100, Math.max(0, (Number(remaining) / limit) * 100)) : 0;
-}
-
-function CapacityBar({ allowance, label, remaining }) {
-  const percent = remainingPercent(remaining, allowance);
-  return (
-    <div
-      className={styles.capacityBar}
-      aria-label={label}
-      aria-valuemax={allowance}
-      aria-valuemin="0"
-      aria-valuenow={remaining}
-      role="progressbar"
-    ><i style={{ width: `${percent}%` }} /></div>
-  );
-}
 
 export default function PortalUsage() {
   const [snapshot, setSnapshot] = useState({ data: null, error: "" });
@@ -76,17 +58,15 @@ export default function PortalUsage() {
     ? { code: "credential_unreadable", title: "Saved provider key needs attention", message: data.providerCredentialMessage }
     : providerStatus(data?.apiStatus?.code, provider);
   const enabledClients = data?.clients.filter(client => client.enabled) || [];
-  const combinedAllowance = enabledClients.reduce((sum, client) => sum + client.allowance, 0);
-  const combinedRemaining = enabledClients.reduce((sum, client) => sum + client.remaining, 0);
-  const combinedUsed = Math.max(0, combinedAllowance - combinedRemaining);
+  const combinedUsed = (data?.clients || []).reduce((sum,client)=>sum+client.used,0);
   const accountStatus = apiStatus.code === "ready"
-    ? "Available"
+    ? "Last request succeeded"
     : apiStatus.code === "unknown" ? "Not checked" : "Attention needed";
 
   return (
     <section className={styles.panel} id="portal-usage" aria-labelledby="portal-usage-title">
       <div className={styles.heading}>
-        <div><h2 id="portal-usage-title">AI request capacity</h2><p>Live portal allowances and the latest recorded {providerLabel} connection status.</p></div>
+        <div><h2 id="portal-usage-title">AI chat usage & provider status</h2><p>Recorded chat activity and the latest {providerLabel} API result. No portal monthly request cap is enforced.</p></div>
         <button type="button" onClick={() => refreshRef.current?.()}>Refresh usage</button>
       </div>
       {error && <p className={styles.error} role="alert">{error} {data ? "The figures below are from the last successful refresh." : ""}</p>}
@@ -102,12 +82,7 @@ export default function PortalUsage() {
         </div>
 
         <div className={styles.metrics}>
-          <div className={styles.capacityMetric}>
-            <span>Combined client capacity</span>
-            <strong>{number(combinedRemaining)} left</strong>
-            <small>{number(combinedUsed)} of {number(combinedAllowance)} requests used this UTC month</small>
-            <CapacityBar allowance={combinedAllowance} label="Combined client requests remaining" remaining={combinedRemaining} />
-          </div>
+          <div><span>Client AI chats this UTC month</span><strong>{number(combinedUsed)} recorded</strong><small>Cleared chat activity is excluded. No monthly request cap.</small></div>
           <div>
             <span>AI-enabled clients</span>
             <strong>{number(enabledClients.length)}</strong>
@@ -116,33 +91,33 @@ export default function PortalUsage() {
           <div>
             <span>{providerLabel} API status</span>
             <strong>{accountStatus}</strong>
-            <small>Provider credits are separate from portal request allowances</small>
+            <small>Provider availability and quotas are managed by the selected provider</small>
           </div>
         </div>
 
         {data.statusTrackingReady === false && <p className={styles.notice}>API status setup is incomplete. Run <code>npm run usage:migrate</code> against this deployment&apos;s database, then refresh.</p>}
 
         <div className={styles.clientCapacity}>
-          <h3>Client monthly allowances</h3>
-          <p>Each bar shows remaining portal requests. It updates after a completed or failed request.</p>
+          <h3>Client AI chat activity</h3>
+          <p>Recorded activity updates after chat requests finish. There is no monthly portal request ceiling.</p>
           <div className={styles.capacityList}>
             {data.clients.map((client, index) => (
               <article key={`${client.name}-${index}`} className={!client.enabled ? styles.paused : ""}>
                 <div>
                   <strong>{client.name}</strong>
-                  <span>{client.enabled ? `${number(client.remaining)} requests left` : "AI access paused"}</span>
+                  <span>{client.enabled ? `${number(client.used)} recorded AI chats` : "AI access paused"}</span>
                 </div>
-                <CapacityBar allowance={client.allowance} label={`${client.name} monthly requests remaining`} remaining={client.enabled ? client.remaining : 0} />
-                <small>{number(client.used)} used · {number(client.allowance)} monthly limit</small>
+                <small>No monthly request cap</small>
               </article>
             ))}
           </div>
           {data.clients.length === 0 && <p>No client accounts yet.</p>}
         </div>
 
-        <p className={styles.note}>These progress bars represent request limits configured inside this portal, not the provider account&apos;s cash or free-request balance. Requests can use different models, tools, and amounts of work.</p>
-        <p className={styles.updated}>Updated {new Date(data.fetchedAt).toLocaleTimeString()}. Refreshes every 15 seconds while visible. Other applications using the same {providerLabel} account are not part of these portal allowances.</p>
+        <p className={styles.note}>Usage counts describe recorded chat activity. Costs and credits are reported separately; provider quotas still apply.</p>
+        <p className={styles.updated}>Updated {new Date(data.fetchedAt).toLocaleTimeString()}. Refreshes every 15 seconds while visible. Other applications using the same {providerLabel} account are not included in this activity.</p>
       </>}
+      {data && <ClearAiUsageHistory clients={data.clients}/>}
       <AiSpending />
     </section>
   );

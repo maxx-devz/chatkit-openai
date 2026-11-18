@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect,useRef,useState } from 'react';
 
 import aocLogo from '@/aoc-logo.png';
 import styles from './admin-dashboard.module.css';
@@ -16,16 +16,15 @@ const ICONS = {
 };
 
 const NAV_ITEMS = [
-  ['overview', 'Overview', '/admin#overview', 'overview'],
-  ['activity', 'AI usage', '/admin#portal-usage', 'usage'],
+  ['overview', 'Overview', '/admin', 'overview'],
+  ['clients', 'Clients', '/admin?view=clients', 'clients'],
+  ['activity', 'AI Usage', '/admin?view=usage', 'usage'],
+  ['activity', 'AI Pricing & Credits', '/admin/credits', 'credits'],
   ['shield', 'Audit Log', '/admin/audit', 'audit'],
-  ['clients', 'Client controls', '/admin#clients', 'clients'],
-  ['spark', 'AI assistant', '/admin#assistant', 'assistant'],
-  ['spark', 'Assistant settings', '/builder', 'builder'],
-  ['shield', 'Source connections', '/admin/sources', 'sources'],
-  ['activity', 'Project search index', '/admin/hubstaff-index', 'hubstaff-index'],
-  ['activity', 'AI allowances', '/admin#ai-controls', 'allowances'],
-  ['shield', 'Access & security', '/admin#security', 'security'],
+  ['spark', 'AI Assistant', '/admin?view=assistant', 'assistant'],
+  ['spark', 'Assistant Settings', '/admin/settings', 'builder'],
+  ['shield', 'Source Connections', '/admin/sources', 'sources'],
+  ['shield', 'Access & Security', '/admin?view=security', 'security'],
 ];
 
 function Icon({ name }) {
@@ -39,14 +38,21 @@ function initials(value) {
 
 export default function AdminSidebar({ admin, active = 'overview' }) {
   const [open, setOpen] = useState(false);
+  const toggle=useRef(null),aside=useRef(null);
+  useEffect(()=>{if(!open)return;aside.current?.querySelector('button')?.focus();
+    const key=event=>{if(event.key==='Escape'){setOpen(false);toggle.current?.focus();}
+      if(event.key==='Tab'){const items=[...aside.current.querySelectorAll('a,button')],first=items[0],last=items.at(-1);
+        if(event.shiftKey && document.activeElement===first){event.preventDefault();last?.focus();}
+        else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first?.focus();}}};
+    document.addEventListener('keydown',key);return()=>document.removeEventListener('keydown',key);},[open]);
   return <>
-    <button type="button" className={styles.mobileNavButton} aria-label="Open administrator menu"
+    <button ref={toggle} type="button" className={styles.mobileNavButton} aria-label="Open administrator menu"
       aria-controls="admin-sidebar" aria-expanded={open} onClick={() => setOpen(true)}>
       <span aria-hidden="true">☰</span>
     </button>
     {open && <button type="button" className={styles.mobileNavBackdrop}
       aria-label="Close administrator menu" onClick={() => setOpen(false)} />}
-    <aside id="admin-sidebar" className={`${styles.sidebar} ${open ? styles.sidebarOpen : ''}`}>
+    <aside ref={aside} id="admin-sidebar" role={open?'dialog':undefined} aria-modal={open || undefined} aria-label={open?'Administrator navigation':undefined} className={`${styles.sidebar} ${open ? styles.sidebarOpen : ''}`}>
       <button type="button" className={styles.mobileCloseButton} aria-label="Close administrator menu"
         onClick={() => setOpen(false)}>×</button>
       <div className={styles.brand}>
@@ -54,15 +60,15 @@ export default function AdminSidebar({ admin, active = 'overview' }) {
         <span>Administrator Portal</span>
       </div>
       <nav aria-label="Administrator portal">
-        {NAV_ITEMS.map(([icon, label, href, id]) => <Link key={id} href={href}
+        {NAV_ITEMS.map(([icon, label, href, id]) => <Link key={id} href={href} prefetch={false} title={label}
           className={active === id ? styles.activeNav : undefined}
           aria-current={active === id ? 'page' : undefined} onClick={() => setOpen(false)}>
           <Icon name={icon} />{label}
         </Link>)}
       </nav>
       <div className={styles.sidebarStatus}>
-        <span><i /> Production controls</span>
-        <p>Changes apply immediately to the connected database.</p>
+        <span><i /> Connected database</span>
+        <p>Local pages may use shared data. Saved changes apply to the configured database.</p>
       </div>
       <div className={styles.adminIdentity}>
         <span>{initials(admin?.name)}</span>

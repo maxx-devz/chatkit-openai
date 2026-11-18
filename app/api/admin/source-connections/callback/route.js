@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { resolveAdminContext } from "@/lib/admin-data";
-import { driveConfiguration } from "@/lib/drive-source-policy";
+import { driveConfiguration, driveCallbackFailureCode } from "@/lib/drive-source-policy";
 import { finishDriveConnection } from "@/lib/drive-source-service";
 
 export const runtime = "nodejs";
@@ -28,7 +28,10 @@ export async function GET(request) {
     }
   } catch (error) {
     // Never echo OAuth codes, tokens, Google payloads, or provider error objects.
-    result.searchParams.set("connection", error?.code === "wrong_google_account" ? "wrong_account" : "failed");
+    const code = driveCallbackFailureCode(error);
+    console.warn("Google Drive callback failed " + JSON.stringify({ code }));
+    result.searchParams.set("connection", code === "wrong_google_account" ? "wrong_account"
+      : code === "google_client_rejected" ? "client_rejected" : "failed");
   }
   return new Response(null, { status: 303, headers: { Location: result.href, "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" } });
 }

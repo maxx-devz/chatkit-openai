@@ -76,6 +76,46 @@ were changed. Browser UI verification was not performed.
 
 ## Private AI source test
 
+### Chat blocked by unreadable prepared guidance
+
+An enabled company-knowledge publication is required guidance. A working Hubstaff
+index does not bypass a failed source check. Chat preparation now returns a safe
+administrator-action message through both JSON and SSE instead of hiding the
+source failure behind a generic connection interruption. Internal document names,
+keys and provider diagnostics are not sent to clients.
+
+For `drive_token_unreadable`, the saved Drive refresh token cannot be decrypted
+with the configured `GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY`. Restore the original
+stable key or reconnect Drive through the intended deployment's `/admin/sources`.
+Deployments sharing this database must use the same Drive encryption key. Restart
+the local server if its environment changed before reconnecting; keep the key
+unchanged afterward. A successful callback updates the stored connection time.
+If that time does not change, check the callback's success/error message and that
+the browser used the intended deployment. Then run `npm run sources:sync` and
+confirm a fresh ready source pack. Do not disable required guidance or serve a
+failed/stale pack merely to make chat respond.
+
+Synchronization replaces unreadable cached ciphertext after a successful authorized
+read, even when the source revision is unchanged. The unchanged-corpus optimization
+only reuses a cache that decrypted successfully. The portal also observes safe
+preparation-error events before ChatKit handles them, avoiding an extra generic
+connection banner above ChatKit's specific error. No provider call is needed to
+verify this recovery path.
+
+The callback URL's `connection=connected` flag alone is not a current access
+check. The admin screen shows a success notice only after a verified server
+response. Checking again clears old verified status immediately, and a failed
+check keeps discovery/synchronization disabled. The saved-authorization timestamp
+is visible separately. Callback failures log only an allowlisted failure code,
+never authorization codes, token values or provider error payloads.
+
+Google `401 invalid_client` is a separate OAuth application-credential problem:
+check the matching Web application's `GOOGLE_DRIVE_CLIENT_ID` and
+`GOOGLE_DRIVE_CLIENT_SECRET`. Changing the Drive encryption key does not fix
+it. The callback now reports `client_rejected` with matching admin setup guidance.
+Save corrected credentials only in the intended deployment; restart local
+`npm run dev` after changing `.env.local`, then complete Google consent again.
+
 The **Private AI source test** panel defaults to **Automatic parent sources**:
 
 1. Ask a question; do not select individual files or provide new source links.

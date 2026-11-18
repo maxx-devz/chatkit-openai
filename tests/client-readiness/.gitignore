@@ -1,0 +1,4 @@
+output/
+ui/.next/
+ui/next-env.d.ts
+ui/AGENTS.md

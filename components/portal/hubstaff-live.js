@@ -3,6 +3,8 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 import styles from "./client-portal.module.css";
+import Link from "next/link";
+import {CLIENT_ASSISTANT_NAME,referenceColumn,workColumns,orderedWorkflowColumns} from "@/lib/portal-presentation";
 
 const HubstaffContext = createContext(null);
 const REFRESH_INTERVAL_MS = 30_000;
@@ -25,7 +27,7 @@ function formatMoney(value, currency = "USD") {
 }
 
 function formatRemainingTime(hours, minutes) {
-  if (Number.isFinite(Number(minutes)) && Number(minutes) < 60) {
+  if (minutes != null && Number.isFinite(Number(minutes)) && Number(minutes) < 60) {
     return { value: String(Math.max(0, Number(minutes))), suffix: "min" };
   }
   return { value: formatHours(hours), suffix: "hrs" };
@@ -258,7 +260,8 @@ export function HubstaffMetrics() {
     const showDerivedTime = Boolean(
       costBudget
       && hours.remaining === null
-      && Number.isFinite(Number(costBudget.remainingHours)),
+      && costBudget.remainingHours != null
+    && Number.isFinite(Number(costBudget.remainingHours)),
     );
     const showCostBudget = Boolean(costBudget && hours.remaining === null && !showDerivedTime);
     const budgetUsed = hours.budgetSpent ?? hours.used;
@@ -267,7 +270,7 @@ export function HubstaffMetrics() {
       : null;
     const workflowColumns = Array.isArray(workflow?.columns) ? workflow.columns : [];
     const activeTasks = workflowColumns
-      .filter((column) => column.stage !== "done")
+      .filter((column) => column.stage !== "done" && !referenceColumn(column))
       .reduce((total, column) => total + column.taskCount, 0);
     const reviewTasks = workflowColumns
       .filter((column) => column.stage === "review")
@@ -344,16 +347,17 @@ export function HubstaffMetrics() {
   return metrics.map((metric) => <LiveMetricCard metric={metric} key={metric.label} />);
 }
 
-export function HubstaffMonthGlance() {
+export function HubstaffMonthGlance({detailed=false}) {
   const { data, status, error, projectConfigured, workflow } = useHubstaff();
   const hours = data?.hours;
   const costBudget = data?.costBudget;
   const activeWorkflowTasks = (workflow?.columns || [])
-    .filter((column) => column.stage !== "done")
+    .filter((column) => column.stage !== "done" && !referenceColumn(column))
     .reduce((total, column) => total + column.taskCount, 0);
   const showDerivedTime = Boolean(
     costBudget
     && hours?.remaining === null
+    && costBudget.remainingHours != null
     && Number.isFinite(Number(costBudget.remainingHours)),
   );
   const showCostBudget = Boolean(costBudget && hours?.remaining === null && !showDerivedTime);
@@ -380,6 +384,11 @@ export function HubstaffMonthGlance() {
         <h2 id="time-overview-title">This Month at a Glance</h2>
         {refreshed ? <small className={styles.liveBadge}>Updated {refreshed}</small> : null}
       </header>
+      {detailed && data && <div className={styles.usageExplanation}>
+        <p><strong>Reporting period:</strong> {data.source?.monthStart || "Not reported"} through {data.source?.monthEnd || "Not reported"} / {data.source?.timeZone || "Timezone not reported"}.</p>
+        <p>Tracked time and available Hubstaff budgets are shown for this project. A client hours fallback is used only when Hubstaff supplies no hours limit.</p>
+        <small>The update badge uses your browser&apos;s local time. Hubstaff activity totals can be delayed.</small>
+      </div>}
       <div className={styles.glanceStats}>
         <div><strong>{formatHours(hours?.used)}</strong><span>Hours Used</span></div>
         <div>
@@ -415,7 +424,7 @@ export function HubstaffMonthGlance() {
   );
 }
 
-export function HubstaffProjectProgress() {
+export function HubstaffProjectProgress({canUseAi=false}) {
   const {
     data,
     status,
@@ -427,10 +436,10 @@ export function HubstaffProjectProgress() {
   } = useHubstaff();
   const [openColumnId, setOpenColumnId] = useState("");
   const [columnTasks, setColumnTasks] = useState({});
-  const columns = Array.isArray(workflow?.columns) ? workflow.columns : [];
-  const activeCount = columns
-    .filter((column) => column.stage !== "done")
+  const columns = orderedWorkflowColumns(Array.isArray(workflow?.columns) ? workflow.columns : []);
+  const activeCount = workColumns(columns)
     .reduce((total, column) => total + column.taskCount, 0);
+  const reviewCount=columns.filter(column=>column.stage==="review").reduce((sum,column)=>sum+column.taskCount,0);
   const maxColumnCount = Math.max(
     1,
     ...columns.filter((column) => column.stage !== "done").map((column) => column.taskCount),
@@ -518,12 +527,13 @@ export function HubstaffProjectProgress() {
               </a>
               <span>
                 {workflowStatus === "ready" || workflowStatus === "refreshing"
-                  ? `${activeCount} active tasks across ${columns.length} workflow stages`
+                  ? `${activeCount} active work tasks · Notes and Ideas are shown separately below`
                   : "Loading the latest workflow stages"}
               </span>
             </div>
             <a href={data.project.url} target="_blank" rel="noreferrer">Open Hubstaff</a>
           </div>
+          {reviewCount>0 && <p className={styles.reviewNotice}><strong>{reviewCount} {reviewCount===1?"task is":"tasks are"} awaiting client review.</strong> Expand the review stage below to open the tasks. Opening a task does not approve it.</p>}
           {workflowStatus === "loading" || workflowStatus === "waiting" ? (
             <div className={styles.workflowSkeleton} aria-label="Loading workflow">
               {Array.from({ length: 4 }, (_, index) => <i key={index} />)}
@@ -539,13 +549,14 @@ export function HubstaffProjectProgress() {
                 const taskState = columnTasks[column.id];
                 const loadedCount = taskState?.status === "ready" ? taskState.tasks.length : null;
                 const isDone = column.stage === "done";
+                const isReference=referenceColumn(column);
                 const displayedCount = isDone
                   ? taskState?.status === "loading"
                     ? "Loading this month"
                     : loadedCount === null
                       ? "Load this month"
                       : `${loadedCount} this month`
-                  : `${column.taskCount} ${column.taskCount === 1 ? "task" : "tasks"}`;
+                  : `${column.taskCount} ${isReference?"reference items":column.taskCount === 1 ? "task" : "tasks"}`;
                 const progress = isDone
                   ? 100
                   : Math.max(
@@ -566,7 +577,7 @@ export function HubstaffProjectProgress() {
                       <span className={styles.workflowCopy}>
                         <strong>{column.name}</strong>
                         <small>{displayedCount}</small>
-                        {!isDone ? <i><b style={{ width: `${progress}%` }} /></i> : null}
+                        {!isDone && !isReference ? <i><b style={{ width: `${progress}%` }} /></i> : null}
                       </span>
                       <span className={styles.workflowChevron} aria-hidden="true">{isOpen ? "−" : "+"}</span>
                     </button>
@@ -629,14 +640,14 @@ export function HubstaffProjectProgress() {
               })}
             </div>
           ) : null}
-          {columns.length ? (
+          {columns.length && canUseAi ? (
             <div className={styles.taskAssistantPrompt}>
               <span><MetricIcon name="tasks" /></span>
               <div>
                 <strong>Need the full story?</strong>
-                <small>Ask AOC-GPT to summarize progress, blockers, or completed work.</small>
+                <small>Ask {CLIENT_ASSISTANT_NAME} to summarize progress, blockers, or completed work.</small>
               </div>
-              <a href="#ai-assistant">Ask AOC-GPT</a>
+              <Link href="/?view=ai" prefetch={false}>Ask {CLIENT_ASSISTANT_NAME}</Link>
             </div>
           ) : null}
           {data.source?.partial || data.source?.activityLimited || error ? (

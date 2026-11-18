@@ -105,3 +105,30 @@ test("workflow state ignores stale stages when a new prompt begins", () => {
   workflow.finish(second);
   assert.equal(workflow.getSnapshot().closing, true);
 });
+
+test("split preparation errors reach the portal before ChatKit reads the unchanged bytes", async () => {
+  const message='The assistant needs an administrator to restore its company guidance connection.';
+  const wire=workflowMarker('access')+'data: '+JSON.stringify({type:'error',message,allow_retry:true})+'\r\n\r\n';
+  const errors=[],stages=[];
+  const response=new Response(new ReadableStream({start(controller){
+    for(let n=0;n<wire.length;n+=17)controller.enqueue(encoder.encode(wire.slice(n,n+17)));
+    controller.close();
+  }}),{headers:{'Content-Type':'text/event-stream'}});
+  const observed=observeWorkflowStream(response,stage=>stages.push(stage),error=>errors.push(error));
+  const reader=observed.body.getReader();let result='';
+  while(true){const {done,value}=await reader.read();if(done)break;const chunk=new TextDecoder().decode(value);result+=chunk;
+    if(result.includes('"allow_retry":true}\r\n'))assert.deepEqual(errors,[message]);
+  }
+  assert.equal(result,wire);assert.deepEqual(errors,[message]);assert.deepEqual(stages,['access']);
+});
+
+test("oversized lines cannot forge error notifications; UI observers cannot corrupt the stream", async () => {
+  const fake='data: '+JSON.stringify({type:'error',message:'not an independent event'});
+  const valid='data: '+JSON.stringify({type:'error',message:'Safe preparation failure'})+'\n\n';
+  const parts=['data: '+ 'x'.repeat(9000),fake+'\n',valid];
+  const errors=[];
+  const response=new Response(new ReadableStream({start(controller){for(const part of parts)controller.enqueue(encoder.encode(part));controller.close();}}),{headers:{'Content-Type':'text/event-stream'}});
+  const observed=observeWorkflowStream(response,()=>{},message=>{errors.push(message);throw Error('UI observer failed');});
+  assert.equal(await observed.text(),parts.join(''));
+  assert.deepEqual(errors,['Safe preparation failure']);
+});

@@ -7,13 +7,14 @@ import PreparedSourceSettings from "./prepared-source-settings";
 import styles from "./drive-sources.module.css";
 
 const results = {
-  connected: "Google Drive connected. Discover sources to verify folder access.",
   cancelled: "Google authorization was cancelled. Nothing was published.",
   wrong_account: "Use the configured Google account and grant read-only Drive access.",
+  client_rejected: "Google rejected this app's OAuth client credentials. Correct this deployment's matching GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_CLIENT_SECRET, then reconnect. Keep the Drive encryption key unchanged. Existing source publication settings were not changed.",
   failed: "Google authorization could not finish. Check the client, callback URL, consent permissions and test-user settings, then reconnect.",
 };
 
-export default function DriveSources() {
+export default function DriveSources({embedded=false}) {
+  const Container=embedded?"div":"main",Title=embedded?"h2":"h1";
   const [connection, setConnection] = useState(null);
   const [inventory, setInventory] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -25,9 +26,11 @@ export default function DriveSources() {
   const [previewedVersions, setPreviewedVersions] = useState({});
   const [autoRefreshing, setAutoRefreshing] = useState(false);
   const actionInProgress = useRef(false);
+  const connected = connection?.connected === true && connection?.accessVerified === true;
 
   const applyConnectionFailure = useCallback(payload => {
     if (["reconnect_required", "not_connected", "drive_token_unreadable", "google_client_rejected", "root_unavailable"].includes(payload.code)) {
+      setMessage("");
       setConnection(previous => previous ? { ...previous, connected: false, accessVerified: false,
         state: payload.code, connectionMessage: payload.error } : previous);
     }
@@ -43,14 +46,20 @@ export default function DriveSources() {
   useEffect(() => {
     let active = true;
     const status = new URLSearchParams(window.location.search).get("connection");
-    loadStatus().then((payload) => { if (active) { setConnection(payload); if (results[status]) setMessage(results[status]); } })
+    loadStatus().then((payload) => { if (active) {
+      setConnection(payload);
+      if (status === "connected") setMessage(payload.connected === true && payload.accessVerified === true
+        ? "Google Drive authorization and folder access verified."
+        : "Google sign-in returned, but Drive access is not verified. Review the current connection status above.");
+      else if (results[status]) setMessage(results[status]);
+    } })
       .catch((failure) => { if (active) setError(failure.message); })
       .finally(() => { if (active) setBusy(""); });
     return () => { active = false; };
   }, [loadStatus]);
 
   useEffect(() => {
-    if (!connection?.connected) return;
+    if (!connected) return;
     let active = true;
     let inFlight = false;
     let controller;
@@ -71,13 +80,14 @@ export default function DriveSources() {
     const onVisible = () => { if (!document.hidden) refresh(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { active = false; controller?.abort(); clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); };
-  }, [connection?.connected, applyConnectionFailure]);
+  }, [connected, applyConnectionFailure]);
 
   async function action(name, fileId) {
     if (busy) return;
     actionInProgress.current = true;
     setBusy(name); setError(""); setMessage("");
-    if (name === "discover" || name === "disconnect") { setInventory(null); setPreview(null); setPreviewedVersions({}); }
+    if (name === "discover" || name === "disconnect" || name === "check") { setInventory(null); setPreview(null); setPreviewedVersions({}); }
+    if (name === "check") setConnection(previous => previous ? {...previous,connected:false,accessVerified:false,state:"checking",connectionMessage:""} : previous);
     if (name === "preview") setPreview(null);
     try {
       if (name === "check") { setConnection(await loadStatus()); return; }
@@ -88,16 +98,20 @@ export default function DriveSources() {
       if (name === "discover") { setInventory(payload); setPage(0); }
       if (name === "preview") { setPreview(payload); setPreviewedVersions(previous => ({ ...previous, [payload.id]: String(payload.version) })); }
       if (name === "disconnect") { setMessage(payload.message); setConnection(await loadStatus()); }
-    } catch (failure) { setError(failure.message); }
+    } catch (failure) {
+      if (name === "check") setConnection(previous => previous ? {...previous,connected:false,accessVerified:false,state:"verification_failed",
+        connectionMessage:"Current Drive access could not be verified. Check the connection again."} : previous);
+      setError(failure.message);
+    }
     finally { actionInProgress.current = false; setBusy(""); }
   }
 
   const files = (inventory?.files || []).filter((file) => file.path.toLowerCase().includes(query.toLowerCase()));
   const pageFiles = files.slice(page * 25, page * 25 + 25);
   return (
-    <main className={styles.page}>
+    <Container className={styles.page} data-admin-embedded={embedded || undefined}>
       <header className={styles.heading}>
-        <div><Link href="/admin">← AOC Admin</Link><p className={styles.eyebrow}>COMPANY KNOWLEDGE · ADMIN MANAGED</p><h1>Company knowledge</h1>
+        <div><Link href="/admin">← AOC Admin</Link><p className={styles.eyebrow}>COMPANY KNOWLEDGE · ADMIN MANAGED</p><Title>Company knowledge</Title>
           <p>Connect your company Drive once. Publish shared company knowledge for all clients; original documents stay in Drive.</p></div>
         <span className={styles.badge}>Audience-controlled source access</span>
       </header>
@@ -106,24 +120,26 @@ export default function DriveSources() {
         <p>You authorize Google as AOC Admin, not as each client. Credentials remain server-only. Publish the shared company pack below so all clients can ask questions without a Google login. Discovery and preview do not alter Drive sharing or send document content to AI; the private AI test remains separate.</p>
         {connection?.setupMessage && <p className={styles.notice}>{connection.setupMessage}</p>}
         {connection?.configured && <dl><dt>Authorized Google account</dt><dd>{connection.allowedEmail}</dd><dt>OAuth callback</dt><dd><code>{connection.redirectUri}</code></dd>
-          <dt>Connection</dt><dd>{connection.connected && connection.accessVerified ? "Connected as " + connection.email
-            : connection.hasAuthorization ? "Saved authorization - access not verified" : "Not connected"}</dd></dl>}
+          <dt>Connection</dt><dd>{busy === "check" ? "Checking Google Drive access..." : connected ? "Connected as " + connection.email
+            : connection.hasAuthorization ? "Saved authorization - access not verified" : "Not connected"}</dd>
+          {connection.connectedAt && <><dt>Authorization saved</dt><dd>{new Date(connection.connectedAt).toLocaleString()}</dd></>}
+        </dl>}
         {connection?.connectionMessage && <p className={styles.notice} role="status">{connection.connectionMessage}</p>}
         <div className={styles.actions}>
           <button disabled={Boolean(busy) || !connection?.configured} onClick={() => action("connect")}>{connection?.hasAuthorization ? "Reconnect Google Drive" : "Connect Google Drive"}</button>
           <button disabled={Boolean(busy) || !connection?.configured} onClick={() => action("check")}>Check connection</button>
-          <button disabled={Boolean(busy) || !connection?.connected} onClick={() => action("discover")}>Discover / refresh sources</button>
-          {connection?.connected && <button className={styles.secondary} disabled={Boolean(busy)} onClick={() => {
+          <button disabled={Boolean(busy) || !connected} onClick={() => action("discover")}>Discover / refresh sources</button>
+          {connected && <button className={styles.secondary} disabled={Boolean(busy)} onClick={() => {
             if (window.confirm("Disconnect this private Drive test and revoke its Google authorization?")) action("disconnect");
           }}>Disconnect</button>}
         </div>
         <p className={styles.small}>Google consent requests read-only Drive access, which Google does not limit to one folder. The server restricts this feature to the configured parent and eligible source descendants. Billing is managed separately in Google Cloud; this page never activates it.</p>
       </section>
       {busy && <p role="status" className={styles.notice}>{busy === "preview" ? "Reading the selected document…" : busy === "discover" ? "Checking accessible source folders and current file metadata…" : "Preparing connection…"}</p>}
-      {autoRefreshing && connection?.connected && <p role="status" className={styles.notice}>Automatically checking parent-folder sources…</p>}
+      {autoRefreshing && connected && <p role="status" className={styles.notice}>Automatically checking parent-folder sources…</p>}
       {error && <p role="alert" className={styles.error}>{error}</p>}
       {message && <p role="status" className={styles.notice}>{message}</p>}
-      <PreparedSourceSettings connected={Boolean(connection?.connected)} onPreview={fileId => action("preview", fileId)} />
+      <PreparedSourceSettings connected={connected} onPreview={fileId => action("preview", fileId)} />
       {inventory && <section className={styles.card} aria-labelledby="inventory-heading">
         <h2 id="inventory-heading">{inventory.rootName} · {inventory.files.length} source candidates</h2>
         <p>Metadata checked {new Date(inventory.checkedAt).toLocaleString()}. This list refreshes every minute while visible. The separate private test checks Drive on demand; normal client/admin chat uses only prepared, audience-approved data.</p>
@@ -141,6 +157,6 @@ export default function DriveSources() {
         <pre className={styles.preview}>{preview.text}</pre>
       </section>}
       {inventory && <DriveSourceAiTest files={inventory.files} rootName={inventory.rootName} previewedVersions={previewedVersions} sourceBusy={busy} onPreview={fileId => action("preview", fileId)} />}
-    </main>
+    </Container>
   );
 }

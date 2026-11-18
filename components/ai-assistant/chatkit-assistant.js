@@ -2,6 +2,7 @@
 
 import { ChatKit, useChatKit } from "@openai/chatkit-react";
 import Script from "next/script";
+import {useAssistantAccess} from "./use-assistant-access";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_COUNT, UPLOAD_ACCEPT } from "@/lib/chatkit-uploads";
 import { isReplyFetch, observeWorkflowStream } from "@/lib/chatkit-workflow";
@@ -194,6 +195,7 @@ function ChatSurface({
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const activeWorkflowRef = useRef(null);
+  const streamErrorShownRef = useRef(false);
   const abortCleanupRef = useRef(null);
   const finishWorkflow = useCallback((outcome = "complete", requestId = null) => {
     if (requestId && activeWorkflowRef.current !== requestId) return;
@@ -205,6 +207,7 @@ function ChatSurface({
   }, [onResponseBusy, workflow]);
   const fetchChatKit = useCallback(async (input, init) => {
     const reply = await isReplyFetch(input, init);
+    if (reply) streamErrorShownRef.current = false;
     const headers = new Headers(input instanceof Request ? input.headers : undefined);
     new Headers(init?.headers).forEach((value, name) => headers.set(name, value));
     headers.set("x-aoc-client", clientId);
@@ -245,6 +248,11 @@ function ChatSurface({
       if (requestWorkflowId && activeWorkflowRef.current === requestWorkflowId) {
         workflow?.advance(requestWorkflowId, stage);
       }
+    }, () => {
+      if (activeWorkflowRef.current !== requestWorkflowId) return;
+      streamErrorShownRef.current = true;
+      setError("");
+      finishWorkflow("error", requestWorkflowId);
     });
   }, [clientId, finishWorkflow, mode, onResponseBusy, refreshAccess, workflow]);
   const { control, setThreadId } = useChatKit({
@@ -289,13 +297,17 @@ function ChatSurface({
     },
     onResponseEnd: () => {
       finishWorkflow("complete");
+      window.dispatchEvent(new Event("aoc:ai-usage-changed"));
       void refreshAccess();
       void onConversationsChanged();
     },
     onError: ({ error: chatError } = {}) => {
+      window.dispatchEvent(new Event("aoc:ai-usage-changed"));
       const cancelled = chatError?.name === "AbortError" || chatError?.cause?.name === "AbortError";
+      const streamErrorShown = streamErrorShownRef.current;
+      streamErrorShownRef.current = false;
       finishWorkflow(cancelled ? "cancelled" : "error");
-      if (!cancelled) {
+      if (!cancelled && !streamErrorShown) {
         setError((previous) => previous || "Chat could not load or finish the request. Please try again.");
       }
     },
@@ -335,13 +347,11 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
   const [tab, setTab] = useState("chat");
   const [mode, setMode] = useState("work");
   const [responseBusy, setResponseBusy] = useState(false);
-  const [access, setAccess] = useState(null);
-  const [accessError, setAccessError] = useState("");
+  const {access,error:accessError,refreshAccess}=useAssistantAccess(clientId);
   const [attempt, setAttempt] = useState(0);
   const [activeThreadId, setActiveThreadId] = useState(null);
   const [threadSelectionVersion, setThreadSelectionVersion] = useState(0);
   const [conversationState, setConversationState] = useState({ loading: true, items: [], error: "" });
-  const accessRequest = useRef(null);
   const conversationRequest = useRef(0);
   const conversationPending = useRef(null);
   const modeRef = useRef("work");
@@ -368,40 +378,6 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
     conversationPending.current = { id: requestId, mode: selectedMode, promise: request };
     return request;
   }, [mode]);
-  const refreshAccess = useCallback(async (signal) => {
-    if (accessRequest.current) return accessRequest.current;
-    const request = (async () => {
-      try {
-        const response = await fetch("/api/ai-access", { cache: "no-store", signal });
-        if (!response.ok) throw new Error("Your assistant access could not be verified. Please refresh or sign in again.");
-        const data = await response.json();
-        if (!signal?.aborted) {
-          setAccess(data.ai);
-          setAccessError("");
-        }
-      } catch (error) {
-        if (!signal?.aborted) setAccessError(error.message);
-      } finally {
-        if (accessRequest.current === request) accessRequest.current = null;
-      }
-    })();
-    accessRequest.current = request;
-    return request;
-  }, []);
-  useEffect(() => {
-    const controller = new AbortController();
-    const refresh = () => { if (!document.hidden) void refreshAccess(controller.signal); };
-    refresh();
-    // Completed replies and failures refresh the allowance immediately. A
-    // minute-by-minute background check is enough between chat turns.
-    const timer = window.setInterval(refresh, 60_000);
-    window.addEventListener("focus", refresh);
-    return () => {
-      controller.abort();
-      window.clearInterval(timer);
-      window.removeEventListener("focus", refresh);
-    };
-  }, [refreshAccess]);
   useEffect(() => {
     setConversationState({ loading: true, items: [], error: "" });
     void loadConversations(mode);
@@ -469,11 +445,6 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
   const blocked = accessError || (!access ? "Checking assistant access…"
     : !access.enabled ? "Your AI assistant is paused. Contact Always Open Commerce to resume access."
       : !domainKey ? "Your assistant is being set up. Please contact Always Open Commerce." : "");
-  const allowanceLimit = Math.max(0, Number(access?.monthlyPromptLimit) || 0);
-  const allowanceRemaining = Math.max(0, Number(access?.requestsRemaining) || 0);
-  const allowancePercent = allowanceLimit
-    ? Math.min(100, (allowanceRemaining / allowanceLimit) * 100)
-    : 0;
   return (
     <div className={styles.root}>
       <div className={styles.modeBar}>
@@ -497,16 +468,7 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
           <button id="chat-tab" role="tab" tabIndex={tab === "chat" ? 0 : -1} aria-selected={tab === "chat"} aria-controls="assistant-chat" type="button" onClick={() => setTab("chat")}>Chat</button>
           <button id="library-tab" role="tab" tabIndex={tab === "library" ? 0 : -1} aria-selected={tab === "library"} aria-controls="assistant-library" type="button" onClick={() => setTab("library")}>Library</button>
         </div>
-        <span className={styles.allowance}>
-          <span>{access ? `${allowanceRemaining} requests left this month` : "Private workspace"}</span>
-          {access && <i
-            aria-label="Monthly AI requests remaining"
-            aria-valuemax={allowanceLimit}
-            aria-valuemin="0"
-            aria-valuenow={allowanceRemaining}
-            role="progressbar"
-          ><b style={{ width: `${allowancePercent}%` }} /></i>}
-        </span>
+        <span className={styles.allowance}>Private workspace</span>
         {tab === "chat" && <button className={styles.reload} type="button" aria-label="Reconnect assistant" disabled={responseBusy} onClick={() => { setAttempt((value) => value + 1); void refreshAccess(); }}>Reconnect</button>}
       </div>
       <div id="assistant-chat" role="tabpanel" aria-labelledby="chat-tab" className={`${styles.content} ${styles.chatPanel}`} hidden={tab !== "chat"}>

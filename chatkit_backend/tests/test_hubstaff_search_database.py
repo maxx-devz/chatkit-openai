@@ -11,7 +11,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from hubstaff_search import search_index
+from hubstaff_search import search_index, index_summary, index_comments
 
 
 @unittest.skipUnless(os.getenv("HUBSTAFF_SEARCH_TEST_DATABASE_URL"),"Opt-in PostgreSQL test")
@@ -56,8 +56,41 @@ class SearchDatabaseTests(unittest.IsolatedAsyncioTestCase):
                 result=await search_index(context(),start="2026-10-01",stop="2026-11-01",order="recent_activity")
                 self.assertEqual([task["id"] for task in result["tasks"]],["6"])
                 self.assertEqual((await search_index(context(),query="notfounduniqueword"))["matchingIndexedTasks"],0)
+                await db.execute("UPDATE portal_hubstaff_search_tasks SET column_name=%s WHERE client_id=1 AND task_id=6",("FOR CLIENT'S REVIEW",))
+                reviewed=await search_index(context(),column="review",status="active")
+                self.assertEqual([task["id"] for task in reviewed["tasks"]],["6"])
+                exact=await search_index(context(),task_id="5")
+                self.assertEqual(exact["tasks"][0]["title"],"Allowed SEO")
+                summary=await index_summary(context())
+                self.assertEqual((summary["totalTasks"],summary["activeTasks"],summary["completedTasks"]),(2,1,1))
+                self.assertEqual({column["name"] for column in summary["columns"]},{"Done","FOR CLIENT'S REVIEW"})
+                await db.execute("""INSERT INTO portal_hubstaff_search_comments
+                    (client_id,task_id,comment_id,content,created_at,seen_generation)
+                    VALUES(1,6,31,'Password: PlainPass123!','2026-10-21',1)""")
+                first=await index_comments(context(),"6",limit=1)
+                self.assertEqual(first["indexedCommentCount"],2)
+                self.assertTrue(first["hasMore"])
+                self.assertEqual(first["comments"][0]["content"],"Certificate repaired")
+                second=await index_comments(context(),"6",limit=1,offset=1)
+                self.assertFalse(second["hasMore"])
+                self.assertNotIn("PlainPass",str(second))
+                await db.execute("""INSERT INTO portal_hubstaff_search_tasks
+                    (client_id,task_id,list_id,title,column_name,done,completed_at,activity_at,fingerprint,seen_generation)
+                    VALUES(1,7,9,'Shipping','Done',TRUE,'2025-01-01','2025-01-01','test7',1),
+                    (2,777,9,'FOREIGN SECRET','Done',TRUE,'2026-01-01','2026-01-01','test777',1)""")
+                await db.execute("UPDATE portal_hubstaff_search_tasks SET activity_at='2030-01-01' WHERE client_id=1 AND task_id=5")
+                latest=await search_index(context(),order="newest_completed")
+                self.assertEqual(latest["tasks"][0]["id"],"7")
+                self.assertEqual((await search_index(context(),order="recent_activity"))["tasks"][0]["id"],"5")
+                foreign=await index_comments(context(),"777")
+                self.assertFalse(foreign["found"])
+                self.assertNotIn("FOREIGN",str(foreign))
                 self.assertFalse((await search_index(context(user="20")))["available"])
+                self.assertFalse((await index_summary(context(user="20")))["available"])
+                self.assertFalse((await index_comments(context(user="20"),"6"))["available"])
                 await db.execute("UPDATE portal_clients SET hubstaff_project_url=%s WHERE id=1",(project+"9",))
                 self.assertFalse((await search_index(context()))["available"])
+                self.assertFalse((await index_summary(context()))["available"])
+                self.assertFalse((await index_comments(context(),"6"))["available"])
         finally:
             await db.close()

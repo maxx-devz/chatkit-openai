@@ -31,6 +31,14 @@ test("Denied access preserves admin inventory but never treats it as authorized 
   assert.equal(result.metadataComplete, false);
 });
 
+test("Legacy worker batches cannot fabricate zero processed counts; recorded zero is distinct from unknown",()=>{
+  const time=new Date();
+  const row=stored({last_batch_at:time,last_batch_tasks:0,last_batch_comments:0});
+  assert.equal(adminIndexProgress(row,scope).lastBatchTasks,null);
+  assert.equal(adminIndexProgress({...row,last_batch_counted_at:time},scope).lastBatchTasks,0);
+  assert.equal(adminIndexProgress({...row,last_batch_counted_at:time,last_batch_comments:15},scope).lastBatchComments,15);
+});
+
 test("A changed project/credential binding cannot show old inventory as current project progress", () => {
   const result = adminIndexProgress(stored({ binding: "old-project-binding" }), scope);
   assert.equal(result.savedTaskCount, 0);
@@ -57,7 +65,8 @@ async function endpoint({ auth = true, origin = true, result = { clientId: "1", 
     adminErrorResponse: () => Response.json({ error: "Sign in again" }, { status: 401 }),
     requestSecurityErrorResponse: e => e.security ? Response.json({ error: "Untrusted origin" }, { status: 403 }) : null,
     readJsonRequest: request => request.json(),
-    adminHubstaffSearchStatus: async () => { calls.push("status"); return { clients: [{ id: "1", savedTaskCount: 190 }] }; },
+    adminHubstaffSearchStatus: async id => { calls.push({statusClientId:id}); return { clients: [{ id: "1", savedTaskCount: 190 }] }; },
+    queueHubstaffSearch: async id => { calls.push({queuedClientId:id}); return {clientId:id,queued:true}; },
     synchronizeHubstaffSearch: async (id, options) => { calls.push({ id, options }); if (error) throw error; return result; },
   };
   globalThis[key] = mocks;
@@ -120,12 +129,38 @@ test("Rate limits and denied access have machine-readable safe backoff codes", a
   }
 });
 
-test("The admin UI uses one managed runner and removes repeated batch clicking", async () => {
-  const source = await readFile(new URL("../components/admin/hubstaff-search-settings.js", import.meta.url), "utf8");
-  assert.match(source, /createHubstaffIndexMonitor/);
+test("Per-client controls replace the standalone index page without embedding paid chat calls", async () => {
+  const source = await readFile(new URL("../components/admin/client-hubstaff-index.js", import.meta.url), "utf8");
+  assert.match(source, /createClientIndexMonitor/);
   assert.match(source, /instance\.stop\(\)/);
-  assert.match(source, /Pause automatic sync/);
-  assert.match(source, /Comments saved in index/);
-  assert.match(source, /records.*not necessarily new records/);
+  assert.match(source, /Start syncing/);
+  assert.match(source, /Discussions completed/);
+  assert.match(source, /Processed counts include updates/);
   assert.doesNotMatch(source, /Sync next batch|setInterval|\/api\/chatkit/);
+  const sidebar=await readFile(new URL("../components/admin/admin-sidebar.js",import.meta.url),"utf8");
+  assert.doesNotMatch(sidebar,/Project search index|\/admin\/hubstaff-index/);
+});
+
+test("Selected-client status validates its ID and queues only after origin and admin checks",async()=>{
+  const {route,calls}=await endpoint();
+  const response=await route.GET(new Request("https://portal.example/api/admin/hubstaff-index?clientId=2"));
+  assert.equal(response.status,200);
+  assert.deepEqual(calls[1],{statusClientId:"2"});
+  calls.length=0;
+  assert.equal((await route.GET(new Request("https://portal.example/api/admin/hubstaff-index?clientId=bad"))).status,400);
+  assert.equal(calls.length,1);
+  assert.equal((await route.GET(new Request("https://portal.example/api/admin/hubstaff-index?clientId=9999999999999999999"))).status,400);
+  calls.length=0;
+  const queued=await route.POST(new Request("https://portal.example/api/admin/hubstaff-index",{
+    method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({clientId:"2",action:"queue"}),
+  }));
+  assert.equal(queued.status,202);
+  assert.deepEqual(calls,["origin","auth",{queuedClientId:"2"}]);
+  for(const settings of [{auth:false},{origin:false}]) {
+    const f=await endpoint(settings);
+    assert.ok([401,403].includes((await f.route.POST(new Request("https://portal.example/api/admin/hubstaff-index",{
+      method:"POST",body:JSON.stringify({clientId:"2",action:"queue"}),
+    }))).status));
+    assert.equal(f.calls.some(call=>call?.queuedClientId),false);
+  }
 });

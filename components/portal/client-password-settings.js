@@ -38,7 +38,8 @@ export default function ClientPasswordSettings({ username }) {
   }
 
   return <section className={styles.panel} id="account-security">
-    <h2>Account security</h2>
+    <h2>Password & sign-in security</h2>
+    <p>Signed in as <strong>{username}</strong>. This page changes your password only; it does not edit company details, permissions or other members.</p>
     <p>Change your password using your current password. If you received a temporary password, change it now.</p>
     <form className={styles.form} onSubmit={changePassword}>
       <label>Current password<input type="password" name="currentPassword" autoComplete="current-password" required maxLength={128} /></label>

@@ -17,6 +17,36 @@
 .mobileNavBackdrop,
 .mobileCloseButton { display: none; }
 
+.content { max-width:1440px; margin:0 auto; }
+.content > [data-admin-embedded] { padding:0; min-height:0; background:transparent; }
+.content section[id],.content details[id] { scroll-margin-top:calc(var(--admin-header-height,110px) + 24px); }
+.sidebar nav a:focus-visible,.content :focus-visible { outline:3px solid #61b9f7; outline-offset:3px; }
+.quickLinks { display:flex; gap:12px; flex-wrap:wrap; }
+.quickLinks a { padding:12px 15px; border:1px solid #c7dced; border-radius:9px; color:#0864a7; background:#f2f8fe; text-decoration:none; }
+.clientTabs { display:flex; gap:7px; flex-wrap:wrap; padding:14px 18px; border-bottom:1px solid #dfebf4; background:#f8fbfe; }
+.clientTabs a { border:1px solid #cddfed; border-radius:8px; padding:10px 12px; color:#285b80; font-size:12px; text-decoration:none; }
+.clientTabs a[aria-current] { color:#fff; background:#076db9; border-color:#076db9; }
+.selectedSections { display:grid; gap:17px; padding:18px; }
+.selectedSections > section,.selectedSections > details { margin:0; }
+.selectedSections h3 { margin:0 0 12px; }
+.selectedSections p { font-size:13px; line-height:1.7; color:#526b83; }
+.selectedSections a { color:#0764a5; }
+.selectedSections summary { font-size:15px; font-weight:750; cursor:pointer; color:#183e60; }
+.resetArea { margin-top:25px; padding:16px; border-top:1px solid #e0e9f1; background:#fbf7f5; border-radius:9px; }
+.resetArea h4 { margin:0; }
+.selectedSections button,.headerActions button { min-height:40px; }
+.selectedSections button { border:1px solid #c7dceb; border-radius:8px; background:#eff7ff; color:#075c9a; padding:10px 13px; cursor:pointer; }
+.selectedSections button:disabled { opacity:.55; cursor:default; }
+.clientDirectory { align-self:start; position:sticky; top:calc(var(--admin-header-height,110px) + 16px); max-height:calc(100vh - var(--admin-header-height,110px) - 32px); border-radius:16px 0 0 16px; }
+.clientList { overflow-y:auto; }
+.clientHeader { position:static; background:#fff; border-radius:0 16px 0 0; }
+.clientToolbar { position:sticky; top:var(--admin-header-height,110px); z-index:12; background:#fff; border-radius:0 16px 0 0; }
+.clientTitle { min-width:0; }
+.clientTitle h2,.clientTitle small { overflow-wrap:anywhere; }
+.clientHeader,.headerActions { flex-wrap:wrap; }
+.clientCopy .clientRequestCount { white-space:normal; overflow:visible; text-overflow:clip; line-height:1.45; }
+@media(max-width:720px) { .clientDirectory { position:static; max-height:310px; } .clientToolbar { position:static; } }
+
 .sidebar {
   position: sticky;
   top: 0;
@@ -322,9 +352,9 @@
 
 .workspace {
   display: grid;
-  min-height: 710px;
+  min-height: 430px;
   margin-top: 16px;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid #dce6ef;
   border-radius: 16px;
   grid-template-columns: 284px minmax(0, 1fr);

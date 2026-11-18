@@ -87,7 +87,7 @@ export default function ResizableDashboardGrid({ clientId, left, right }) {
       <div ref={gridRef} className={`${styles.dashboardGrid} ${expanded ? styles.assistantExpanded : ""}`} style={{ "--assistant-width": `${assistantWidth}%` }}>
         {expanded ? (
           <div className={styles.expandedToolbar}>
-            <span>AOC-GPT expanded</span>
+            <span>AOC AI expanded</span>
             <button type="button" onClick={resetWidth}>Return to split view</button>
           </div>
         ) : null}
@@ -102,7 +102,7 @@ export default function ResizableDashboardGrid({ clientId, left, right }) {
             aria-valuemax={FULL_WIDTH}
             aria-valuenow={Math.round(assistantWidth)}
             tabIndex={0}
-            title="Drag left to expand AOC-GPT; double-click to reset. Press End for full width."
+            title="Drag left to expand AOC AI; double-click to reset. Press End for full width."
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={saveWidth}

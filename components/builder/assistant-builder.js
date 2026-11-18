@@ -12,7 +12,8 @@ async function readResponse(response) {
   return data;
 }
 
-export default function AssistantBuilder({ initialData }) {
+export default function AssistantBuilder({ initialData,embedded=false }) {
+  const Container=embedded?"div":"main",Title=embedded?"h2":"h1";
   const [state, setState] = useState(initialData.state);
   const [draft, setDraft] = useState(initialData.state?.draft);
   const [section, setSection] = useState("Instructions");
@@ -68,12 +69,12 @@ export default function AssistantBuilder({ initialData }) {
     finally { setBusy(""); }
   }
 
-  return <main className={styles.page}>
-    <header className={styles.topbar}>
+  return <Container className={styles.page} data-admin-embedded={embedded || undefined}>
+    {!embedded && <header className={styles.topbar}>
       <div className={styles.brand}><span className={styles.mark}>AOC</span><div><strong>Assistant settings</strong><small>Private workspace</small></div></div>
       <nav aria-label="Workspace"><Link href="/admin">Administrator portal</Link><span>{initialData.admin.name}</span><SignOutButton /></nav>
-    </header>
-    <div className={styles.intro}><div><p className={styles.eyebrow}>CONFIGURE · TEST · PUBLISH</p><h1>Your assistant, your instructions.</h1><p>Shape what each client’s assistant knows, creates, and says.</p></div>
+    </header>}
+    <div className={styles.intro}><div><p className={styles.eyebrow}>CONFIGURE · TEST · PUBLISH</p><Title>Your assistant, your instructions.</Title><p>Shape what each client’s assistant knows, creates, and says.</p></div>
       <label className={styles.clientLabel}>Client<select value={state?.clientId || ""} disabled={Boolean(busy)} onChange={(event) => selectClient(event.target.value)}>
         {initialData.clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
       </select></label></div>
@@ -132,5 +133,5 @@ export default function AssistantBuilder({ initialData }) {
         </aside>
       </div>
     </>}
-  </main>;
+  </Container>;
 }

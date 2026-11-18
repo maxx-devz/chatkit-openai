@@ -213,7 +213,7 @@ export default function ProviderSettings() {
         </button>
       </footer>
       <p className={styles.testDisclosure}>Saving verifies the key and model list only; it does not generate a reply or consume generation tokens.
-        Actual chat requests use your provider&apos;s API credits or free-model allowance. ChatGPT plan access is separate from API billing.</p>
+        This is connection/model verification, not a billing-capacity check. Actual chat requests use your provider&apos;s API credits or free-model allowance. ChatGPT plan access is separate from API billing.</p>
       <aside className={styles.database}>
         <span className={styles.dot} aria-hidden="true" />
         <div><strong>Database · {settings?.database.connected ? "Connected" : "Checking connection"}</strong>

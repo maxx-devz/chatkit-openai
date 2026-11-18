@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { OAuth2Client } from "google-auth-library";
 import { databasePool } from "../../lib/database.js";
 import { beginDriveConnection, finishDriveConnection, driveConnectionStatus, discoverConnectedSources, previewConnectedSource } from "../../lib/drive-source-service.js";
-import { digestDriveValue, sealDriveValue, unsealDriveValue, DRIVE_SCOPE, DRIVE_FOLDER } from "../../lib/drive-source-policy.js";
+import { digestDriveValue, sealDriveValue, unsealDriveValue, DRIVE_SCOPE, DRIVE_FOLDER, DriveSourceError, driveCallbackFailureCode } from "../../lib/drive-source-policy.js";
 
 const secret = "unit-test-only-drive-key-1234567890123456789";
 const rootId = "unit_test_root_12345";
@@ -17,6 +17,17 @@ Object.assign(process.env, { BETTER_AUTH_URL: "http://127.0.0.1:3000", GOOGLE_DR
   GOOGLE_DRIVE_ALLOWED_EMAIL: email, GOOGLE_DRIVE_ROOT_FOLDER_ID: rootId });
 
 after(async () => { await databasePool.end(); });
+
+test("Callback failures distinguish rejected app credentials without exposing provider payloads", () => {
+  for (const code of ["invalid_client", "unauthorized_client"]) {
+    const error = {response:{data:{error:code,error_description:'private provider payload'}},config:{client_secret:'synthetic-private-secret'}};
+    assert.equal(driveCallbackFailureCode(error),"google_client_rejected");
+  }
+  assert.equal(driveCallbackFailureCode({response:{data:{error:'invalid_grant'}}}),"oauth_exchange_rejected");
+  assert.equal(driveCallbackFailureCode({publicDetails:{code:'session_missing'}}),"admin_session_unavailable");
+  assert.equal(driveCallbackFailureCode(new DriveSourceError('wrong_google_account','private identity details')),'wrong_google_account');
+  assert.equal(driveCallbackFailureCode({code:'synthetic-private-secret'}),'oauth_callback_failed');
+});
 
 test("OAuth challenge is encrypted, admin/session bound and uses PKCE/read-only consent", async (t) => {
   const queries = [];

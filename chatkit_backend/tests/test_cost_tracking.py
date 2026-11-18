@@ -64,6 +64,13 @@ class PriceTests(unittest.TestCase):
             self.assertEqual(row["basis"], "unknown")
             self.assertIsNone(row["amount"])
 
+    def test_reported_router_cost_preserves_actual_token_breakdown(self):
+        row=observation("openrouter","vendor/model",{**tokens(),"cost":"0.005"})
+        self.assertEqual(row["basis"],"reported")
+        self.assertEqual(row["input_tokens"],tokens()["input_tokens"])
+        self.assertEqual(row["output_tokens"],tokens()["output_tokens"])
+        self.assertEqual(row["cached_tokens"],tokens()["input_tokens_details"]["cached_tokens"])
+
     def test_decisions_use_verified_input_cache_rates_and_no_output_charge(self):
         row = priced(tokens(), api="decisions")
         self.assertEqual(row["amount"], Decimal("0.000084500000"))

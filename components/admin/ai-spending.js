@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { costStatus, spendingCsv, usd, unpricedReason } from "../../lib/ai-spending-format.js";
 import styles from "./portal-usage.module.css";
 
@@ -47,8 +48,9 @@ export default function AiSpending() {
   return <section className={styles.spending} aria-labelledby="client-spending-title">
     <div className={styles.heading}>
       <div><h3 id="client-spending-title">Client API spending · USD</h3>
-        <p>For extension pricing and billing review. Separate from monthly request allowances.</p></div>
+        <p>Visible provider cost history for pricing and usage review. Chat has no portal request cap.</p></div>
       <div className={styles.spendingActions}>
+        <Link href="/admin/credits" prefetch={false}>AI credit pricing & allowances</Link>
         <label>UTC month <input type="month" value={month} onChange={event => setMonth(event.target.value)} /></label>
         <button type="button" onClick={() => setRefresh(value => value + 1)}>Refresh costs</button>
         <button type="button" disabled={!data?.ready} onClick={download}>Export CSV</button>
@@ -75,7 +77,7 @@ export default function AiSpending() {
         images and paid tools may leave the subtotal incomplete. Storage and other account charges require billing reconciliation.
         These figures are not an invoice, prepaid balance or automatic client charge; agree extension fees separately.</p>
       <p className={styles.updated}>Tracking started {data.trackingStartedAt ? new Date(data.trackingStartedAt).toLocaleString() : "not recorded"}.
-        Earlier spending is not backfilled. Resetting request allowances does not erase this ledger.
+        Earlier spending is not backfilled. Cleared activity and dollar usage are excluded from this report. Credit accounting and provider invoices are unchanged.
         Updated {new Date(data.fetchedAt).toLocaleTimeString()}.</p>
     </>}
   </section>;

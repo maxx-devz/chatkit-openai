@@ -5,6 +5,7 @@ import ChatKitAssistant from "./chatkit-assistant";
 import aocIcon from "@/aoc-icon.png";
 import styles from "./ai-assistant-panel.module.css";
 import { clientAppearance } from "@/lib/builder-data";
+import {CLIENT_ASSISTANT_NAME} from "@/lib/portal-presentation";
 
 export default async function AiAssistantPanel({
   clientId,
@@ -30,7 +31,7 @@ export default async function AiAssistantPanel({
           <Image src={aocIcon} alt="" />
         </span>
         <div>
-          <h2 id="ai-assistant-title">AOC-GPT</h2>
+          <h2 id="ai-assistant-title">{CLIENT_ASSISTANT_NAME}</h2>
           <p>Ask questions and continue saved conversations</p>
         </div>
         <span className={styles.badge}>Private</span>

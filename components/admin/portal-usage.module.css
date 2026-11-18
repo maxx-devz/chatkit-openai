@@ -50,3 +50,17 @@
   .heading { align-items: flex-start; flex-direction: column; }
   .capacityList { grid-template-columns: 1fr; }
 }
+.historyControls { margin-top:24px; padding:20px; border:1px solid #d5e3ef; border-radius:14px; background:#fff; }
+.historyControls h3,.historyControls h4 { margin:0 0 10px; color:#18334e; }
+.historyControls p { color:#4e657d; line-height:1.65; }
+.historyFields { display:grid; grid-template-columns:2fr 1fr 1fr; gap:16px; margin:16px 0; align-items:end; }
+.historyControls label { display:grid; gap:7px; color:#274b6d; font-size:13px; }
+.historyControls select,.historyControls input:not([type=checkbox]) { width:100%; min-height:40px; padding:8px 10px; border:1px solid #bccfe0; border-radius:8px; background:#fff; color:#18334e; }
+.historyControls .historyAll { display:flex; gap:8px; align-items:center; min-height:40px; }
+.historyControls button { min-height:40px; padding:8px 14px; border:1px solid #a4c7e8; border-radius:8px; background:#f4f9ff; color:#07579b; cursor:pointer; }
+.historyControls button:disabled { opacity:.55; cursor:default; }
+.historyControls :focus-visible { outline:3px solid #267fe1; outline-offset:3px; }
+.historyPreview { margin-top:16px; padding:16px; border:1px solid #d5e3ef; border-radius:10px; background:#f7faff; }
+.historyPreview label { max-width:320px; margin:16px 0; }
+.historyControls .clearHistoryButton { background:#a6252a; border-color:#a6252a; color:#fff; }
+@media(max-width:720px) { .historyFields { grid-template-columns:1fr; } }
