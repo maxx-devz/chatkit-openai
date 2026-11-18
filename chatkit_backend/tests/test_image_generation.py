@@ -223,7 +223,7 @@ class ImageChatKitStreamTests(unittest.IsolatedAsyncioTestCase):
         async with AsyncOpenAI(api_key="test-only", max_retries=2,
                 http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle))) as client:
             context.hosted_client = client
-            with patch("ai_provider.active_client", return_value=client), \
+            with patch("assistant.recheck_context", new=AsyncMock()), patch("ai_provider.active_client", return_value=client), \
                     patch.dict(os.environ, {"OPENAI_IMAGE_MODEL": "gpt-image-2.5-flare"}), \
                     patch("assistant.logger"):
                 stream = await PortalChatKitServer(store).process(json.dumps({

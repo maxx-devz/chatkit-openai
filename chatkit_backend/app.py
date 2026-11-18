@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from assistant import PortalChatKitServer
 from security import verify_signature
-from workspace_access import authorize_client
+from workspace_access import authorize_client, recheck_context
 from debugger_trace import inline_debug_events, verified_debug_context
 from store import Context, PostgresStore
 from builder_config import load_config
@@ -49,6 +49,13 @@ class SourceReference(BaseModel):
     usage: Literal["reference", "company_guidance"] = "reference"
 
 
+class SourceBoundary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    owner_id: str = Field(pattern=r"^[1-9][0-9]{0,18}$")
+    audience: str = Field(max_length=100)
+    revision: str = Field(pattern=r"^[a-f0-9]{32}$")
+
+
 class Envelope(BaseModel):
     model_config = ConfigDict(extra="forbid")
     agency_id: str | None = Field(default=None, pattern=r"^[1-9][0-9]{0,18}$")
@@ -60,6 +67,7 @@ class Envelope(BaseModel):
     hubstaff: dict | None = None
     hubstaff_index_binding: str = Field(default="", pattern=r"^(?:[0-9a-f]{64})?$")
     chat_mode: str = Field(default="work", pattern=r"^(work|general)$")
+    source_boundaries: list[SourceBoundary] = Field(default_factory=list, max_length=4)
     source_references: list[SourceReference] = Field(default_factory=list, max_length=4)
     payload: dict
 
@@ -165,6 +173,7 @@ async def chatkit(request: Request):
         db = await connect_database(os.environ["DATABASE_URL"])
         client = await load_client(db, envelope)
         context = Context(db, envelope.client_id, envelope.user_id, envelope.instructions, client)
+        context.authorization = envelope
         context.debug_trace = verified_debug_context(request.headers)
         context.chat_mode = envelope.chat_mode
         context.source_references = [reference.model_dump() for reference in envelope.source_references]
@@ -207,6 +216,7 @@ async def chatkit(request: Request):
                 try:
                     async with asyncio.timeout(95):
                         async for event in inline_debug_events(result, context.debug_trace):
+                            await recheck_context(context)
                             yield event
                 except asyncio.CancelledError:
                     raise
@@ -261,6 +271,7 @@ async def upload(request: Request):
             async with await connect_database(os.environ["DATABASE_URL"]) as db:
                 client = await load_client(db, envelope)
                 context = Context(db, envelope.client_id, envelope.user_id, "", client)
+                context.authorization = envelope
                 attachment = await upload_file(context, payload["filename"], content)
                 return JSONResponse(attachment.model_dump(mode="json", exclude_none=True,
                     context={"exclude_metadata": True}), headers=NO_STORE)

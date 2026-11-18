@@ -55,6 +55,19 @@ async def authorize_client(db, envelope):
     client = await cursor.fetchone()
     if not client:
         raise denied()
+    if getattr(envelope, "source_references", []) and not getattr(envelope, "source_boundaries", []):
+        raise denied()
+    if client.get("openai_vector_store_id"):
+        cursor = await db.execute("SELECT 1 FROM portal_clients WHERE id<>%s AND openai_vector_store_id=%s LIMIT 1",
+                                  (envelope.client_id, client["openai_vector_store_id"]))
+        if await cursor.fetchone():
+            raise denied()
+    for boundary in getattr(envelope, "source_boundaries", []):
+        cursor = await db.execute("SELECT revision FROM agency_platform.source_approval(%s,%s,%s,NULL)",
+                                  (boundary.owner_id,boundary.audience,envelope.client_id))
+        approval = await cursor.fetchone()
+        if not approval or approval["revision"] != boundary.revision:
+            raise denied()
     return client
 
 
@@ -67,3 +80,18 @@ async def authorize_platform(db, envelope):
         cursor = await db.execute("SELECT agency_platform.legacy_admin_scope_safe() AS allowed")
         if not (await cursor.fetchone())["allowed"]:
             raise denied()
+
+
+async def recheck_context(context):
+    envelope = getattr(context, "authorization", None)
+    if envelope is None:
+        raise denied()
+    if context.preview:
+        await authorize_platform(context.db, envelope)
+    else:
+        client = await authorize_client(context.db, envelope)
+        # A tool may only continue with the project, website and store approved
+        # when this response started.
+        for key in ("hubstaff_project_url", "approved_website_url", "openai_vector_store_id"):
+            if client.get(key) != context.client.get(key):
+                raise denied()

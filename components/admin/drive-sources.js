@@ -112,12 +112,12 @@ export default function DriveSources({embedded=false}) {
     <Container className={styles.page} data-admin-embedded={embedded || undefined}>
       <header className={styles.heading}>
         <div><Link href="/admin">← AOC Admin</Link><p className={styles.eyebrow}>COMPANY KNOWLEDGE · ADMIN MANAGED</p><Title>Company knowledge</Title>
-          <p>Connect your company Drive once. Publish shared company knowledge for all clients; original documents stay in Drive.</p></div>
+          <p>Connect your company Drive once. Publish shared company knowledge for AOC agency clients; original documents stay in Drive.</p></div>
         <span className={styles.badge}>Audience-controlled source access</span>
       </header>
       <section className={styles.card} aria-labelledby="connection-heading">
         <h2 id="connection-heading">Google Drive · read only</h2>
-        <p>You authorize Google as AOC Admin, not as each client. Credentials remain server-only. Publish the shared company pack below so all clients can ask questions without a Google login. Discovery and preview do not alter Drive sharing or send document content to AI; the private AI test remains separate.</p>
+        <p>You authorize Google as AOC Admin, not as each client. Credentials remain server-only. Publish the shared company pack below so AOC agency clients can ask questions without a Google login. Discovery and preview do not alter Drive sharing or send document content to AI; the private AI test remains separate.</p>
         {connection?.setupMessage && <p className={styles.notice}>{connection.setupMessage}</p>}
         {connection?.configured && <dl><dt>Authorized Google account</dt><dd>{connection.allowedEmail}</dd><dt>OAuth callback</dt><dd><code>{connection.redirectUri}</code></dd>
           <dt>Connection</dt><dd>{busy === "check" ? "Checking Google Drive access..." : connected ? "Connected as " + connection.email

@@ -92,7 +92,7 @@ export default function PreparedSourceSettings({ connected, onPreview }) {
       <h2 id="prepared-heading">Company knowledge &amp; AI instructions</h2></div>
       <span className={styles.badge}>{status?.ready ? "Prepared sources ready" : "Sources need preparation"}</span></div>
     <p>Client ChatKit and your private AOC Admin assistant can use an encrypted, database-backed source cache. No OpenAI file upload, vector-store service or additional AI call is used for syncing. Existing provider usage still applies when chatting.</p>
-    <p>Connect Google once as AOC Admin, then publish a shared company pack below. All current and future clients inherit it automatically. Clients only type in their chatbox: no Google login, Drive permissions or repeated uploads are needed.</p>
+    <p>Connect Google once as AOC Admin, then publish a shared company pack below. Approved guidance applies to clients owned by the AOC agency. Clients only type in their chatbox: no Google login, Drive permissions or repeated uploads are needed.</p>
     <p className={styles.small}>This page synchronizes every minute while visible. For continuous updates when closed, run <code>npm run sources:watch</code> locally or configure the protected production scheduler. Sources older than 15 minutes, disconnected sources and failed syncs are blocked rather than silently treated as current.</p>
     <div className={styles.providerInfo} role="status">{busy === "sync" ? "Checking source revisions and preparing changed documents…" : status?.ready
       ? `${status.sync.indexedDocuments || 0} documents prepared · ${status.sync.unsupportedFiles || 0} unsupported files · checked ${new Date(status.checkedAt).toLocaleString()}`
@@ -101,13 +101,14 @@ export default function PreparedSourceSettings({ connected, onPreview }) {
     {error && <p className={styles.error} role="alert">{error}</p>}
     {notice && <p className={styles.notice} role="status">{notice}</p>}
     <fieldset className={styles.testFieldset} disabled={Boolean(busy) && busy !== "sync"}>
-      <legend>Publish once for all clients</legend>
+      <legend>AOC agency company knowledge</legend>
+      <p>Source changes require publication approval. Publishing is currently unavailable.</p>
       <label className={styles.search} htmlFor="prepared-source-audience">Apply settings to<select id="prepared-source-audience" value={audience} onChange={event => chooseAudience(event.target.value)}>
-        <option value="clients">All clients + AOC Admin — shared company knowledge</option>
+        <option value="clients">AOC agency clients + AOC Admin — company knowledge</option>
         <option value="admin">My private AOC Admin AI — optional extra sources</option>
         {(status?.clients || []).map(client => <option key={client.id} value={client.id}>{client.name} · optional client-only extras</option>)}
       </select></label>
-      <p className={styles.small}>Shared instructions apply in both client chat modes and AOC Admin. Reference access in General chat is controlled below. Individual client settings are optional extras, not required setup. Pausing extras does not disable shared guidance. Read-only access prevents edits, not disclosure: select only content approved for every client. Keep private company records in the private admin audience.</p>
+      <p className={styles.small}>Shared instructions apply in both client chat modes and AOC Admin. Reference access in General chat is controlled below. Individual client settings are optional extras, not required setup. Pausing extras does not disable shared guidance. Read-only access prevents edits, not disclosure: select only content approved for AOC agency clients. Keep private company records in the private admin audience.</p>
       {audience === "clients" && status?.sharedManagedElsewhere && <p className={styles.notice} role="status">Another administrator owns the shared pack ({status.sharedEnabled ? "enabled" : "paused"}). Sign in as its publisher to update it; this account cannot replace it.</p>}
       {audience === "clients" && <div className={styles.providerInfo}>
         <label className={styles.checkLabel}><input type="checkbox" checked={automaticParent} onChange={event => {
@@ -138,8 +139,8 @@ export default function PreparedSourceSettings({ connected, onPreview }) {
       <p className={styles.small}>These supplement existing portal/client instructions. Application security always wins; mandatory approved source rules take precedence over conflicting additional guidance.</p>
       <label className={styles.checkLabel}><input type="checkbox" checked={form.generalReferences} onChange={event => setForm({ ...form, generalReferences: event.target.checked })} />Allow relevant prepared reference excerpts in General chat too. General chat still does not fetch Hubstaff data.</label>
       <label className={styles.checkLabel}><input type="checkbox" checked={form.enabled} onChange={event => setForm({ ...form, enabled: event.target.checked })} />Enable these prepared sources and additional instructions for the selected audience</label>
-      <label className={styles.checkLabel}><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} />I approve {automaticParent ? "the configured Company Knowledge parent and its eligible current and future files" : "the selected instructions and reference content"} {audience === "clients" ? "for ALL current and future clients and AOC Admin" : "for this audience"}, including future source edits and new eligible files inside approved reference folders. Relevant content will be processed by the configured AI provider.</label>
-      <div className={styles.actions}><button type="button" disabled={Boolean(busy) || !status?.ready || (form.enabled && !consent) || instructionCharacters > 10_000 || (audience === "clients" && status?.sharedManagedElsewhere)} onClick={() => action("save")}>{audience === "clients" ? "Save shared company pack" : "Save optional audience settings"}</button>
+      <label className={styles.checkLabel}><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} />I approve {automaticParent ? "the configured Company Knowledge parent and its eligible current and future files" : "the selected instructions and reference content"} {audience === "clients" ? "for AOC agency clients and AOC Admin" : "for this audience"}, with source revisions requiring separate publication approval. Relevant content will be processed by the configured AI provider.</label>
+      <div className={styles.actions}><button type="button" disabled title="Source changes require publication approval" onClick={() => action("save")}>{audience === "clients" ? "Save shared company pack" : "Save optional audience settings"}</button>
         <button type="button" disabled={Boolean(busy) || (audience === "clients" && status?.sharedManagedElsewhere)} className={styles.secondary} onClick={() => action("disable")}>Pause source use</button></div>
     </fieldset>
   </section>;

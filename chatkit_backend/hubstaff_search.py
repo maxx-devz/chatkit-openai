@@ -16,6 +16,7 @@ AUTHORIZED = """
     JOIN portal_clients p ON p.id=i.client_id
     JOIN portal_memberships m ON m.client_id=p.id
     WHERE i.client_id=%s AND m.user_id=%s AND i.binding=%s
+      AND m.is_active=TRUE AND m.role IN ('member','client_admin','aoc_admin')
       AND p.portal_enabled=TRUE AND p.ai_enabled=TRUE
       AND BTRIM(p.hubstaff_project_url)=i.mapping_url
       AND i.failure_code IS NULL AND i.checked_at>NOW()-INTERVAL '15 minutes'

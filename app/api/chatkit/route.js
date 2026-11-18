@@ -100,6 +100,7 @@ async function handlePOST(request) {
       user_id: context.userId,
       instructions: appendPreparedInstructions(ASSISTANT_INSTRUCTIONS, prepared.instructions),
       source_references: prepared.references,
+      source_boundaries: prepared.boundaries || [],
       portal_origin: new URL(process.env.BETTER_AUTH_URL).origin,
       hubstaff,
       hubstaff_index_binding: indexed?.binding || "",

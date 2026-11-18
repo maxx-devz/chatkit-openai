@@ -10,6 +10,16 @@ Object.assign(process.env, { BETTER_AUTH_URL: "http://127.0.0.1:3000", GOOGLE_DR
 after(async () => databasePool.end());
 beforeEach(() => clearPreparedDocumentCache());
 
+function mockQuery(t, query) {
+  return t.mock.method(databasePool, "query", async (sql, parameters) => {
+    if (typeof sql === "string" && sql.includes("agency_platform.source_scope")) return {rows:[{allowed:true}]};
+    if (typeof sql === "string" && sql.includes("agency_platform.source_approval")) {
+      return { rows: [{revision:"a".repeat(32),agency_id:"100"}] };
+    }
+    return query(sql,parameters);
+  });
+}
+
 function row() {
   const value = { owner_id: "42", audience: "client:1", client_id: "1", enabled: true,
     reference_paths: ["client_folder_123"], instruction_ids: ["rules_doc_123"], additional_instructions: "Keep answers concise.",
@@ -27,7 +37,7 @@ function row() {
 test("The hot path uses server-established client identity and never calls Google or any provider", async t => {
   const value = row();
   const queries = [];
-  t.mock.method(databasePool, "query", async (sql, parameters) => {
+  mockQuery(t, async (sql, parameters) => {
     if (sql.includes('pg_catalog.pg_class')) return { rows: [{ installed: false }] };
     queries.push({ sql, parameters }); return { rows: parameters[0] === "1" ? [value] : [] };
   });
@@ -47,7 +57,7 @@ test("The hot path uses server-established client identity and never calls Googl
 test("Shared company sources reach every client and admin without a client-specific publication or Google call", async t => {
   const shared = { ...row(), audience: "clients", client_id: null };
   const queries = [];
-  t.mock.method(databasePool, "query", async (sql, parameters) => {
+  mockQuery(t, async (sql, parameters) => {
     if (sql.includes('pg_catalog.pg_class')) return { rows: [{ installed: false }] };
     queries.push({ sql, parameters }); return { rows: [shared] };
   });
@@ -68,7 +78,7 @@ test("Shared company sources reach every client and admin without a client-speci
 test("Shared and client-only packs combine within bounded context; pausing extras preserves shared rules", async t => {
   const shared = { ...row(), audience: "clients", client_id: null };
   let rows = [shared, row()];
-  t.mock.method(databasePool, "query", async () => ({ rows }));
+  mockQuery(t, async () => ({ rows }));
   const result = await loadPreparedSourceContext({ clientId: "1" }, "website");
   assert.match(result.instructions, /Shared company guidance/);
   assert.match(result.instructions, /Audience-specific guidance/);
@@ -81,7 +91,7 @@ test("Shared and client-only packs combine within bounded context; pausing extra
 
 test("A second administrator cannot pause or overwrite the shared publisher's pack", async t => {
   const writes = [];
-  t.mock.method(databasePool, "query", async (sql, parameters) => {
+  mockQuery(t, async (sql, parameters) => {
     if (/^UPDATE|^INSERT/.test(sql)) writes.push(parameters);
     return { rows: /SELECT owner_id,enabled/.test(sql) ? [{ owner_id: "other-admin", enabled: true }] : [] };
   });
@@ -92,20 +102,20 @@ test("A second administrator cannot pause or overwrite the shared publisher's pa
 
 test("Private admin publications are resolved by owner, not by the selected browser client", async t => {
   let query;
-  t.mock.method(databasePool, "query", async (sql, parameters) => { query = { sql, parameters }; return { rows: [] }; });
+  mockQuery(t, async (sql, parameters) => { query = { sql, parameters }; return { rows: [] }; });
   await findPreparedPublication({ ownerId: "42" });
   assert.match(query.sql, /p.owner_id=\$1 AND p.audience='admin'/);
   assert.deepEqual(query.parameters, ["42"]);
 });
 
 test("A disabled publication does not decrypt or load any source content", async t => {
-  t.mock.method(databasePool, "query", async () => ({ rows: [{ enabled: false, encrypted_documents: "invalid" }] }));
+  mockQuery(t, async () => ({ rows: [{ enabled: false, encrypted_documents: "invalid" }] }));
   assert.deepEqual(await loadPreparedSourceContext({ clientId: "1" }, "website"), { instructions: "", references: [], checkedAt: null });
 });
 
 test("Revocation, inactive publisher, failed sync and stale snapshots block generation", async t => {
   let value = row();
-  t.mock.method(databasePool, "query", async () => ({ rows: [value] }));
+  mockQuery(t, async () => ({ rows: [value] }));
   for (const change of [{ google_email: "revoked@example.com" }, { administrator_active: false }, { failure_code: "access_denied" },
     { checked_at: new Date(Date.now() - 16 * 60_000) }, { connected_at: new Date() }]) {
     value = { ...row(), ...change };
@@ -125,7 +135,7 @@ test("Encrypted source bodies are bound to the owner and exact connection revisi
 test("Warm replies read fresh metadata, not the large blob; revision and encryption-key changes invalidate memory", async t => {
   let full = { ...row(), audience: "clients", client_id: null, sync_info: { corpusRevision: "revision-1" } };
   let reads = 0;
-  t.mock.method(databasePool, "query", async query => {
+  mockQuery(t, async query => {
     if (typeof query !== "string") { reads++; assert.equal(query.query_timeout, 45_000); return { rows: [full] }; }
     assert.doesNotMatch(query, /i\.encrypted_documents/);
     const { encrypted_documents: _ciphertext, ...metadata } = full;

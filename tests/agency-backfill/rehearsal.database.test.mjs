@@ -107,8 +107,8 @@ test('Stage 04 migrated synthetic database acceptance', {skip:!enabled}, async t
       assert.ok(await portal.loadPortalAiAccess(headers));
       const report=await credits.readClientCredits(appPool,'501',{period:'2025-07',readOnly:true});
       assert.ok(report);assert.equal((await appPool.query('SELECT pricing_id::text FROM portal_ai_credit_periods WHERE client_id=501')).rows[0].pricing_id,'11');
-      assert.deepEqual((await sources.findApplicablePreparedPublications({clientId:'501'})).map(p=>p.audience),['clients']);
-      assert.deepEqual(await sources.findApplicablePreparedPublications({clientId:'601'}),[]);
+      await assert.rejects(sources.findApplicablePreparedPublications({clientId:'501'}),e=>e.code==='source_approval_required');
+      await assert.rejects(sources.findApplicablePreparedPublications({clientId:'601'}),e=>e.code==='source_approval_required');
       sessionUser={id:'fixture-ben',email:'ben@example.invalid',name:'Fixture Harbor User'};
       await assert.rejects(portal.resolvePortalContext(headers),e=>e.publicDetails?.status===403);
       sessionUser={id:'fixture-mira',email:'mira@example.invalid',name:'Fixture AOC User'};
@@ -137,7 +137,7 @@ test('Stage 04 migrated synthetic database acceptance', {skip:!enabled}, async t
     await t.test('disabled company publisher is immediately excluded',async()=>{
       await admin.query('UPDATE portal_admins SET is_active=false WHERE user_id=300');
       try {
-        assert.deepEqual(await sources.findApplicablePreparedPublications({clientId:'501'}),[]);
+        await assert.rejects(sources.findApplicablePreparedPublications({clientId:'501'}),e=>e.code==='source_approval_required');
         await withAgencyScope(pools[0],ownScope,async db=>assert.equal(await read(db,'portal_source_publications',{owner_id:'300',audience:'clients'}),null));
       } finally {await admin.query('UPDATE portal_admins SET is_active=true WHERE user_id=300');}
     });

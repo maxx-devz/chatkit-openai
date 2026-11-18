@@ -12,6 +12,8 @@ from chatkit.server import ChatKitServer
 from chatkit.types import UserMessageItem
 
 from store import Context
+from workspace_access import recheck_context
+from dataclasses import replace
 from generation import generation_tools
 from provider_errors import provider_issue
 from uploads import AttachmentConverter, MAX_CONTEXT_ATTACHMENTS
@@ -29,6 +31,22 @@ from hubstaff_search import project_index_tools
 
 logger = logging.getLogger(__name__)
 configure_agents()
+
+
+def guard_tools(tools, context):
+    guarded = []
+    for tool in tools:
+        if hasattr(tool, "on_invoke_tool"):
+            invoke = tool.on_invoke_tool
+            async def checked(run, args, invoke=invoke):
+                await recheck_context(context)
+                result = await invoke(run, args)
+                await recheck_context(context)
+                return result
+            guarded.append(replace(tool, on_invoke_tool=checked))
+        else:
+            guarded.append(tool)
+    return guarded
 
 
 def hubstaff_tools(context):
@@ -244,7 +262,7 @@ def make_agent(context, emit=None):
     if not getattr(context, "preview", False):
         instructions += "\n\n" + CLIENT_SOURCE_PRIVACY
     return Agent(name="AOC client assistant", model=agent_model(getattr(context, "ai_model", None), context),
-                 instructions=instructions, tools=tools,
+                 instructions=instructions, tools=guard_tools(tools, context),
                  model_settings=agent_model_settings(context))
 
 

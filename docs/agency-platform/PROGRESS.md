@@ -1,6 +1,6 @@
 # Agency Platform progress
 
-> Current primary checkout is `C:\Users\MY PC\Desktop\AI\portal` on `feat/agency-platform`. Stage 07 passed local verification. [Stage 07 results and delivery limits](#stage-07-private-files-and-cached-content)
+> Current primary checkout is `C:\Users\MY PC\Desktop\AI\portal` on `feat/agency-platform`. Stage 08 passed local verification. [Stage 08 results and approval dependency](#stage-08-agency-ai-retrieval-and-approved-revisions)
 
 Updated November 18, 2026, Asia/Shanghai.
 
@@ -16,7 +16,8 @@ Updated November 18, 2026, Asia/Shanghai.
 | Stage 05 — trusted workspace context | Implemented and verified locally | Real Better Auth sessions, two agencies in PostgreSQL, browser switch and refresh, regression tests and full build. |
 | Stage 06 — server entry-point ownership | Implemented and verified locally | Complete route inventory, signed Next.js/Python access checks, four-client denial matrix and migration 004 rehearsal. |
 | Stage 07 — private files and cached content | Implemented and verified locally | Authenticated delivery, copied-link/revocation checks, upload expiry and workspace cache isolation. |
-| Stage 08 onward | Awaiting separate authorization | Stage 11 remains the planned gate for public agency routes. |
+| Stage 08 — agency AI retrieval and approved revisions | Implemented and verified locally | Scoped source revision adoption, canary retrieval, source/tool/stream revocation checks. |
+| Stage 09 onward | Awaiting separate authorization | Stage 11 remains the planned gate for public agency routes. |
 
 Older `docs/PHASE_0_*` files describe a separate historical architecture/closeout
 process with outstanding reviews. This stage does not mark that process complete
@@ -808,3 +809,65 @@ No additional configuration or storage credential is required. Existing private 
 Browser back/forward cache behavior, already-open tabs displaying bytes fetched earlier, real CDN header propagation and deployed revocation latency remain unverified. Private no-store responses and document replacement cover subsequent application delivery. They cannot erase a recipient’s saved files or previously rendered content.
 
 Stage 11 gating and legacy Admin restrictions remain active. The WSL cluster was stopped and removed after testing. **Stop before Stage 08.** Production migration, deployment and push require their separate workflow.
+
+
+## Stage 08 agency AI retrieval and approved revisions
+
+Built on `570bc51` in the primary `AI\portal` checkout on `feat/agency-platform`. The starting working tree was clean. Read AGENTS, CONTEXT, DECISIONS, the Stage 07 handoff, database portability and installed Next.js data-security guidance.
+
+### Isolation and revision behavior
+
+- Migration 005 adds a protected revision-approval table alongside Stage 04's existing ownership-approval table. It adopts only enabled publications already classified by the reviewed ownership registry, with an existing source connection, binding and corpus revision. Unresolved ownership and missing revision metadata confer no retrieval access. Existing migrations 001–004 are preserved.
+- The former shared company pack has an explicit AOC agency binding. Retrieval exposes its effective audience as `agency:<id>` and checks the selected client's current agency ownership. Another subscribing agency receives none of that guidance automatically. The legacy database label `clients` remains as a compatibility key for existing publications, UI and the Stage 04 registry. It no longer denotes universal retrieval access.
+- Client extras require their exact client and agency. Private Admin guidance requires its owner. The private Admin assistant can retain AOC agency guidance through the established platform operation. Public agency routes remain gated until Stage 11.
+- Approval pins the publication settings, corpus revision and connection binding/configuration. Retrieval rechecks active publisher, agency, client ownership, enabled state, connection identity, freshness and current approval on every call, including warm-cache calls. New corpus or instruction changes fail closed. The synchronization cache may retain a changed draft corpus, but it is withheld from chat.
+- **Stage 20B remains a dependency.** New publication saves/enables are rejected until its approval workflow exists. Disabling remains available. This stage provides no approval UI or runtime permission to issue revision approvals. The migration adopts existing enabled, ownership-reviewed content as the initial baseline. A separately reviewed operator migration is required for deployment.
+- Next.js signs source boundary identifiers and approved revisions together with the existing agency/client/user/session context. Python rechecks each boundary against current PostgreSQL state. Source excerpts without their boundaries are denied. The application derives those fields from authenticated context, never from prompt text.
+- Function tools recheck live access before invocation and again before returning their result. Stream chunks recheck access before delivery. Revoking a source during a tool call or stream blocks subsequent results/chunks. The trusted project, website and vector-store IDs must still match the initial client configuration. A vector-store ID configured on multiple clients is denied. Hosted tools receive only the server-configured store/domain and retain the stream delivery checks.
+- Retrieved task text, website material and attachments remain untrusted request data. Model tool parameters cannot replace the closure's agency/client/user context. Existing source privacy filtering, buffered/sanitized client output, scoped reopened history, uploads and tool queries remain in use. Permitted task/public website evidence and dates remain available. Private source titles, paths, IDs, revisions and Drive links remain covered by the existing client response filters.
+
+### Changed files
+
+| Area | Paths |
+| --- | --- |
+| Schema and runner | `database/agency-platform/005_source_boundaries.sql`, `scripts/migrate-agency-sources.mjs`, `package.json` |
+| Source retrieval | `lib/prepared-source-store.js`, `lib/prepared-source-policy.js`, `lib/prepared-source-context.js`, `app/api/chatkit/route.js` |
+| Source settings UI | `components/admin/drive-sources.js`, `components/admin/prepared-source-settings.js`; labels name AOC agency clients and the publish action is disabled pending approval support. |
+| Python access and tools | `chatkit_backend/app.py`, `chatkit_backend/assistant.py`, `chatkit_backend/preview.py`, `chatkit_backend/workspace_access.py`, `chatkit_backend/hubstaff_search.py` |
+| Fixtures/regressions | `tests/agency-backfill/sources.database.test.mjs`, `tests/agency-backfill/rehearsal.database.test.mjs`, `tests/drive-sources/prepared.test.mjs`, `chatkit_backend/tests/test_stage08_sources_database.py`, `chatkit_backend/tests/test_stage06_database.py`, `chatkit_backend/tests/test_client_stream.py`, `chatkit_backend/tests/test_image_generation.py` |
+| Records | This progress entry and DECISIONS S08-D01 |
+
+### Actual results
+
+| Check | Result |
+| --- | --- |
+| Full Node suite | 366 passed, 0 failed, 0 skipped. |
+| Prepared-source and Hubstaff index suites | 40 passed, 0 failed, 0 skipped. Source fixtures explicitly supply approved revision metadata. |
+| Python discovery | 180 tests, 172 passed and 8 skipped. Opt-in database tests are exercised separately below. Privacy, reopened history, attachments and model-wire suites retain their fixtures. |
+| Stage 03/04 disposable regression | Nine Stage 03 scenarios, identical no-write reports and idempotent Stage 04 applications passed. The updated pre-005 source assertions expect retrieval denial until its migration is installed. |
+| Stage 05–07 real database fixtures | Five Stage 05 TAP tests and eleven extended Stage 06/07 TAP tests passed. Signed Python, reopened scoped history, foreign cursors, per-user uploads and membership/project/store changes were exercised with real database access. Five Python database tests ran inside that fixture, including the added context recheck. |
+| Stage 08 source fixture | One integrated real-database test passed. Migration 005 ran twice. AOC agency guidance, two distinct AOC client extras, a fictional Harbor client canary and private Admin canary stayed in their permitted audiences. An unknown client retrieved nothing. Changed instruction/corpus revisions and revoked source access blocked retrieval. |
+| Stage 08 tool/stream fixture | Two Python tests passed against the disposable database. The actual guarded function tool denied invocation after source withdrawal and withheld a result when access changed during execution. A signed ASGI streaming fixture delivered the permitted first chunk and withheld the next chunk after source revocation. Foreign client context was denied. |
+| Build and lint | Full Next.js 16.3.3 Turbopack production build and ESLint on changed JavaScript passed. |
+
+The first migration rehearsal caught a name collision with Stage 04's existing approval table. The new revision table received a separate name. Model-wire fixtures were updated to mock their session recheck explicitly. Source/tool fixtures used the installed Agents SDK ToolContext and isolated legacy publication owners. Final runs passed.
+
+### Fixture and live-test limits
+
+The canaries are synthetic. Prompt-injection strings stayed inside retrieved data and could not change the server's selected workspace. This is authorization and delivery evidence. It is not a live model resistance benchmark. No live AI generation, provider upload, real customer document, Drive consent, Hubstaff request, Make message or payment occurred.
+
+The tool fixture uses a synthetic tool body with actual application guard and real PostgreSQL authorization. The stream fixture uses a synthetic SDK byte stream through the actual signed ASGI endpoint. Existing model-wire tests mock the guard for their synthetic Context objects. Live hosted-vector ownership, provider behavior, streaming performance and deployed revocation latency remain unverified.
+
+Revocation controls subsequent retrieval and delivery. Previously delivered content and material already sent to a provider cannot be recalled. Reopened conversations retain their authorized historical business facts and pass the existing response privacy filters. This stage does not erase prior history or claim a general semantic confidentiality filter.
+
+The immediate checks concern committed portal membership/publication/connection changes and recorded sync failures. A permission revoked directly at Google is discovered by the next source check or by the 15-minute source freshness limit. Cached material may remain eligible during that discovery window. Live provider revocation timing was not exercised.
+
+**Stage 06 browser verification and live CDN checks remain pending.** Browser back/forward cache behavior and Stage 07's remaining delivery checks carry forward. The legacy runtime database credential still has direct legacy-table privileges. Functions trust the server-established actor context. Existing Stage 03 agency-table RLS claims remain limited to its tested runtime roles.
+
+### Private setup and next gate
+
+No new production secret is required. Use the existing private `AGENCY_MIGRATION_DATABASE_URL` with the reviewed database name and runtime login for `npm run agency:sources -- --confirm-database <database> --app-role <login>`. The migration operator needs the existing dedicated-owner membership. Runtime receives only the two source-check functions. The revision table is owner-controlled.
+
+`AGENCY_MIGRATION_DATABASE_URL` and `AGENCY_WORKSPACE_TEST_DATABASE_URL` remain absent/empty in the project environment file. The rehearsal generated their disposable loopback values in its private process environment. To repeat source tests, prepare the synthetic Stage 03–07 fixture, supply those URLs plus the distinct same-database runtime `DATABASE_URL`, synthetic `BETTER_AUTH_URL` and `BETTER_AUTH_SECRET` privately in the test shell. Run the source fixture with the existing React-server/alias test flags. The source fixture supplies synthetic Drive configuration internally and runs migration 005 itself. No environment file was copied or edited.
+
+Neon was untouched. The disposable WSL PostgreSQL cluster was stopped and removed. **Stop before Stage 09.** Stage 20B approval workflow, deployment and production migration require their later instructions.

@@ -569,3 +569,12 @@ builds remain blocked by local dependency layout/missing existing Website Insigh
 packages. No dependency/framework changes or commercial decisions were made.
 The task server is stopped at closeout. See [runbook](STAGE04_REHEARSAL.md) and
 [actual results](PROGRESS.md). Stop before 05; new routes remain gated until 11.
+
+
+## S08-D01 — Agency source revisions and Stage 20B gate
+
+The former shared company guidance is an AOC-agency publication. Other agencies receive none by subscription or a NULL owner. Keep the legacy `clients` storage key for compatibility while enforcing its explicit agency binding and exposing the effective agency audience during retrieval. Client extras and private Admin guidance retain their separate scopes.
+
+Pin the existing enabled and ownership-reviewed publication, connection and corpus revision in migration 005. New instructions, publication settings and corpus revisions are held from retrieval. Disable is available. Stage 20B will supply draft capture, approver permissions, consent, immutable approval audit and an approved revision transition. No runtime approval-writing route is introduced now.
+
+Tool invocation, tool result delivery and streamed chunks recheck current access. A source or membership revocation blocks subsequent work/delivery, with previously delivered bytes and provider-submitted material outside recall. Hosted model behavior and production performance need their separately scoped live checks.

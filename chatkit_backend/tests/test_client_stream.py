@@ -127,7 +127,7 @@ class ClientStreamTests(unittest.IsolatedAsyncioTestCase):
             async with AsyncOpenAI(api_key="test-only", max_retries=0,
                     base_url="https://openrouter.ai/api/v1",
                     http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle))) as client:
-                with patch("ai_provider.active_client", return_value=client), \
+                with patch("assistant.recheck_context", new=AsyncMock()), patch("ai_provider.active_client", return_value=client), \
                         patch("assistant.provider_issue", wraps=provider_issue) as failure:
                     configure_agents()
                     server = PortalChatKitServer(store)

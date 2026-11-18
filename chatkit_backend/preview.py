@@ -79,6 +79,7 @@ async def preview(request: Request):
                 context = Context(db, data.client_id, data.user_id, data.instructions, client,
                     config=AssistantConfig.model_validate(client["draft"]).model_dump(), preview=True,
                     portal_origin=data.portal_origin.rstrip("/"), hubstaff=data.hubstaff)
+                context.authorization = data
                 started_at = datetime.now(timezone.utc)
                 context.ai_provider = await load_provider_settings(db)
                 context.ai_model = context.ai_provider.model

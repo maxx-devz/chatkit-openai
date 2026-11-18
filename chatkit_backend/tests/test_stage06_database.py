@@ -143,3 +143,26 @@ class DatabaseBoundaries(unittest.IsolatedAsyncioTestCase):
             self.assertEqual((await self.send(data, "/chatkit/upload")).status_code, 403)
         finally:
             await self.bootstrap.execute("UPDATE portal_memberships SET is_active=true WHERE client_id=%s AND user_id=%s", (actor["client"],actor["user"]))
+
+    async def test_stage08_tool_guard_rechecks_after_revocation(self):
+        from app import Envelope
+        from store import Context
+        from workspace_access import recheck_context
+        actor=self.actors[0]
+        envelope=Envelope(**self.envelope(actor, {}))
+        client=await load_client(self.db,envelope)
+        context=Context(self.db,actor["client"],actor["user"],"",client)
+        context.authorization=envelope
+        await recheck_context(context)
+        await self.bootstrap.execute("UPDATE portal_memberships SET is_active=false WHERE client_id=%s AND user_id=%s",(actor["client"],actor["user"]))
+        try:
+            with self.assertRaises(HTTPException):
+                await recheck_context(context)
+        finally:
+            await self.bootstrap.execute("UPDATE portal_memberships SET is_active=true WHERE client_id=%s AND user_id=%s",(actor["client"],actor["user"]))
+        await self.bootstrap.execute("UPDATE portal_clients SET openai_vector_store_id='vs_foreign' WHERE id=%s",(actor["client"],))
+        try:
+            with self.assertRaises(HTTPException):
+                await recheck_context(context)
+        finally:
+            await self.bootstrap.execute("UPDATE portal_clients SET openai_vector_store_id=%s WHERE id=%s",(client.get("openai_vector_store_id"),actor["client"]))
