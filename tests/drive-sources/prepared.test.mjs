@@ -27,7 +27,10 @@ function row() {
 test("The hot path uses server-established client identity and never calls Google or any provider", async t => {
   const value = row();
   const queries = [];
-  t.mock.method(databasePool, "query", async (sql, parameters) => { queries.push({ sql, parameters }); return { rows: parameters[0] === "1" ? [value] : [] }; });
+  t.mock.method(databasePool, "query", async (sql, parameters) => {
+    if (sql.includes('pg_catalog.pg_class')) return { rows: [{ installed: false }] };
+    queries.push({ sql, parameters }); return { rows: parameters[0] === "1" ? [value] : [] };
+  });
   t.mock.method(globalThis, "fetch", async () => { throw new Error("No network allowed during prepared retrieval"); });
   const context = await loadPreparedSourceContext({ clientId: "1" }, "website access", "general");
   assert.match(context.instructions, /Never invent verified settings/);
@@ -36,7 +39,7 @@ test("The hot path uses server-established client identity and never calls Googl
   assert.doesNotMatch(context.instructions, /Source: Approved rules/);
   assert.equal(context.references.length, 1);
   assert.doesNotMatch(JSON.stringify(context.references), /Other client confidential/);
-  assert.match(queries[0].sql, /WHERE p.audience='clients' OR \(p.client_id=\$1\)/);
+  assert.match(queries[0].sql, /WHERE \(p.audience='clients' OR \(p.client_id=\$1\)\)/);
   assert.deepEqual(queries[0].parameters, ["1"]);
   assert.deepEqual((await loadPreparedSourceContext({ clientId: "999" }, "website")).references, []);
 });
@@ -44,7 +47,10 @@ test("The hot path uses server-established client identity and never calls Googl
 test("Shared company sources reach every client and admin without a client-specific publication or Google call", async t => {
   const shared = { ...row(), audience: "clients", client_id: null };
   const queries = [];
-  t.mock.method(databasePool, "query", async (sql, parameters) => { queries.push({ sql, parameters }); return { rows: [shared] }; });
+  t.mock.method(databasePool, "query", async (sql, parameters) => {
+    if (sql.includes('pg_catalog.pg_class')) return { rows: [{ installed: false }] };
+    queries.push({ sql, parameters }); return { rows: [shared] };
+  });
   t.mock.method(globalThis, "fetch", async () => { throw new Error("Google/provider hot-path access is forbidden"); });
   for (const scope of [{ clientId: "1" }, { clientId: "999" }, { ownerId: "42" }]) {
     const result = await loadPreparedSourceContext(scope, "website", "general");
