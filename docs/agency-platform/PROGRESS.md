@@ -1,6 +1,6 @@
 # Agency Platform progress
 
-> Current primary checkout is `C:\Users\MY PC\Desktop\AI\portal` on `feat/agency-platform`. Stage 06 passed local verification. [Stage 06 results and rollout limits](#stage-06-server-entry-point-ownership)
+> Current primary checkout is `C:\Users\MY PC\Desktop\AI\portal` on `feat/agency-platform`. Stage 07 passed local verification. [Stage 07 results and delivery limits](#stage-07-private-files-and-cached-content)
 
 Updated November 18, 2026, Asia/Shanghai.
 
@@ -15,7 +15,8 @@ Updated November 18, 2026, Asia/Shanghai.
 | Stage 04 — existing AOC ownership migration rehearsal | Complete for approved synthetic local data only | Two no-write dry runs, two idempotent applies, preserved history, quarantine and restore verified; [runbook](STAGE04_REHEARSAL.md) |
 | Stage 05 — trusted workspace context | Implemented and verified locally | Real Better Auth sessions, two agencies in PostgreSQL, browser switch and refresh, regression tests and full build. |
 | Stage 06 — server entry-point ownership | Implemented and verified locally | Complete route inventory, signed Next.js/Python access checks, four-client denial matrix and migration 004 rehearsal. |
-| Stage 07 onward | Awaiting separate authorization | Stage 11 remains the planned gate for public agency routes. |
+| Stage 07 — private files and cached content | Implemented and verified locally | Authenticated delivery, copied-link/revocation checks, upload expiry and workspace cache isolation. |
+| Stage 08 onward | Awaiting separate authorization | Stage 11 remains the planned gate for public agency routes. |
 
 Older `docs/PHASE_0_*` files describe a separate historical architecture/closeout
 process with outstanding reviews. This stage does not mark that process complete
@@ -766,3 +767,44 @@ Apply migration 004 and deploy matching Next.js/Python signed-envelope support o
 Public agency routes remain gated until Stage 11. Harbor's own client portal stays gated too; the matrix verifies foreign denial and positive existing AOC flows. Broad legacy Admin operations remain unavailable in a foreign or ambiguous estate. Provider control retains its narrow platform guard.
 
 The disposable WSL cluster was stopped and removed after verification. **Stop before Stage 07.** No push, production write or next-stage work was performed.
+
+
+## Stage 07 private files and cached content
+
+Built on `1b5f02d` on `feat/agency-platform` in the primary `AI\portal` checkout. The starting tree was clean. Read AGENTS, the Stage 06 handoff, CONTEXT, DECISIONS, database portability and the installed Next.js data-security guidance.
+
+### Implementation and delivery contract
+
+- Reused Stage 05–06 live session, agency ownership, client assignment and role checks. Existing PostgreSQL library, upload and generated-file stores retain their client foreign keys. Composer uploads, generated files and conversations additionally retain their private user keys. The globally unique client ID maps to one agency through the ownership registry. No storage provider or schema change was needed.
+- Private library and generated downloads now share `lib/private-download.js`. Both routes authenticate before querying bytes and send attachment disposition, sanitized basename, private/no-store, Vary Cookie, no-referrer, nosniff and sandbox CSP headers. Plain HTML or code references remain download attachments. No private storage directory or public object bucket is introduced.
+- Download URLs are authenticated resource identifiers. Each request requires the current session and current workspace permission. There is no bearer grant embedded in those URLs, so there is no post-revocation bearer-grant expiry window. The next authorized request after committed membership loss fails, even when the same session previously downloaded the file or warmed a server cache. A request already authorized and streaming, or bytes previously downloaded or rendered, cannot be recalled.
+- Existing time windows remain explicit. Unattached ChatKit uploads expire from retrieval after 24 hours. Attached uploads follow their conversation lifetime and scoped access. Staff preview artifacts can be read for 24 hours from creation by their active authorized owner and within the restricted AOC Admin estate. That age limit does not grant anonymous access. Client generated files and library references remain available for their record lifetime while current access permits them.
+- The signed Next.js-to-Python request has the existing 60-second timestamp tolerance. It is a private service credential mechanism. Python still rechecks the live session and membership before each request. No browser receives this signature.
+- Library requests now send the rendered client ID. A tab whose workspace cookie changed receives the existing stale-workspace error. The existing explicit workspace switch replaces the whole document, discarding React/ChatKit conversation state and router caches. Hubstaff cache keys include the verified agency/client/user/role key. Decrypted source caches also include client, publisher, revision and encryption-key binding and revalidate fresh authorization metadata before reuse. Deduplication for saved uploads is constrained by client and upload ID. Generated artifacts and raw uploads receive random IDs.
+- The asset review found the repository-owned `aoc-logo.png` and `aoc-icon.png` branding imports. There is no `public` upload directory or service worker serving private bytes. Their static image delivery confers no access to the authenticated file routes. Client persistent browser storage contains layout preferences. The debugger stores its tab identifier separately. Existing Internal-local planning data belongs to its separate Internal workflow and was not migrated into client storage.
+
+### Files
+
+`lib/private-download.js`; the two file routes under `app/api/client-library/[id]` and `app/api/assistant-files/[id]`; `lib/portal-data.js`; `lib/builder-data.js`; `components/ai-assistant/chatkit-assistant.js`; `tests/private-download.test.mjs`; `tests/agency-backfill/entrypoints.database.test.mjs`; `chatkit_backend/tests/test_stage06_database.py`; this progress record.
+
+### Actual verification
+
+| Check | Result |
+| --- | --- |
+| Top-level Node suite | 366 passed, 0 failed, 0 skipped. Includes traversal/header injection filename cases, attachment disposition, sandbox and private cache headers. |
+| Focused agency, permissions, Hubstaff and prepared-source tests | 34 passed. Existing warm source-cache tests recheck revocation/failure metadata and isolate client reads. Concurrent cache tests keep identical provider keys separate by workspace. |
+| Python discovery | 177 tests, 172 passed and 5 skipped. Four opt-in tests are run against the real database below. The existing Hubstaff database suite remained skipped. |
+| Disposable WSL PostgreSQL | PostgreSQL 18.3 on loopback with generated process-only credentials. Stage 03’s 9 scenarios, Stage 04’s two no-write reports and two applies, and Stage 05’s four session/support scenarios passed. Migrations 003 and 004 each ran twice. |
+| Extended entry-point/database fixture | 10 scenarios passed (11 TAP tests including the parent). Contains Stage 06’s real-session routes plus Stage 07 copied anonymous/foreign links, switched workspace, same-client shared-library versus private generated artifact, revoked membership after warm cache, private response headers and preview age expiry. |
+| Python signed ASGI plus real PostgreSQL | All 4 tests passed inside the fixture. Upload tests save duplicate synthetic bytes as distinct IDs, reject access by another client and by another user in the same client, expire an unattached upload after 25 hours, reject traversal names and deny signed upload after membership loss. Existing signed history/cursor/delete tests passed too. |
+| Build and lint | Full Next.js 16.3.3 Turbopack production build passed. ESLint passed on changed JavaScript. |
+
+Tests used actual Better Auth cookies, real route functions and database queries. The upstream Next.js ChatKit response and external provider dependencies used labeled fixtures. The warmed-cache scenario used the actual workspace key helper with a test-owned memory cache, while prepared-source tests exercised their production cache with mocked metadata. No CDN request, browser account switch or live provider flow was run in Stage 07. **Stage 06 browser verification remains pending.** Stage 05’s prior browser result is retained as historical evidence.
+
+### Setup, revocation limits and next gate
+
+No additional configuration or storage credential is required. Existing private `DATABASE_URL`, `BETTER_AUTH_URL` and `BETTER_AUTH_SECRET` were replaced in test processes with synthetic loopback settings. Neon was untouched. `AGENCY_MIGRATION_DATABASE_URL` and `AGENCY_WORKSPACE_TEST_DATABASE_URL` remain absent/empty in the project environment file. For a repeat, supply them privately in the approved test shell along with the separate same-database runtime `DATABASE_URL`, synthetic auth settings and Python executable if needed. Reuse `npm run test:agency:entrypoints` after preparing the disposable Stage 03–06 fixture. No environment file was copied or changed.
+
+Browser back/forward cache behavior, already-open tabs displaying bytes fetched earlier, real CDN header propagation and deployed revocation latency remain unverified. Private no-store responses and document replacement cover subsequent application delivery. They cannot erase a recipient’s saved files or previously rendered content.
+
+Stage 11 gating and legacy Admin restrictions remain active. The WSL cluster was stopped and removed after testing. **Stop before Stage 08.** Production migration, deployment and push require their separate workflow.

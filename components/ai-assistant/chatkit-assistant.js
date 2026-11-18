@@ -99,25 +99,25 @@ function ConversationSidebar({ activeId, mode, onDelete, onNew, onRename, onSele
   );
 }
 
-function ClientLibrary({ onUseChat }) {
+function ClientLibrary({ onUseChat, clientId }) {
   const [state, setState] = useState({ loading: true, items: [], error: "" });
   const [showLink, setShowLink] = useState(false);
   const [saving, setSaving] = useState(false);
   const load = useCallback(async () => {
     try {
-      const response = await fetch("/api/client-library", { cache: "no-store" });
+      const response = await fetch("/api/client-library", { cache: "no-store", headers: { "x-aoc-client": clientId } });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "The document library could not be loaded.");
       setState({ loading: false, items: data.items || [], error: "" });
     } catch (error) { setState((current) => ({ ...current, loading: false, error: error.message })); }
-  }, []);
+  }, [clientId]);
   useEffect(() => { void load(); }, [load]);
   async function addLink(event) {
     event.preventDefault();
     setSaving(true);
     const form = new FormData(event.currentTarget);
     try {
-      const response = await fetch("/api/client-library", { method: "POST", headers: { "Content-Type": "application/json" },
+      const response = await fetch("/api/client-library", { method: "POST", headers: { "Content-Type": "application/json", "x-aoc-client": clientId },
         body: JSON.stringify(Object.fromEntries(form)), cache: "no-store" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "The link could not be saved.");
@@ -129,7 +129,7 @@ function ClientLibrary({ onUseChat }) {
   }
   async function remove(item) {
     if (!window.confirm(`Remove "${item.title}" from this client's library?`)) return;
-    const response = await fetch("/api/client-library", { method: "DELETE", headers: { "Content-Type": "application/json" },
+    const response = await fetch("/api/client-library", { method: "DELETE", headers: { "Content-Type": "application/json", "x-aoc-client": clientId },
       body: JSON.stringify({ id: item.id }), cache: "no-store" });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
@@ -507,7 +507,7 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
           )}
         </div>
       </div>
-      {tab === "library" && <div id="assistant-library" role="tabpanel" aria-labelledby="library-tab" className={styles.content}><ClientLibrary onUseChat={() => setTab("chat")} /></div>}
+      {tab === "library" && <div id="assistant-library" role="tabpanel" aria-labelledby="library-tab" className={styles.content}><ClientLibrary clientId={clientId} onUseChat={() => setTab("chat")} /></div>}
     </div>
   );
 }

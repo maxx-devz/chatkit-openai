@@ -113,3 +113,33 @@ class DatabaseBoundaries(unittest.IsolatedAsyncioTestCase):
                 await load_client(self.db,Envelope(**data))
         finally:
             await self.bootstrap.execute("DELETE FROM portal_internal_users WHERE user_id=%s",(actor["user"],))
+
+    async def test_stage07_private_uploads_expire_and_keep_user_ownership(self):
+        from store import Context
+        from uploads import upload_file, load_upload
+        from chatkit.store import NotFoundError
+        actor = self.actors[0]
+        client = await load_client(self.db, Envelope(**self.envelope(actor, {})))
+        context = Context(self.db, actor["client"], actor["user"], "", client)
+        first = await upload_file(context, "same.txt", b"private synthetic bytes")
+        second = await upload_file(context, "same.txt", b"private synthetic bytes")
+        self.assertNotEqual(first.id, second.id)
+        self.assertEqual((await load_upload(context, first.id, include_content=True))["content"], b"private synthetic bytes")
+        for target in self.actors[1:]:
+            foreign = Context(self.db, target["client"], target["user"], "", {"id": target["client"]})
+            with self.assertRaises(NotFoundError):
+                await load_upload(foreign, first.id)
+        other_user = Context(self.db, actor["client"], self.actors[1]["user"], "", client)
+        with self.assertRaises(NotFoundError):
+            await load_upload(other_user, first.id)
+        await self.bootstrap.execute("UPDATE portal_chatkit_uploads SET created_at=now()-interval '25 hours' WHERE id=%s", (first.id,))
+        with self.assertRaises(NotFoundError):
+            await load_upload(context, first.id)
+        data = self.envelope(actor, {"filename": "../escape.txt", "content": "dGVzdA=="})
+        self.assertEqual((await self.send(data, "/chatkit/upload")).status_code, 400)
+        data["payload"]["filename"] = "valid.txt"
+        await self.bootstrap.execute("UPDATE portal_memberships SET is_active=false WHERE client_id=%s AND user_id=%s", (actor["client"],actor["user"]))
+        try:
+            self.assertEqual((await self.send(data, "/chatkit/upload")).status_code, 403)
+        finally:
+            await self.bootstrap.execute("UPDATE portal_memberships SET is_active=true WHERE client_id=%s AND user_id=%s", (actor["client"],actor["user"]))

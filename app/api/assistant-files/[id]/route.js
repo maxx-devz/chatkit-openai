@@ -1,6 +1,7 @@
+import { privateDownloadHeaders } from "@/lib/private-download";
 import { resolveAdminContext } from "@/lib/admin-data";
 import { getPortalAiContext } from "@/lib/portal-data";
-import { builderPool, builderHeaders, builderResponseError } from "@/lib/builder-data";
+import { builderPool, builderResponseError } from "@/lib/builder-data";
 import { builderError } from "@/lib/builder-config";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,8 +21,6 @@ export async function GET(request, { params }) {
     }
     if (!rows.length) throw builderError("File not found.", 404);
     const file = rows[0];
-    return new Response(file.content, { headers: { ...builderHeaders, "Content-Type": file.mime_type,
-      "Content-Length": String(file.content.length), "Content-Disposition": `attachment; filename="${file.filename.replace(/[^a-zA-Z0-9 ._-]/g, "_")}"`,
-      "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox" } });
+    return new Response(file.content, { headers: privateDownloadHeaders(file) });
   } catch (error) { return builderResponseError(error); }
 }

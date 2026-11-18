@@ -221,6 +221,50 @@ test("Stage 06 existing entry points keep four clients isolated", {skip:!process
       await worker.synchronizeAllHubstaffSearch({signal:controller.signal,maxClients:4});
       assert.deepEqual(selected,["501","502"]);
     });
+    await t.test("Stage 07 copied URLs, switched workspaces and warmed cache require live access",async()=>{
+      const {inWorkspaceCache,workspaceCacheKey}=await import("../../lib/workspace-cache.js");
+      const cache=new Map();
+      async function cachedRead(identity) {
+        const context=await portal.resolvePortalContext(identity.headers);
+        return inWorkspaceCache(context.workspaceKey,()=>{
+          const key=workspaceCacheKey("same-file-reference");
+          if(!cache.has(key)) cache.set(key, "client-"+context.client.id);
+          return cache.get(key);
+        });
+      }
+      assert.equal(await cachedRead(actor),"client-501");
+      assert.equal(await cachedRead(identities[1]),"client-502");
+      const own=resources[0],path="/api/client-library/"+own.file;
+      const allowed=await files.GET(request(path),{params:Promise.resolve({id:own.file})});
+      assert.equal(allowed.status,200);
+      assert.equal(allowed.headers.get("cache-control"),"private, no-store");
+      assert.equal(allowed.headers.get("vary"),"Cookie");
+      assert.match(allowed.headers.get("content-security-policy"),/sandbox/);
+      const anonymous=new Request(origin+path,{headers:{host:new URL(origin).host}});
+      assert.equal((await files.GET(anonymous,{params:Promise.resolve({id:own.file})})).status,401);
+      // This user can explicitly switch to a second assigned workspace.
+      await db.query("INSERT INTO portal_memberships(client_id,user_id,role) VALUES(502,301,'member')");
+      const h=new Headers(actor.headers);
+      h.set("cookie",h.get("cookie").replace("s04-orchid","s04-birch"));
+      assert.equal((await files.GET(new Request(origin+path,{headers:h}),{params:Promise.resolve({id:own.file})})).status,404);
+      const oldTab=new Headers(h);oldTab.set("x-aoc-client","501");
+      await assert.rejects(portal.resolvePortalContext(oldTab),e=>e.publicDetails?.status===409);
+      await db.query("DELETE FROM portal_memberships WHERE client_id=502 AND user_id=301");
+      await db.query("INSERT INTO portal_memberships(client_id,user_id,role) VALUES(501,305,'member')");
+      const teammate=new Headers(identities[1].headers);
+      teammate.set("cookie",teammate.get("cookie").replace("s04-birch","s04-orchid"));
+      assert.equal((await files.GET(new Request(origin+path,{headers:teammate}),{params:Promise.resolve({id:own.file})})).status,200);
+      assert.equal((await generated.GET(new Request(origin+"/api/assistant-files/"+own.artifact,{headers:teammate}),{params:Promise.resolve({id:own.artifact})})).status,404);
+      await db.query("DELETE FROM portal_memberships WHERE client_id=501 AND user_id=305");
+      await db.query("UPDATE portal_memberships SET is_active=false WHERE client_id=501 AND user_id=301");
+      try {
+        assert.equal((await files.GET(request(path),{params:Promise.resolve({id:own.file})})).status,403);
+        assert.equal((await generated.GET(request("/api/assistant-files/"+own.artifact),{params:Promise.resolve({id:own.artifact})})).status,403);
+        await assert.rejects(cachedRead(actor),e=>e.publicDetails?.status===403);
+      } finally {await db.query("UPDATE portal_memberships SET is_active=true WHERE client_id=501 AND user_id=301");}
+      await db.query("UPDATE portal_assistant_files SET preview=true,created_at=now()-interval '25 hours' WHERE id=$1",[own.artifact]);
+      assert.equal((await generated.GET(request("/api/assistant-files/"+own.artifact),{params:Promise.resolve({id:own.artifact})})).status,404);
+    });
     await t.test("legacy Admin creation assigns AOC ownership atomically and cannot adopt old records",async()=>{
       const platform=await import("../../lib/admin-data.js");
       const username="stage06.operator",password=randomBytes(24).toString("hex")+"Aa!";
@@ -245,6 +289,15 @@ test("Stage 06 existing entry points keep four clients isolated", {skip:!process
       const grant=await db.query("SELECT * FROM agency_platform.request_workspaces((SELECT external_id FROM portal_users WHERE id=(SELECT user_id FROM portal_memberships WHERE client_id=$1)))",[created.id]);
       assert.equal(grant.rowCount,1);assert.equal(grant.rows[0].client_role,"client_admin");
       assert.equal((await platform.resolveAdminContext(headers)).admin.id,"300");
+      const preview=randomUUID();
+      await db.query("INSERT INTO portal_assistant_files(id,client_id,user_id,preview,filename,mime_type,content,created_at) VALUES($1,501,300,true,'../../preview.webp','image/webp',$2,now()-interval '23 hours')",[preview,Buffer.from("synthetic-preview")]);
+      const url=origin+"/api/assistant-files/"+preview+"?preview=1";
+      const response=await generated.GET(new Request(url,{headers}),{params:Promise.resolve({id:preview})});
+      assert.equal(response.status,200);
+      assert.equal(response.headers.get("content-disposition"),'attachment; filename="preview.webp"');
+      await db.query("UPDATE portal_assistant_files SET created_at=now()-interval '25 hours' WHERE id=$1",[preview]);
+      assert.equal((await generated.GET(new Request(url,{headers}),{params:Promise.resolve({id:preview})})).status,404);
+
     });
   } finally {await closeAuthDatabase();await db.end();await databasePool.end().catch(()=>{});}
 });
