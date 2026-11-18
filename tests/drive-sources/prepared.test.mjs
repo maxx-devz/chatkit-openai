@@ -133,14 +133,16 @@ test("Warm replies read fresh metadata, not the large blob; revision and encrypt
   });
   await loadPreparedSourceContext({ clientId: "1" }, "website");
   full = { ...full, checked_at: new Date() }; // unchanged corpus after a fresh Google check
-  await loadPreparedSourceContext({ clientId: "2" }, "website");
+  await loadPreparedSourceContext({ clientId: "1" }, "website");
   assert.equal(reads, 1);
+  await loadPreparedSourceContext({ clientId: "2" }, "website");
+  assert.equal(reads, 2);
   full = { ...full, failure_code: "access_denied" };
   await assert.rejects(loadPreparedSourceContext({ clientId: "1" }, "website"));
-  assert.equal(reads, 1);
+  assert.equal(reads, 2);
   full = { ...full, failure_code: null, sync_info: { corpusRevision: "revision-2" } };
   await loadPreparedSourceContext({ clientId: "1" }, "website");
-  assert.equal(reads, 2);
+  assert.equal(reads, 3);
   const secret = process.env.GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY;
   process.env.GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY = secret + "changed";
   try { await assert.rejects(loadPreparedSourceContext({ clientId: "1" }, "website"), /could not be decrypted/); }

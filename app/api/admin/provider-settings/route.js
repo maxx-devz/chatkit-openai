@@ -1,4 +1,4 @@
-import { resolveAdminContext, adminErrorResponse } from "@/lib/admin-data";
+import { resolvePlatformOperator, adminErrorResponse } from "@/lib/admin-data";
 import { assertTrustedOrigin, readJsonRequest, requestSecurityErrorResponse } from "@/lib/request-security";
 import { publicProviderSettings, getRuntimeProvider, providerFromKey, saveProviderConfiguration } from "@/lib/provider-settings";
 import { validateProvider, validateProviderKey } from "@/lib/provider-secrets";
@@ -24,7 +24,7 @@ function failure(error) {
 
 export async function GET(request) {
   try {
-    await resolveAdminContext(request.headers);
+    await resolvePlatformOperator(request.headers);
     return Response.json(await publicProviderSettings(), { headers });
   } catch (error) { return failure(error); }
 }
@@ -32,7 +32,7 @@ export async function GET(request) {
 async function configure(request, save) {
   try {
     assertTrustedOrigin(request.headers);
-    const { admin } = await resolveAdminContext(request.headers);
+    const { admin } = await resolvePlatformOperator(request.headers);
     const settings = await publicProviderSettings();
     if (!settings.ready) return Response.json({ error: settings.setupMessage }, { status: 503, headers });
     const body = await readJsonRequest(request, 4000);

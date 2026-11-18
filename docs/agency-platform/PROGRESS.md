@@ -1,6 +1,6 @@
 # Agency Platform progress
 
-> Current primary checkout: `C:\Users\MY PC\Desktop\AI\portal` on `feat/agency-platform-isolation`. The Stage 03–04 Git import and local verification are complete. Earlier handoff notices describe the source checkout before import. [Primary checkout results](#primary-checkout-verification)
+> Current primary checkout is `C:\Users\MY PC\Desktop\AI\portal` on `feat/agency-platform`. Stage 05 passed local verification. [Stage 05 results and rollout limits](#stage-05-trusted-workspace-context)
 
 Updated November 18, 2026, Asia/Shanghai.
 
@@ -13,7 +13,8 @@ Updated November 18, 2026, Asia/Shanghai.
 | Stage 02A — three product offers | Complete: draft package rules, no published offer | DECISIONS S02A-D02 and D04; independent platform-only, specialist-only and combined selections |
 | Stage 03 — additive agency schema and database checks | Complete for the approved disposable local target | PostgreSQL 18.3: 9 real scenario groups passed; migration CLI apply/repeat and cleanup verified; no Neon/deployment claim |
 | Stage 04 — existing AOC ownership migration rehearsal | Complete for approved synthetic local data only | Two no-write dry runs, two idempotent applies, preserved history, quarantine and restore verified; [runbook](STAGE04_REHEARSAL.md) |
-| Stage 05 onward | Not started; not authorized | Stop here; no automatic continuation or unfinished agency-mode exposure; new routes remain deferred until Stage 11 |
+| Stage 05 — trusted workspace context | Implemented and verified locally | Real Better Auth sessions, two agencies in PostgreSQL, browser switch and refresh, regression tests and full build. |
+| Stage 06 onward | Awaiting separate authorization | Stage 11 remains the planned gate for public agency routes. |
 
 Older `docs/PHASE_0_*` files describe a separate historical architecture/closeout
 process with outstanding reviews. This stage does not mark that process complete
@@ -628,7 +629,7 @@ Production migration needs its own approved staging snapshot, restored backup,
 writer/provisioning freeze, tested delta replay and final cutover approval. These
 are later gates, not blockers that prevent finishing the authorized local stage.
 
-## Next permitted action
+## Historical handoff after Stage 04
 
 **Stage 04 synthetic local rehearsal is complete. Stop before Stage 05.** No
 production migration, dependency installation, new agency route or automatic
@@ -662,3 +663,49 @@ The full Next.js build, browser sign-in, live providers and deployment checks
 were outside this focused rerun. The older build failure above belongs to the
 source worktree. The source and primary environment files were preserved, Neon
 was untouched, and the Git commits are local. Work stopped before Stage 05.
+
+
+## Stage 05 trusted workspace context
+
+Implemented in the primary checkout on local branch `feat/agency-platform`, created from the verified Stage 03–04 handoff at `9e426a7`. The following results supersede the earlier build and browser status for this checkout.
+
+### Request and support boundaries
+
+- Better Auth verifies the session against its backing store on each protected request. Client authorization intersects enabled client, active legacy client membership, active agency, active agency membership, current ownership and active client assignment. The lower client permission wins. An installation without the agency schema retains existing client membership access. A partially installed agency schema closes the affected routes until the context migration is ready.
+- The configured portal host must match, including its port. A URL, header or active-workspace cookie can select an authorized workspace. Conflicts and unknown hosts are rejected. A multi-workspace user chooses before a client page loads. The same-origin selection endpoint verifies and saves the agency and client in HttpOnly cookies. Switching loads a new document. Hubstaff and decrypted source data caches have separate workspace keys.
+- Platform operator status comes from an active database record. Global provider configuration uses this authority. Broad legacy Admin queries require an all-AOC client estate. They deny access when a foreign or unowned client exists. Replacing those queries with resource-scoped operations remains future work. Staff can read their own agency context without a client grant. Client access requires an assignment. Internal account exclusion and Internal panel policy continue to apply. Public `/agency` and `/api/agency` routes remain gated until Stage 11.
+- The only support action is `support.workspace.status.read`. It returns a portal-enabled flag for one client. A trusted operator records a reason, ticket, named support actor, independent approvals from an agency admin and client admin, and expiry within one hour. Each exercise rechecks the actor, both approvers, resource, grant and time. The database logs issuance, exercise, denial and revocation. The application login cannot read or issue the grants directly. Leadership approval of live consent procedures, retention and any emergency access remains pending. No support UI or live grant was enabled.
+- The application derives the actor ID from Better Auth before calling the restricted PostgreSQL functions. Those functions trust the designated application login for the actor argument. A stolen database credential is outside that guarantee. Stage 03's separate role-bound RLS checks cover the scoped agency tables. The legacy application login still has its Stage 04 permissions on legacy tables.
+
+### Files
+
+| Area | Changed paths |
+| --- | --- |
+| Schema and migration | `database/agency-platform/003_request_context.sql`, `scripts/migrate-agency-context.mjs`, `package.json` |
+| Authentication and authorization | `lib/auth.js`, `lib/portal-data.js`, `lib/admin-data.js`, `lib/client-permissions.js`, `lib/workspace-selection.js`, `lib/workspace-schema.js`, `proxy.js`, `app/api/admin/provider-settings/route.js` |
+| Client selection | `app/page.js`, `app/credits/page.js`, `app/api/session/client/route.js`, `components/portal/workspace-chooser.js`, `components/portal/account-controls.js` |
+| Workspace caches | `lib/workspace-cache.js`, `lib/hubstaff.js`, `lib/prepared-source-context.js`, `lib/prepared-source-store.js`, `app/api/chatkit/route.js`, the three project, workflow and task routes under `app/api/hubstaff/` |
+| Tests and record | `tests/agency-workspace.test.mjs`, `tests/agency-backfill/{workspace,rehearsal}.database.test.mjs`, `tests/internal-user/access.test.mjs`, `tests/drive-sources/prepared.test.mjs`, `tests/{provider-activation,openrouter-admin}-route.test.mjs`, this progress entry |
+
+### Local verification
+
+| Check | Actual result |
+| --- | --- |
+| Full top-level Node suite (`npm test` command) | 365 passed, 0 failed, 0 skipped. Provider metadata and writes used test doubles. |
+| Focused agency, backfill planning, prepared-source, client-permission and Hubstaff tests | 34 passed, 0 failed, 0 skipped. Includes incomplete-schema denial, concurrent cache lookups and separate decrypted-source reads for two client workspaces. Some tests overlap the top-level suite. |
+| Internal account and panel regression suite | 115 passed, 0 failed, 0 skipped. The suite uses mock identities and adapters. |
+| Stage 03–04 regression on fresh disposable WSL PostgreSQL 18.3 | Nine Stage 03 database scenarios passed. Two dry runs made no writes and agreed. Stage 04 classified 51 records with 7 quarantined. Repeat application changed 0 ownership rows and preserved the snapshot. All eight Stage 04 application/SQL scenarios passed. This older DAL test mocks the session and Internal guard. |
+| Stage 05 migration with synthetic data | Ran migration 003 twice against the same disposable database with the named Stage 04 non-owner application login. Both completed. |
+| Stage 05 real authentication and routes | Five scenarios passed (6 TAP tests including the parent). Synthetic users signed in through Better Auth. Checks covered conflicting selections, unknown host, required choice, foreign clients, request-supplied roles, stale cookies after downgrade, membership/agency suspension, revoked sessions, Internal exclusion, separate platform access, support expiry, denial, revocation and audit. |
+| Headless Chrome against the production build | One of the five Stage 05 scenarios. Opened a bookmarked client URL, chose Orchid, switched to Birch, refreshed and verified the account and HttpOnly cookies. Both public agency route prefixes returned 404. The chooser, selection endpoint, database and page navigation were real. Unrelated dashboard API calls and external requests were intercepted. |
+| Build and lint | Full Next.js 16.3.3 Turbopack production build passed, including TypeScript and static generation. ESLint passed on the changed JavaScript. |
+
+The browser check initially refreshed before the switch had completed. The final check waits for the selection response and the new client's welcome text before refreshing. The local Next.js server was stopped and the temporary WSL cluster was removed. No external sign-in, provider, message, payment, Neon database, deployment or push was used.
+
+### Private setup and next gate
+
+The primary checkout's private `.env.local` contains entries for `DATABASE_URL`, `BETTER_AUTH_URL` and `BETTER_AUTH_SECRET`. Presence alone was checked. The tests supplied their own loopback values. Before a separately approved staging run, set these three in the Next.js server environment for that target, including the exact authorized host in `BETTER_AUTH_URL`.
+
+`AGENCY_MIGRATION_DATABASE_URL` and `AGENCY_WORKSPACE_TEST_DATABASE_URL` are absent or empty in the primary `.env.local`. This did not block local testing. For another rehearsal, set the migration URL privately in the operator's shell, confirm the disposable database name and pass its Stage 04 application login to `npm run agency:context -- --confirm-database <database> --app-role <login>`. For `npm run test:agency:context`, supply the test-only bootstrap URL and the distinct non-owner `DATABASE_URL` for that same synthetic fixture. Load the Better Auth schema and set a private synthetic auth secret and loopback origin first. `AGENCY_WORKSPACE_BROWSER_CHECK=1` additionally exercises Chrome against a built local server on that origin. Keep the bootstrap and migration credentials outside the application runtime. Neither the rehearsal nor Stage 05 requires new provider credentials.
+
+**Stage 06 is the next stage and requires a separate instruction.** Production migration, custom domains, live provider flows and deployment remain unverified.

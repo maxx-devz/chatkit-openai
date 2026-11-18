@@ -19,7 +19,7 @@ async function harness({ access = "available", blocked = false, authenticated = 
   const mocks = {
     OpenRouterSetupError,
     checkOpenRouterAccount: async () => { throw new Error("OpenAI metadata must not use OpenRouter credentials."); },
-    resolveAdminContext: async () => { if (!authenticated) throw { publicDetails: true }; return { admin: { id: 7 } }; },
+    resolvePlatformOperator: async () => { if (!authenticated) throw { publicDetails: true }; return { admin: { id: 7 } }; },
     adminErrorResponse: () => Response.json({ error: "Unauthorized" }, { status: 401 }),
     assertTrustedOrigin: headers => { if (headers.get("origin") !== "https://portal.example") throw new Error("Untrusted origin"); },
     readJsonRequest: request => request.json(), requestSecurityErrorResponse: () => null,

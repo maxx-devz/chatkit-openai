@@ -1,7 +1,20 @@
 import { NextResponse } from "next/server";
+import { requestWorkspaceHeaders, trustedPortalHost } from "./lib/workspace-selection.js";
 import { DEBUGGER_PORTAL_HEADER, debuggerPageRequest } from "./lib/debugger/routing.js";
 
 export function proxy(request) {
+  if (!trustedPortalHost(request.headers.get("host"))) return new NextResponse("Unknown portal host.", { status: 403 });
+  // Reserve agency-mode routes until the Stage 11 rollout.
+  if (/^\/(?:api\/)?agency(?:\/|$)/.test(request.nextUrl.pathname)) return new NextResponse(null, { status: 404 });
+  let requestHeaders;
+  try { requestHeaders = requestWorkspaceHeaders(new URL(request.url), request.headers); }
+  catch { return new NextResponse("Invalid workspace selection.", { status: 400 }); }
+  requestHeaders.delete(DEBUGGER_PORTAL_HEADER);
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    response.headers.set("Cache-Control", "private, no-store");
+    return response;
+  }
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDevelopment = process.env.NODE_ENV === "development";
   // Client-side navigation keeps the initial document's CSP. Login and staff
@@ -26,10 +39,8 @@ export function proxy(request) {
     ${isDevelopment ? "" : "upgrade-insecure-requests;"}
   `.replace(/\s{2,}/g, " ").trim();
 
-  const requestHeaders = new Headers(request.headers);
   // Never trust a caller-supplied return path. Any page can open the same
   // authenticated inspector, without rendering that page's role-specific shell.
-  requestHeaders.delete(DEBUGGER_PORTAL_HEADER);
   const debuggerPage = debuggerPageRequest(request.url, request.method);
   if (debuggerPage) requestHeaders.set(DEBUGGER_PORTAL_HEADER, debuggerPage.portalPath);
   requestHeaders.set("x-nonce", nonce);
@@ -39,24 +50,11 @@ export function proxy(request) {
   const response = debuggerPage?.rewrite
     ? NextResponse.rewrite(debuggerPage.destination, options)
     : NextResponse.next(options);
-  if (debuggerPage) response.headers.set("Cache-Control", "private, no-store");
+  response.headers.set("Cache-Control", "private, no-store");
   response.headers.set("Content-Security-Policy", policy);
   return response;
 }
 
 export const config = {
-  matcher: [
-    {
-      source: "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico)$).*)",
-      missing: [
-        { type: "header", key: "next-router-prefetch" },
-        { type: "header", key: "purpose", value: "prefetch" },
-      ],
-    },
-    {
-      // A prefetched debugger URL must not cache the underlying portal page.
-      source: "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico)$).*)",
-      has: [{ type: "query", key: "debugger", value: "true" }],
-    },
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

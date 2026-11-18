@@ -124,6 +124,7 @@ const db = { query: async (query, values) => {
     legacyQueries++;
     return { rows: session.user.id === 'admin' ? [{ id: '30', role: 'aoc_admin', display_name: 'Fixture admin' }] : [] };
   }
+  if (query.includes('pg_catalog.pg_class')) return { rows: [{foundation:false, ready:false}] };
   if (query.includes('WITH synced_user')) {
     legacyQueries++;
     return { rows: session.user.id === 'client' ? [{ id: '7', portal_user_id: '40', slug: 'fixture-client', role: 'client_admin', display_name: 'Fixture client' }] : [] };
@@ -177,9 +178,9 @@ const { POST: unlink } = await import('../../app/api/internal/connection/unlink/
 const { POST: chatkit } = await import('../../app/api/chatkit/route.js');
 const { GET: clientHubstaff } = await import('../../app/api/hubstaff/route.js');
 const { GET: builder } = await import('../../app/api/builder/route.js');
-const headers = new Headers({ origin: 'https://portal.example' });
+const headers = new Headers({ host: 'portal.example', origin: 'https://portal.example' });
 const request = (path, method = 'GET', body) => new Request(`https://portal.example${path}`, {
-  method, headers: { origin: 'https://portal.example', ...(body ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}) }, body,
+  method, headers: { host: 'portal.example', origin: 'https://portal.example', ...(body ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}) }, body,
 });
 
 function mockTeamRoster(t, { token = 'hsoat_fixture_token', timeOffRequests = [], balances = [], policies = [],
@@ -552,12 +553,12 @@ test('non-manager cannot read or create internal user accounts through the new A
   assert.equal((await internalUsersGet(request('/api/internal/internal-users'))).status, 403);
   assert.equal((await availableHubstaffMembers(request('/api/internal/hubstaff-members'))).status, 403);
   const create = new Request('https://portal.example/api/internal/internal-users', {
-    method: 'POST', headers: { origin: 'https://portal.example', 'content-type': 'application/json' },
+    method: 'POST', headers: { host: 'portal.example', origin: 'https://portal.example', 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'Not authorized' }),
   });
   assert.equal((await internalUsersPost(create)).status, 403);
   const assign = new Request('https://portal.example/api/internal/internal-users', {
-    method: 'PUT', headers: { origin: 'https://portal.example', 'content-type': 'application/json' },
+    method: 'PUT', headers: { host: 'portal.example', origin: 'https://portal.example', 'content-type': 'application/json' },
     body: JSON.stringify({ id: '2', role: 'hr', assigned: true }),
   });
   assert.equal((await internalUsersPut(assign)).status, 403);
@@ -615,7 +616,7 @@ test('account managers default to AOC members, can list other unmapped organizat
     ] });
     assert.equal((await availableHubstaffMembers(request('/api/internal/hubstaff-members?aoc_only=all'))).status, 400);
     const outsider = new Request('https://portal.example/api/internal/internal-users', {
-      method: 'POST', headers: { origin: 'https://portal.example', 'content-type': 'application/json' },
+      method: 'POST', headers: { host: 'portal.example', origin: 'https://portal.example', 'content-type': 'application/json' },
       body: JSON.stringify({ name: 'Outside Organization', username: 'outside.org',
         password: 'FixturePassword123!', position: 'team_member', hubstaffUserId: '606' }),
     });
@@ -648,7 +649,7 @@ test('internal admin sees all current panels and cannot smuggle roles through ac
   assert.equal(list.status, 200);
   assert.equal((await list.json()).canManage, true);
   const mutation = (method, body) => new Request('https://portal.example/api/internal/internal-users', {
-    method, headers: { origin: 'https://portal.example', 'content-type': 'application/json' },
+    method, headers: { host: 'portal.example', origin: 'https://portal.example', 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
   assert.equal((await internalUsersPost(mutation('POST', { name: 'Incomplete' }))).status, 400);
@@ -669,7 +670,7 @@ test('access managers manage business roles while only internal admin may grant 
   roles = ['internal_access_manager'];
   session = { user: { id: 'internal-user-a', name: 'Manager' } };
   const put = (id, role, assigned) => new Request('https://portal.example/api/internal/internal-users', {
-    method: 'PUT', headers: { origin: 'https://portal.example', 'content-type': 'application/json' },
+    method: 'PUT', headers: { host: 'portal.example', origin: 'https://portal.example', 'content-type': 'application/json' },
     body: JSON.stringify({ id, role, assigned }),
   });
   const beforeAudit = roleAudit.length;
@@ -691,7 +692,7 @@ test('access managers manage business roles while only internal admin may grant 
   assert.equal((await internalUsersPut(put('1', 'internal_access_manager', false))).status, 403);
   assert.equal(roleAudit.length, auditedChanges);
   const injected = new Request('https://portal.example/api/internal/internal-users', {
-    method: 'PUT', headers: { origin: 'https://portal.example', 'content-type': 'application/json' },
+    method: 'PUT', headers: { host: 'portal.example', origin: 'https://portal.example', 'content-type': 'application/json' },
     body: JSON.stringify({ id: '2', role: 'sales', assigned: true, permissions: ['people.leave.read'] }),
   });
   assert.equal((await internalUsersPut(injected)).status, 400);
@@ -734,7 +735,7 @@ test('manager can list accounts but cannot update their own managed account', as
   assert.equal(list.status, 200);
   assert.equal((await list.json()).internalUsers[0].roles[0], 'internal_access_manager');
   const patch = new Request('https://portal.example/api/internal/internal-users', {
-    method: 'PATCH', headers: { origin: 'https://portal.example', 'content-type': 'application/json' },
+    method: 'PATCH', headers: { host: 'portal.example', origin: 'https://portal.example', 'content-type': 'application/json' },
     body: JSON.stringify({ id: '1', name: 'Self', position: 'team_member',
       panelAccess: ['overview'], active: true, hubstaffUserId: '101' }),
   });
@@ -747,7 +748,7 @@ test('internal admin can update its own account details but cannot deactivate it
   roles = ['internal_admin'];
   session = { user: { id: 'internal-user-a', name: 'Internal Admin' } };
   const patch = (overrides = {}) => new Request('https://portal.example/api/internal/internal-users', {
-    method: 'PATCH', headers: { origin: 'https://portal.example', 'content-type': 'application/json' },
+    method: 'PATCH', headers: { host: 'portal.example', origin: 'https://portal.example', 'content-type': 'application/json' },
     body: JSON.stringify({ id: '1', name: 'Updated Admin', position: 'team_member',
       panelAccess: ['overview', 'my_tasks'], active: true, hubstaffUserId: '101', ...overrides }),
   });

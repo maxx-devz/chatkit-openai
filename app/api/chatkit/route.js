@@ -17,6 +17,7 @@ import {
   hubstaffMetricsRequested, hubstaffActivityAnalyticsRequested,
   hubstaffCredentialAuditRequested, hubstaffTaskReferences,
 } from "@/lib/chatkit-hubstaff";
+import { inWorkspaceCache } from "@/lib/workspace-cache";
 import { loadHubstaffAssistantSnapshot } from "@/lib/hubstaff";
 import { indexedHubstaffSnapshot } from "@/lib/hubstaff-search-store";
 import { loadPreparedSourceContext } from "@/lib/prepared-source-context";
@@ -57,7 +58,7 @@ async function handlePOST(request) {
       if (!savedMode) return Response.json({ error: "This conversation is no longer available." }, { status: 404, headers: noStore });
       if (savedMode !== mode) return Response.json({ error: "This conversation belongs to the other chat mode. Reload and try again." }, { status: 409, headers: noStore });
     }
-    const run = async (send = () => {}) => {
+    const run = (send = () => {}) => inWorkspaceCache(context.workspaceKey, async () => {
     try {
     const needsConversationContext = threadId && ((mode === "work" && hubstaffConversationContextRequested(payload))
       || (isReplyRequest(payload) && !chatKitInputText(payload)));
@@ -159,7 +160,7 @@ async function handlePOST(request) {
       // known failures here so SSE and ordinary requests share safe diagnostics.
       return chatFailureResponse(error);
     }
-    };
+    });
     if (request.headers.get("x-aoc-workflow") === "1" && isReplyRequest(payload)) {
       return streamWithWorkflow(run);
     }

@@ -95,7 +95,8 @@ test('Stage 04 migrated synthetic database acceptance', {skip:!enabled}, async t
     const sources=await import('../../lib/prepared-source-store.js');
     const credits=await import('../../lib/credits-repository.js');
     appPool=(await import('../../lib/database.js')).databasePool;
-    const headers=new Headers({cookie:'aoc_active_client=s04-orchid'});
+    process.env.BETTER_AUTH_URL ||= "http://127.0.0.1:3000";
+    const headers=new Headers({host:new URL(process.env.BETTER_AUTH_URL).host,cookie:'aoc_active_client=s04-orchid'});
     await t.test('existing authenticated AOC DAL paths use real migrated SQL',async()=>{
       const context=await portal.resolvePortalContext(headers);
       assert.equal(context.client.id,'501');assert.equal(context.user.id,'301');

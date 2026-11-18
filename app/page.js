@@ -8,7 +8,8 @@ import loginStyles from "@/components/auth/login.module.css";
 import ClientPortal from "@/components/portal/client-portal";
 import { resolveAdminContext } from "@/lib/admin-data";
 import { isPortalAuthConfigured } from "@/lib/auth";
-import { resolvePortalContext } from "@/lib/portal-data";
+import { resolvePortalContext, listWorkspaceChoices, clientShellContext } from "@/lib/portal-data";
+import WorkspaceChooser from "@/components/portal/workspace-chooser";
 import { notFound } from "next/navigation";
 import { debuggerAccess, debuggerEnabled } from "@/lib/debugger/access";
 import { DEBUGGER_PORTAL_HEADER, debuggerPortalPath } from "@/lib/debugger/routing";
@@ -31,15 +32,24 @@ export default async function HomePage({ searchParams }) {
   const requestHeaders = await headers();
 
   try {
-    portalContext = await resolvePortalContext(requestHeaders);
+    portalContext = await resolvePortalContext(requestHeaders, { document: true });
   } catch (error) {
     if (error?.publicDetails?.status === 401) redirect("/login");
     if (error?.publicDetails?.code === "internal_user_only") redirect("/internal");
+    const code = error?.publicDetails?.code;
+    if (["workspace_selection_required","workspace_denied","agency_client_gated"].includes(code)) {
+      const choices = await listWorkspaceChoices(requestHeaders);
+      return <main className={loginStyles.page}><div className={loginStyles.card}>
+        <WorkspaceChooser choices={choices} message={code === "agency_client_gated" ? error.publicDetails.message : undefined} />
+      </div></main>;
+    }
 
     let isAdministrator = false;
     try {
-      await resolveAdminContext(requestHeaders);
-      isAdministrator = true;
+      if (code === "client_membership_required") {
+        await resolveAdminContext(requestHeaders);
+        isAdministrator = true;
+      }
     } catch {
       // The original client-access error is more useful for non-admin users.
     }
@@ -65,5 +75,5 @@ export default async function HomePage({ searchParams }) {
     );
   }
 
-  return <ClientPortal portalContext={portalContext} requestedView={params?.view} initialWebsite={params?.site} connectionResult={params?.connection} />;
+  return <ClientPortal key={portalContext.workspaceKey} portalContext={clientShellContext(portalContext)} requestedView={params?.view} initialWebsite={params?.site} connectionResult={params?.connection} />;
 }

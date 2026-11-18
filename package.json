@@ -6,7 +6,9 @@
   "scripts": {
     "agency:plan": "node scripts/migrate-agency-platform.mjs --plan",
     "agency:migrate": "node scripts/migrate-agency-platform.mjs",
+    "agency:context": "node scripts/migrate-agency-context.mjs",
     "agency:backfill": "node scripts/migrate-agency-backfill.mjs",
+    "test:agency:context": "node --conditions=react-server --experimental-test-module-mocks --import ./tests/internal-user/aliases.mjs --test tests/agency-workspace.test.mjs tests/agency-backfill/workspace.database.test.mjs",
     "test:agency:backfill": "node --test tests/agency-backfill/plan.test.mjs",
     "test:agency:backfill:database": "node --conditions=react-server --experimental-test-module-mocks --import ./tests/internal-user/aliases.mjs --test tests/agency-backfill/rehearsal.database.test.mjs",
     "test:agency": "node --test tests/agency-platform.test.mjs",

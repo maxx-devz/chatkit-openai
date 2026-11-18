@@ -1,3 +1,4 @@
+import { inWorkspaceCache } from "@/lib/workspace-cache";
 import {
   hubstaffErrorResponse,
   loadHubstaffProject,
@@ -18,11 +19,11 @@ export async function GET(request) {
 async function handleGET(request) {
   try {
     const context = await resolvePortalContext(request.headers);
-    const data = await loadHubstaffProject(context.client.hubstaffProjectUrl, {
+    const data = await inWorkspaceCache(context.workspaceKey, () => loadHubstaffProject(context.client.hubstaffProjectUrl, {
       monthlyHoursLimit: context.client.hubstaffMonthlyHoursLimit,
       includeTasks: false,
       trackingProjectId: context.client.hubstaffTrackingProjectId,
-    });
+    }));
 
     if (
       data?.project?.trackingProjectId

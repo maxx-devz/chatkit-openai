@@ -10,7 +10,7 @@ async function endpoint({ auth = true, origin = true, accountError, modelBlocked
   const calls = [], key = `provider_route_${randomUUID()}`;
   const mocks = {
     assertTrustedOrigin: () => { calls.push("origin"); if (!origin) throw { security: true }; },
-    resolveAdminContext: async () => { calls.push("auth"); if (!auth) throw { publicDetails: {} }; return { admin: { id: "admin-test" } }; },
+    resolvePlatformOperator: async () => { calls.push("auth"); if (!auth) throw { publicDetails: {} }; return { admin: { id: "admin-test" } }; },
     adminErrorResponse: () => Response.json({ error: "Sign in" }, { status: 401 }),
     requestSecurityErrorResponse: error => error.security ? Response.json({ error: "Bad origin" }, { status: 403 }) : null,
     readJsonRequest: request => request.json(),

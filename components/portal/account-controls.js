@@ -4,11 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { authClient } from "@/lib/auth-client";
+import { switchWorkspace } from "./workspace-chooser";
 import styles from "./account-controls.module.css";
 
 export default function AccountControls({ client, memberships, user }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
   const initials = client.name
     .split(/\s+/)
     .filter(Boolean)
@@ -24,18 +26,8 @@ export default function AccountControls({ client, memberships, user }) {
     if (!slug || slug === client.slug) return;
     setBusy("switching");
 
-    const response = await fetch("/api/session/client", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slug }),
-    });
-
-    if (response.ok) {
-      router.refresh();
-      return;
-    }
-
-    setBusy("");
+    try { await switchWorkspace(memberships.find(item => item.slug === slug)); }
+    catch (failure) { setError(failure.message); setBusy(""); }
   }
 
   async function signOut() {
@@ -60,7 +52,7 @@ export default function AccountControls({ client, memberships, user }) {
             >
               {memberships.map((membership) => (
                 <option key={membership.slug} value={membership.slug}>
-                  {membership.name}
+                  {membership.agencyName} / {membership.name}
                 </option>
               ))}
             </select>
@@ -70,6 +62,7 @@ export default function AccountControls({ client, memberships, user }) {
         )}
         <small>{user.username || user.name} · {roleLabel}</small>
       </div>
+      {error && <small role="alert">{error}</small>}
       <button
         aria-label="Sign out"
         disabled={Boolean(busy)}

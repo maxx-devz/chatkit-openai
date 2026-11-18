@@ -1,55 +1,25 @@
-import {
-  ACTIVE_CLIENT_COOKIE,
-  portalErrorResponse,
-  resolvePortalContext,
-} from "@/lib/portal-data";
-import { readJsonRequest } from "@/lib/request-security";
-import { isValidUsername } from "@/lib/input-validation";
+import { choosePortalWorkspace, portalErrorResponse } from "@/lib/portal-data";
+import { ACTIVE_AGENCY_COOKIE, ACTIVE_CLIENT_COOKIE, workspaceError } from "@/lib/workspace-selection";
+import { assertTrustedOrigin, readJsonRequest, requestSecurityErrorResponse } from "@/lib/request-security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function PUT(request) {
-  let slug;
-
   try {
-    const body = await readJsonRequest(request, 2_000);
-    slug = typeof body?.slug === "string" ? body.slug.trim().toLowerCase() : "";
-    if (!isValidUsername(slug)) slug = "";
-  } catch {
-    return Response.json(
-      { error: "The client selection is invalid.", code: "invalid_client" },
-      { status: 400 },
-    );
-  }
-
-  try {
-    const context = await resolvePortalContext(request.headers);
-    const allowed = context.memberships.some(
-      (membership) => membership.slug === slug,
-    );
-
-    if (!allowed) {
-      return Response.json(
-        {
-          error: "You do not have access to that client account.",
-          code: "client_access_denied",
-        },
-        { status: 403 },
-      );
+    assertTrustedOrigin(request.headers);
+    const body = await readJsonRequest(request, 2000);
+    if (typeof body.slug !== "string" || typeof body.agencySlug !== "string") {
+      throw workspaceError("invalid_workspace", "Choose an agency and client.", 400);
     }
-
-    const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
-    return Response.json(
-      { selected: true, slug },
-      {
-        headers: {
-          "Cache-Control": "no-store",
-          "Set-Cookie": `${ACTIVE_CLIENT_COOKIE}=${encodeURIComponent(slug)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${secure}`,
-        },
-      },
-    );
+    const selected = await choosePortalWorkspace(request.headers, { slug: body.slug, agencySlug: body.agencySlug });
+    const headers = new Headers({ "Cache-Control": "private, no-store" });
+    const secure = new URL(process.env.BETTER_AUTH_URL).protocol === "https:" ? "; Secure" : "";
+    for (const [name,value] of [[ACTIVE_AGENCY_COOKIE,selected.agencySlug],[ACTIVE_CLIENT_COOKIE,selected.slug]]) {
+      headers.append("Set-Cookie", name + "=" + encodeURIComponent(value) + "; Path=/; HttpOnly; SameSite=Lax" + secure);
+    }
+    return Response.json({ selected: true, slug: selected.slug, agencySlug: selected.agencySlug }, { headers });
   } catch (error) {
-    return portalErrorResponse(error);
+    return requestSecurityErrorResponse(error) || portalErrorResponse(error);
   }
 }

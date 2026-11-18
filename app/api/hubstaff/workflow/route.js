@@ -1,3 +1,4 @@
+import { inWorkspaceCache } from "@/lib/workspace-cache";
 import {
   hubstaffErrorResponse,
   loadHubstaffWorkflowOverview,
@@ -14,7 +15,7 @@ export async function GET(request) {
 async function handleGET(request) {
   try {
     const context = await resolvePortalContext(request.headers);
-    const data = await loadHubstaffWorkflowOverview(context.client.hubstaffProjectUrl);
+    const data = await inWorkspaceCache(context.workspaceKey, () => loadHubstaffWorkflowOverview(context.client.hubstaffProjectUrl));
     return Response.json(data, {
       headers: { "Cache-Control": "private, no-store" },
     });
