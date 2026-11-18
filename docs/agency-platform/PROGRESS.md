@@ -929,3 +929,34 @@ Existing ten-minute Google sign-in attempts from older code should be restarted 
 The Google revocation discovery window remains the next provider/source check or the existing 15-minute freshness bound. Live AI, Stage 06 browser verification, live CDN checks, managed-secret rotation/restore and deployed revocation latency remain pending. Make inbound/business-event verification and deduplication are pending only if a later workflow is authorized; no inbound receiver was added.
 
 Neon and environment files were untouched. No live payment or message was sent. The disposable WSL cluster was stopped and removed. **Stop before Stage 10.** Nothing was pushed.
+
+
+## Computer-switch handoff after Stage 09
+
+The completed implementation is saved in local commit `48a5043` on `feat/agency-platform`, following Stage 08 commit `3fb6cf5`. The primary checkout is `C:\Users\MY PC\Desktop\AI\portal`. The tree was clean before this documentation checkpoint. Stages 01–09 are complete within the local verification scope recorded above.
+
+### Completed and verified
+
+Connection ownership, Google callback/reconnect/refresh protections and Make connection-test restrictions are implemented. Stage 08 agency knowledge and approved revisions are preserved. Source publishing remains held for Stage 20B. Public agency routes stay gated until Stage 11, and broad legacy Admin operations retain the all-AOC restriction.
+
+The recorded final checks passed with 367 top-level Node tests, 40 source/Hubstaff tests, 115 Internal Portal tests and five real-database OAuth scenario groups (6 TAP tests including the parent). Full production build and focused ESLint passed. The disposable WSL PostgreSQL run also passed the earlier agency, migration, source, tool and stream regression fixtures. Google network responses, Make responses and model-wire behavior used fixtures. These are the completed Stage 09 results, not additional checks run for this documentation-only checkpoint.
+
+### Unfinished work and next step
+
+- Stage 10 has not started. Resume only after reading this record, AGENTS.md, CONTEXT.md, DECISIONS.md and the supplied Stage 10 task.
+- Stage 20B still needs publication draft/approval workflow and approved-revision transitions. New knowledge revisions remain withheld until reviewed.
+- Live AI and Google/Hubstaff consent, refresh and revocation timing remain unverified. Stage 06 browser verification, live CDN/header checks and browser back/forward cache checks remain pending.
+- Managed-secret rotation/restore and production deployment/migration remain pending. Make agency workflows and authenticated, deduplicated inbound business events require later authorization if introduced.
+- Google-side revocation retains the documented discovery window of the next provider/source check or the existing 15-minute freshness bound. Previously delivered data cannot be recalled.
+
+### Resume on another computer
+
+Transfer the local Git history through this documentation checkpoint and select `feat/agency-platform`. A remote checkout alone will not contain these unpushed commits. Check the branch, commit and local edits before changing files. Older source-worktree banners in CONTEXT/HANDOFF are historical; the current primary-checkout status is this PROGRESS record.
+
+Configure secrets privately on the receiving computer. No environment file or credential is part of this checkpoint. Keep the original encryption keys with any corresponding encrypted data. A fresh synthetic database may use its own disposable keys. Refer to [STAGE09_CONNECTIONS](STAGE09_CONNECTIONS.md) for connection owners, exact setting names, redirects, consent scopes and rotation steps.
+
+The absent/empty operator-only settings are `AGENCY_MIGRATION_DATABASE_URL` and `AGENCY_WORKSPACE_TEST_DATABASE_URL`. Supply them only in the approved disposable test shell, with a distinct runtime `DATABASE_URL` for that same fixture. Optional `WEBSITE_INSIGHTS_GOOGLE_CLIENT_ID`, `WEBSITE_INSIGHTS_GOOGLE_CLIENT_SECRET` and `WEBSITE_INSIGHTS_ENCRYPTION_KEY` may use their documented fallbacks. Never put migration-owner credentials in browser or ordinary runtime configuration.
+
+The local PostgreSQL test cluster was stopped and removed. Recreate an approved disposable database and its synthetic fixtures before database tests. The private source-machine `.tmp` runners, test logs, installed dependencies and environment files are excluded from Git. Reuse the versioned migrations, fixture modules and Stage 03/04 runbooks for a fresh setup. The application changes have not been applied to Neon.
+
+Only this progress document is changed by the computer-switch checkpoint. No implementation, environment or temporary file is included. No push, live provider action or Stage 10 work is performed. Work stops here.
