@@ -40,7 +40,7 @@ export async function POST(request) {
     }
     if (body.action === "discover") return Response.json(await discoverConnectedSources(admin.id, { signal: request.signal }), { headers });
     if (body.action === "preview") return Response.json(await previewConnectedSource(admin.id, body.fileId, { signal: request.signal }), { headers });
-    if (body.action === "disconnect") return Response.json(await disconnectDriveSource(admin.id), { headers });
+    if (body.action === "disconnect") return Response.json(await disconnectDriveSource(admin.id, session), { headers });
     return Response.json({ error: "Choose a supported source connection action." }, { status: 400, headers });
   } catch (error) { return failure(error); }
 }

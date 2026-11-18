@@ -578,3 +578,14 @@ The former shared company guidance is an AOC-agency publication. Other agencies 
 Pin the existing enabled and ownership-reviewed publication, connection and corpus revision in migration 005. New instructions, publication settings and corpus revisions are held from retrieval. Disable is available. Stage 20B will supply draft capture, approver permissions, consent, immutable approval audit and an approved revision transition. No runtime approval-writing route is introduced now.
 
 Tool invocation, tool result delivery and streamed chunks recheck current access. A source or membership revocation blocks subsequent work/delivery, with previously delivered bytes and provider-submitted material outside recall. Hosted model behavior and production performance need their separately scoped live checks.
+
+
+## S09-D01 — Business connections and replay-safe lifecycle
+
+Keep client Hubstaff mappings, AOC-private Hubstaff credentials, independent Internal Hubstaff identity, AOC Drive publishers, client/site Search Console grants, Make's fixed platform connection test and deployment-wide AI providers as explicit separate ownership classes. New agencies inherit none of AOC's private connections or source approvals.
+
+Use migration 006's protected Google connection ledger for current agency/resource binding and generation. Encrypted OAuth state carries the snapshot. Callback credential writes, reconnects, property changes and disconnects advance or validate generation transactionally. Existing ciphertext stays compatible, and old pending sign-ins must restart.
+
+Drive and Search Console disconnect locally. Google Account app revocation is a separate account-holder action because it can affect other grants using the same OAuth app. Stage 08 approvals remain pinned, so a new Drive connection needs later publication approval.
+
+Retain Make's fixed test. Agency workflows and inbound business events require a separately defined destination/payload contract, authentication and durable event deduplication before activation. The inventory records the managed-secret rotation plan and pending live consent checks. Stage 11 stays gated and work stops before Stage 10.

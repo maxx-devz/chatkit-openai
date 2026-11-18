@@ -13,6 +13,9 @@ async function integration({ scope = SEARCH_SCOPE, saved = null, properties = []
     encrypted_refresh_token: JSON.stringify({ value: "earlier-test-refresh", purpose: "website-insights:1:website-one:test-client" }), ...saved } : null;
   const sealDriveValue = (value, purpose) => JSON.stringify({ value, purpose });
   const mocks = {
+    integrationScope: async (_session,service,id,_owner,client) => ({agency_id:"100",generation:"0",args:["fixture", "session", service,id,null,client]}),
+    sameIntegration: (current,expected) => {if(current.agency_id!==expected.agency_id || current.generation!==expected.generation) throw new InsightError("scope_changed","Changed",409);},
+    commitIntegration: async (_fence,_session,write) => write(mocks.db),
     randomBytes, createHash, InsightError, SEARCH_SCOPE, propertyCoversWebsite,
     googleConfig: () => config,
     getWebsite: async () => ({ url: "https://example.com/" }),
@@ -23,6 +26,7 @@ async function integration({ scope = SEARCH_SCOPE, saved = null, properties = []
     OAuth2Client: class {
       generateAuthUrl(options) { calls.push({ consent: options }); return "https://accounts.google.com/test-only"; }
       async getToken(options) { if (exchangeError) throw new Error("synthetic exchange failure"); calls.push({ exchange: options }); return { tokens: { refresh_token: "test-only-refresh", scope } }; }
+      async request() { return {data:{siteEntry:properties}}; }
       setCredentials() {}
       async getAccessToken() { if (refreshError) throw new Error("synthetic refresh failure"); return { token: "test-only-access" }; }
     },

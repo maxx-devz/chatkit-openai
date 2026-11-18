@@ -1,6 +1,6 @@
 # Agency Platform progress
 
-> Current primary checkout is `C:\Users\MY PC\Desktop\AI\portal` on `feat/agency-platform`. Stage 08 passed local verification. [Stage 08 results and approval dependency](#stage-08-agency-ai-retrieval-and-approved-revisions)
+> Current primary checkout is `C:\Users\MY PC\Desktop\AI\portal` on `feat/agency-platform`. Stage 09 passed local verification. [Stage 09 results and connection setup](#stage-09-business-connection-ownership)
 
 Updated November 18, 2026, Asia/Shanghai.
 
@@ -17,7 +17,8 @@ Updated November 18, 2026, Asia/Shanghai.
 | Stage 06 — server entry-point ownership | Implemented and verified locally | Complete route inventory, signed Next.js/Python access checks, four-client denial matrix and migration 004 rehearsal. |
 | Stage 07 — private files and cached content | Implemented and verified locally | Authenticated delivery, copied-link/revocation checks, upload expiry and workspace cache isolation. |
 | Stage 08 — agency AI retrieval and approved revisions | Implemented and verified locally | Scoped source revision adoption, canary retrieval, source/tool/stream revocation checks. |
-| Stage 09 onward | Awaiting separate authorization | Stage 11 remains the planned gate for public agency routes. |
+| Stage 09 — business connection ownership | Implemented and verified locally | Explicit Google ownership, callback/refresh generation checks, Make connection-test restrictions and secret-rotation plan. |
+| Stage 10 onward | Awaiting separate authorization | Stage 11 remains the planned gate for public agency routes. |
 
 Older `docs/PHASE_0_*` files describe a separate historical architecture/closeout
 process with outstanding reviews. This stage does not mark that process complete
@@ -871,3 +872,60 @@ No new production secret is required. Use the existing private `AGENCY_MIGRATION
 `AGENCY_MIGRATION_DATABASE_URL` and `AGENCY_WORKSPACE_TEST_DATABASE_URL` remain absent/empty in the project environment file. The rehearsal generated their disposable loopback values in its private process environment. To repeat source tests, prepare the synthetic Stage 03–07 fixture, supply those URLs plus the distinct same-database runtime `DATABASE_URL`, synthetic `BETTER_AUTH_URL` and `BETTER_AUTH_SECRET` privately in the test shell. Run the source fixture with the existing React-server/alias test flags. The source fixture supplies synthetic Drive configuration internally and runs migration 005 itself. No environment file was copied or edited.
 
 Neon was untouched. The disposable WSL PostgreSQL cluster was stopped and removed. **Stop before Stage 09.** Stage 20B approval workflow, deployment and production migration require their later instructions.
+
+
+## Stage 09 business connection ownership
+
+Built on 3fb6cf5 in AI\portal on feat/agency-platform. The starting tree was clean. Read AGENTS, CONTEXT, DECISIONS, the Stage 08 handoff, database portability and installed Next.js data-security guidance. The [connection inventory and private setup](STAGE09_CONNECTIONS.md) was recorded before code changes and covers Hubstaff client mappings, independent Internal Hubstaff auth, Drive, Search Console, Make and deployment AI providers.
+
+### Changes and decisions
+
+- Migration 006 pins Drive publishers to AOC and Search Console sites to their current client/agency. The owner-controlled ledger stores resource and generation metadata. Its runtime functions independently verify the live session and applicable role. Unknown or foreign ownership denies access.
+- Google PKCE/state protections remain separate between Drive and Search Console. Encrypted state now contains the agency, service, resource and generation. Final credential writes recheck current authorization and expected generation in the same transaction. Local disconnect, reconnect and property changes advance generation. A stale callback or refresh cannot overwrite a replacement or return data read under that old connection.
+- Search Console validates provider read access before saving authorization and verifies a matching property through its API before selection. Viewer/report-reading behavior is preserved; managing credentials remains a Client Administrator action.
+- Drive background reads check publisher ownership and connection continuity around refresh and reads. Reconnecting invalidates the old Stage 08 connection approval. New knowledge is still held for Stage 20B. Local Drive disconnect replaces automatic Google-wide revocation, which could affect Search Console or another connection using the same OAuth app.
+- Reused Internal Hubstaff's identity mapping, encrypted state, connection-version updates and serialized refresh. Client Hubstaff still uses trusted per-client project mappings through the AOC-private integration. The existing project ownership tests remain relevant.
+- Make remains a restricted connection test with a fixed payload and server-only destination. Destination validation rejects embedded URL credentials, fragments and nonstandard ports. UI confirmation uses fixed text. Agency workflow actions and inbound delivery remain unavailable. Durable inbound/business-event deduplication remains a future dependency if those actions are enabled.
+- Deployment OpenAI/OpenRouter keys stay platform-private. No new agency credential-sharing route or automatic connection inheritance was introduced. Stage 11 gating and the legacy Admin all-AOC estate restriction remain active.
+
+### Files
+
+| Area | Files |
+| --- | --- |
+| Schema and operator command | database/agency-platform/006_connection_ownership.sql, scripts/migrate-agency-connections.mjs, package.json |
+| Connection lifecycle | lib/integration-ownership.js, lib/drive-source-service.js, lib/website-insights/google.js, app/api/admin/source-connections/route.js |
+| Make connection test | lib/make-webhook.js, tests/make-connection.test.mjs |
+| Controlled and database fixtures | tests/website-insights-google.test.mjs, tests/drive-sources/oauth.test.mjs, tests/drive-sources/sync.test.mjs, tests/agency-backfill/connections.database.test.mjs |
+| Records | STAGE09_CONNECTIONS.md, this record and DECISIONS S09-D01 |
+
+### Actual results
+
+| Check | Result |
+| --- | --- |
+| Full top-level Node suite | 367 passed, 0 failed, 0 skipped. Includes the fixed Make payload, URL restrictions and safe response test. |
+| Source and Hubstaff index suites | 40 passed, 0 failed, 0 skipped. Existing Google account/scope, PKCE, replay, revoked-token, folder/revision and project cases passed with explicit ownership metadata fixtures. |
+| Internal account, OAuth, role and panel suites | 115 passed, 0 failed, 0 skipped. Internal application code and its existing version-aware credential logic were reused. |
+| Disposable WSL PostgreSQL regression | Fresh loopback PostgreSQL 18.3. Stage 03's nine scenarios, Stage 04's two no-write reports/two applies and application checks, Stage 05's five TAP tests, Stage 06/07's eleven extended TAP tests and Stage 08's source/tool/stream fixture passed. |
+| Migration 006 | Applied twice to the disposable database with the designated non-owner runtime login. Existing Drive credential rows and the valid Stage 08 source approval were preserved before reconnect tests. |
+| Stage 09 real database/Google fixtures | Five scenario groups passed, 6 TAP tests including the parent. Tests cover foreign and same-agency unassigned client callbacks, one-use callback replay, encrypted storage, matching-property selection, disconnect during exchange, stale refresh, duplicate generation commit, role downgrade during exchange, denied direct ledger access, AOC-only Drive, stale Drive callbacks and refreshes, local disconnect and invalidation of source approval after reconnect. |
+| Build and lint | Full Next.js 16.3.3 Turbopack production build and ESLint on changed JavaScript passed. |
+
+The tests used actual database rows, session records, application connection functions, transactions and AES-GCM encryption. Google token exchange, identity response and resource reads were mocked. The Make test used a mocked response and sent no real message. Existing Internal provider fixtures and Stage 08 model-wire/stream fixtures remain labeled as fixtures. No live provider sign-in, consent, refresh, AI call or project update occurred.
+
+The initial local failures were a reused synthetic website URL, a source-sync mock missing the new scope queries and a fixture denial-code expectation for Drive replay. These were corrected. Final runs passed.
+
+### Setup, pending checks and next gate
+
+No new encryption secret is required. Existing server-managed secrets and encrypted stores were reused; the inventory includes a coordinated rotation/rollback plan. Managed deployment secrets and live rotation were not changed or verified.
+
+The optional WEBSITE_INSIGHTS_GOOGLE_CLIENT_ID, WEBSITE_INSIGHTS_GOOGLE_CLIENT_SECRET and WEBSITE_INSIGHTS_ENCRYPTION_KEY entries and AGENCY_MIGRATION_DATABASE_URL / AGENCY_WORKSPACE_TEST_DATABASE_URL are absent/empty in the primary environment file. The Search Console fallbacks remain supported. Existing app, Drive, Hubstaff, Make and provider-encryption entries are present; this was only a presence check.
+
+For an approved repeat, privately set the migration/test URLs and distinct runtime DATABASE_URL for the same disposable fixture, plus synthetic BETTER_AUTH_URL and BETTER_AUTH_SECRET. Apply migration 006 through npm run agency:connections -- --confirm-database <database> --app-role <login>. The fixture needs the earlier synthetic schemas, Better Auth sessions and Stage 08 source fixture. Keep owner credentials outside runtime and out of chat. Stage 09's Google fixtures supply their own test configuration.
+
+Before any future real provider check, ask for the named test account/resources and redirect URLs. The user performs sign-in and consent. Exact setting names and read scopes are listed in STAGE09_CONNECTIONS.md. No production password or API token is needed in chat.
+
+Existing ten-minute Google sign-in attempts from older code should be restarted after deployment because they lack the new encrypted ownership snapshot. Stored grants adopt the ledger without re-encryption. The legacy application credential still has backing-table privileges; this stage does not claim global credential-table RLS.
+
+The Google revocation discovery window remains the next provider/source check or the existing 15-minute freshness bound. Live AI, Stage 06 browser verification, live CDN checks, managed-secret rotation/restore and deployed revocation latency remain pending. Make inbound/business-event verification and deduplication are pending only if a later workflow is authorized; no inbound receiver was added.
+
+Neon and environment files were untouched. No live payment or message was sent. The disposable WSL cluster was stopped and removed. **Stop before Stage 10.** Nothing was pushed.

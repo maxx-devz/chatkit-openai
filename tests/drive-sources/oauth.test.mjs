@@ -1,4 +1,4 @@
-import test, { after } from "node:test";
+import test, { after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { OAuth2Client } from "google-auth-library";
 import { databasePool } from "../../lib/database.js";
@@ -9,7 +9,7 @@ const secret = "unit-test-only-drive-key-1234567890123456789";
 const rootId = "unit_test_root_12345";
 const ownerId = "123";
 const state = "x".repeat(43);
-const session = { session: { id: "unit-test-session-1" } };
+const session = { user:{id:"fixture-admin"}, session: { id: "unit-test-session-1" } };
 const clientId = "unit-test.apps.googleusercontent.com";
 const email = "jaymark@alwaysopencommerce.co";
 Object.assign(process.env, { BETTER_AUTH_URL: "http://127.0.0.1:3000", GOOGLE_DRIVE_CLIENT_ID: clientId,
@@ -17,6 +17,17 @@ Object.assign(process.env, { BETTER_AUTH_URL: "http://127.0.0.1:3000", GOOGLE_DR
   GOOGLE_DRIVE_ALLOWED_EMAIL: email, GOOGLE_DRIVE_ROOT_FOLDER_ID: rootId });
 
 after(async () => { await databasePool.end(); });
+
+const fixtureFence={agency_id:"100",generation:"0",args:["fixture-admin",session.session.id,"drive",ownerId,ownerId,null]};
+function challenge() { return JSON.stringify({verifier:"test-verifier",fence:fixtureFence}); }
+function mockQuery(t, query) {
+  return t.mock.method(databasePool,"query",async(sql,values)=>{
+    if(sql.includes("agency_platform.connection_scope") || sql.includes("agency_platform.drive_connection_scope")) return {rows:[fixtureFence]};
+    if(sql.includes("agency_platform.advance_connection") || ["BEGIN","COMMIT","ROLLBACK"].includes(sql)) return {rows:[]};
+    return query(sql,values);
+  });
+}
+beforeEach(t=>t.mock.method(databasePool,"connect",async()=>({query:(...args)=>databasePool.query(...args),release(){}})));
 
 test("Callback failures distinguish rejected app credentials without exposing provider payloads", () => {
   for (const code of ["invalid_client", "unauthorized_client"]) {
@@ -31,7 +42,7 @@ test("Callback failures distinguish rejected app credentials without exposing pr
 
 test("OAuth challenge is encrypted, admin/session bound and uses PKCE/read-only consent", async (t) => {
   const queries = [];
-  t.mock.method(databasePool, "query", async (sql, values) => { queries.push({ sql, values }); return { rows: [] }; });
+  mockQuery(t, async (sql, values) => { queries.push({ sql, values }); return { rows: [] }; });
   const connection = await beginDriveConnection(ownerId, session);
   const url = new URL(connection.url);
   assert.equal(url.origin, "https://accounts.google.com");
@@ -44,13 +55,13 @@ test("OAuth challenge is encrypted, admin/session bound and uses PKCE/read-only 
   const insert = queries.find((q) => q.sql.startsWith("INSERT"));
   assert.equal(insert.values[1], ownerId);
   assert.equal(insert.values[2], digestDriveValue(session.session.id));
-  const verifier = unsealDriveValue(insert.values[3], "oauth:" + insert.values[0], secret);
+  const {verifier} = JSON.parse(unsealDriveValue(insert.values[3], "oauth:" + insert.values[0], secret));
   assert.equal(url.searchParams.get("code_challenge"), digestDriveValue(verifier));
   assert.equal(connection.state, url.searchParams.get("state"));
 });
 
 test("Forged/missing browser state never reaches database or token exchange", async (t) => {
-  const query = t.mock.method(databasePool, "query", async () => { throw new Error("must not query"); });
+  const query = mockQuery(t, async () => { throw new Error("must not query"); });
   const exchange = t.mock.method(OAuth2Client.prototype, "getToken", async () => { throw new Error("must not exchange"); });
   for (const cookie of [undefined, "other-browser"]) await assert.rejects(finishDriveConnection(ownerId, session, state, cookie, "fake-code"), /does not match/);
   assert.equal(query.mock.callCount(), 0);
@@ -59,7 +70,7 @@ test("Forged/missing browser state never reaches database or token exchange", as
 
 test("Expired/replayed/different-session challenge is rejected before OAuth exchange", async (t) => {
   let query;
-  t.mock.method(databasePool, "query", async (sql, values) => { query = { sql, values }; return { rows: [] }; });
+  mockQuery(t, async (sql, values) => { query = { sql, values }; return { rows: [] }; });
   const exchange = t.mock.method(OAuth2Client.prototype, "getToken", async () => { throw new Error("must not exchange"); });
   await assert.rejects(finishDriveConnection(ownerId, session, state, state, "fake-code"), /expired or was already used/);
   assert.match(query.sql, /DELETE.*session_hash=.*expires_at>NOW\(\).*RETURNING/);
@@ -78,9 +89,9 @@ function mockExchange(t, identity = { sub: "test-google-sub", email, email_verif
 
 test("Successful mocked exchange verifies identity and encrypts only the refresh token", async (t) => {
   const queries = [];
-  t.mock.method(databasePool, "query", async (sql, values) => {
+  mockQuery(t, async (sql, values) => {
     queries.push({ sql, values });
-    return { rows: sql.startsWith("DELETE") ? [{ encrypted_verifier: sealDriveValue("test-verifier", "oauth:" + digestDriveValue(state), secret) }] : [] };
+    return { rows: sql.startsWith("DELETE") ? [{ encrypted_verifier: sealDriveValue(challenge(), "oauth:" + digestDriveValue(state), secret) }] : [] };
   });
   const { verify } = mockExchange(t);
   t.mock.method(globalThis, "fetch", async (url, options) => {
@@ -98,20 +109,20 @@ test("Successful mocked exchange verifies identity and encrypts only the refresh
   assert.equal(JSON.stringify(insert.values).includes("mock-access-token"), false);
 });
 
-test("Wrong account/denied scope is never persisted and its unused grant is revoked", async (t) => {
+test("Wrong account/denied scope is never persisted and existing Google grants are preserved", async (t) => {
   const queries = [];
-  t.mock.method(databasePool, "query", async (sql) => {
+  mockQuery(t, async (sql) => {
     queries.push(sql);
-    return { rows: [{ encrypted_verifier: sealDriveValue("test-verifier", "oauth:" + digestDriveValue(state), secret) }] };
+    return { rows: [{ encrypted_verifier: sealDriveValue(challenge(), "oauth:" + digestDriveValue(state), secret) }] };
   });
   const { revoke } = mockExchange(t, { sub: "outsider", email: "other@example.com", email_verified: true });
   await assert.rejects(finishDriveConnection(ownerId, session, state, state, "fake-code"), /configured test Google account/);
   assert.equal(queries.some((sql) => sql.startsWith("INSERT")), false);
-  assert.equal(revoke.mock.callCount(), 1);
+  assert.equal(revoke.mock.callCount(), 0);
 });
 
 test("Connection status is owner-scoped and never returns encrypted token material", async (t) => {
-  t.mock.method(databasePool, "query", async (sql, values) => {
+  mockQuery(t, async (sql, values) => {
     assert.deepEqual(values, [ownerId]);
     assert.match(sql, /WHERE owner_id=\$1/);
     return { rows: [{ google_email: email, root_folder_id: rootId, oauth_client_id: clientId,
@@ -124,7 +135,7 @@ test("Connection status is owner-scoped and never returns encrypted token materi
 });
 
 test("Changed root/client/account requires explicit reconnection before any Google read", async (t) => {
-  t.mock.method(databasePool, "query", async () => ({ rows: [{ google_email: email, root_folder_id: "different_root", oauth_client_id: clientId }] }));
+  mockQuery(t, async () => ({ rows: [{ google_email: email, root_folder_id: "different_root", oauth_client_id: clientId }] }));
   const network = t.mock.method(globalThis, "fetch", async () => { throw new Error("must not fetch"); });
   await assert.rejects(discoverConnectedSources(ownerId), /Connect the configured Google test account/);
   assert.equal(network.mock.callCount(), 0);
@@ -132,7 +143,7 @@ test("Changed root/client/account requires explicit reconnection before any Goog
 
 function documentReads(t, { changedAfterExport = false } = {}) {
   let exports = 0;
-  t.mock.method(databasePool, "query", async () => ({ rows: [{ google_email: email, root_folder_id: rootId,
+  mockQuery(t, async () => ({ rows: [{ google_email: email, root_folder_id: rootId,
     oauth_client_id: clientId, encrypted_refresh_token: sealDriveValue("mock-refresh", "refresh:" + ownerId + ":" + clientId + ":" + rootId, secret) }] }));
   t.mock.method(OAuth2Client.prototype, "getAccessToken", async () => ({ token: "mock-access-token" }));
   t.mock.method(globalThis, "fetch", async url => {
@@ -176,7 +187,7 @@ test("Cancelled source read never exports or requests a Google access token", as
 
 function storedConnection(t, { badToken = false } = {}) {
   const queries = [];
-  t.mock.method(databasePool, "query", async (sql, values) => {
+  mockQuery(t, async (sql, values) => {
     queries.push(sql); assert.deepEqual(values, [ownerId]);
     return { rows: [{ google_email: email, root_folder_id: rootId, oauth_client_id: clientId,
       connected_at: "2026-10-21", encrypted_refresh_token: badToken ? "broken" : sealDriveValue("mock-refresh", "refresh:" + ownerId + ":" + clientId + ":" + rootId, secret) }] };
