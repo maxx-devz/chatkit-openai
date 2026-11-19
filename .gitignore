@@ -56,3 +56,9 @@ __pycache__/
 /tests/internal-user/ui/.next/
 /tests/internal-user/ui/AGENTS.md
 /tests/internal-user/ui/CLAUDE.md
+
+# Local document-layout preview output
+/.tmp/
+/tests/client-documents-preview/ui/.next/
+/tests/client-documents-preview/ui/AGENTS.md
+/tests/client-documents-preview/ui/CLAUDE.md

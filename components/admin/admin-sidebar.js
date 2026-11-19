@@ -24,6 +24,7 @@ const NAV_ITEMS = [
   ['spark', 'AI Assistant', '/admin?view=assistant', 'assistant'],
   ['spark', 'Assistant Settings', '/admin/settings', 'builder'],
   ['shield', 'Source Connections', '/admin/sources', 'sources'],
+  ['shield', 'Documents & Journey', '/admin/client-documents', 'documents'],
   ['shield', 'Access & Security', '/admin?view=security', 'security'],
 ];
 
