@@ -16,6 +16,7 @@ async function clientRequest(method, body) {
 }
 
 export default function ClientMembersPanel({ clientId, currentUserId }) {
+  const [secureInvitations, setSecureInvitations] = useState(false);
   const [members, setMembers] = useState([]);
   const [events, setEvents] = useState([]);
   const [nextCursor, setNextCursor] = useState(null);
@@ -28,6 +29,7 @@ export default function ClientMembersPanel({ clientId, currentUserId }) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || "Members could not be loaded.");
     setMembers(data.members || []);
+    setSecureInvitations(Boolean(data.secureInvitations));
   }, []);
 
   async function loadAudit(before = "", append = false) {
@@ -56,7 +58,7 @@ export default function ClientMembersPanel({ clientId, currentUserId }) {
       const data = await clientRequest("POST", Object.fromEntries(fields));
       form.reset();
       await Promise.all([reload(), loadAudit()]);
-      setNotice(`${data.member.name}'s login was created. Share the temporary password securely and ask them to change it under Account security.`);
+      setNotice(data.member.pending ? "If eligible, the invitation request is pending agency approval. No login or access was created." : `${data.member.name}’s login was created. Share the temporary password securely and ask them to change it under Account security.`);
     } catch (failure) { setError(failure.message); }
     finally { setBusy(""); }
   }
@@ -82,20 +84,24 @@ export default function ClientMembersPanel({ clientId, currentUserId }) {
     {error ? <p className={styles.error} role="alert">{error}</p> : null}
     {notice ? <p className={styles.success} role="status">{notice}</p> : null}
     <form className={styles.form} onSubmit={createMember}>
-      <h3>Create a client login</h3>
+      <h3>{secureInvitations ? "Request a client invitation" : "Create a client login"}</h3>
+      {secureInvitations ? <p>Enter an existing account email. An agency administrator must approve the request before the recipient receives a single-use link. No access is granted by this request.</p> : <>
       <p>Use a unique username and a temporary password. Existing portal logins cannot be linked here yet.</p>
       <p>This creates a login, not an email invitation. Share the temporary password securely and ask the new user to change it on the Account page.</p>
+      </>}
       <div className={styles.fields}>
+        {secureInvitations ? <label>Existing account email<input name="email" type="email" required maxLength={254} /></label> : <>
         <label>Name<input name="name" required maxLength={120} autoComplete="off" /></label>
         <label>Username<input name="username" required minLength={3} maxLength={50}
           pattern="[a-z0-9][a-z0-9._-]{2,49}" autoCapitalize="none" autoComplete="off" /></label>
         <label>Temporary password<input name="password" type="password" required minLength={12}
           maxLength={128} autoComplete="new-password" /></label>
+        </>}
         <label>Role<select name="role" defaultValue="member">
           <option value="member">Member</option><option value="client_viewer">Viewer</option>
         </select></label>
       </div>
-      <button disabled={Boolean(busy)} type="submit">{busy === "create" ? "Creating..." : "Create login"}</button>
+      <button disabled={Boolean(busy)} type="submit">{busy === "create" ? "Saving..." : secureInvitations ? "Request invitation" : "Create login"}</button>
     </form>
     <div className={styles.list}>
       <h3>Client members</h3>

@@ -13,6 +13,8 @@ const actions = [];
 const actor = { user_id: '7', account_type: 'internal_user', is_active: true,
   position: 'team_member', panel_access: ['overview'], display_name: 'Fixture Manager' };
 const db = { async query(sql, values = []) {
+  // This adapter models the pre-011 schema; real MFA checks use disposable PG.
+  if (sql.includes("to_regprocedure('agency_platform.account_status")) return { rows: [{ready:false}] };
   if (sql.includes("to_regclass('portal_internal_users')")) return { rows: [{ relation: 'portal_internal_users' }] };
   if (sql.includes('SELECT e.*, u.display_name')) return { rows: [actor] };
   if (sql.includes("to_regclass('portal_internal_user_roles')")) return { rows: [{ relation: 'portal_internal_user_roles' }] };

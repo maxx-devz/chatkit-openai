@@ -18,7 +18,8 @@ async def session_actor(db, envelope):
     if not actor:
         raise denied()
     cursor = await db.execute("""
-        SELECT to_regnamespace('agency_platform') IS NOT NULL AS foundation,
+        SELECT to_regprocedure('agency_platform.account_session(text,text)') IS NOT NULL AS account_security,
+          to_regnamespace('agency_platform') IS NOT NULL AS foundation,
           to_regclass('agency_platform.support_grants') IS NOT NULL AS ready,
           to_regclass('public.portal_internal_users') IS NOT NULL AS internal
     """)
@@ -29,6 +30,11 @@ async def session_actor(db, envelope):
         cursor = await db.execute("SELECT 1 FROM public.portal_internal_users WHERE user_id=%s", (envelope.user_id,))
         if await cursor.fetchone():
             raise denied()
+    if state.get("account_security"):
+        try:
+            await db.execute("SELECT agency_platform.account_session(%s,%s)", (actor["external_id"], envelope.auth_session_id))
+        except Exception:
+            raise denied() from None
     return actor, state
 
 

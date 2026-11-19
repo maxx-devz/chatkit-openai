@@ -112,7 +112,13 @@
     "test:employee:secrets": "npm run test:internal-user:secrets",
     "test": "node --test \"tests/*.test.mjs\"",
     "test:http": "node scripts/check-builder-http.mjs",
-    "test:ai-reset:database": "node --env-file=.env.local scripts/check-ai-fresh-reset-database.mjs"
+    "test:ai-reset:database": "node --env-file=.env.local scripts/check-ai-fresh-reset-database.mjs",
+    "migrate:account-security": "node scripts/migrate-account-security.mjs",
+    "seed:auth:review": "node --env-file=.env.auth-review scripts/seed-account-security-review.mjs",
+    "dev:auth:review": "node --env-file=.env.auth-review scripts/dev-platform-review.mjs --account-security",
+    "check:auth:review": "node --env-file=.env.auth-review scripts/check-account-security-review.mjs",
+    "test:account-security:database": "node --conditions=react-server --experimental-test-module-mocks --import ./tests/internal-user/aliases.mjs --test tests/agency-backfill/account-security.database.test.mjs",
+    "test:account-security:browser": "playwright test --config tests/account-security/playwright.config.mjs"
   },
   "engines": {
     "node": ">=22"

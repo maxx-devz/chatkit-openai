@@ -783,3 +783,56 @@ in-flight bytes cannot be recalled. UI access refresh is every 15 seconds/on
 focus/manual check, independent of server enforcement. No new scheduler/queue,
 mail, paid action or HR workflow. Existing source approval/rotation/scheduler/CDN
 and external rollout checks remain pending. Stop before Stage 14, no push.
+
+## S14-D01 — provider-supported controls, synthetic rollout first (2026-11-19)
+
+Use the installed Better Auth 1.7.2 TOTP/backup-code, password-reset, verification
+and session APIs. Do not upgrade providers or implement credential hashing.
+Install its supported schema plus versioned 011 before enabling the server-only
+PORTAL_ACCOUNT_SECURITY_ENABLED flag. Existing unmigrated deployments retain
+their prior behavior; installing 011 makes current authorization checks independent
+of request selectors or a runtime flag being turned off. Existing trusted ordinary
+runtime credentials and the Stage 11 external gate remain required.
+
+Platform roles, agency administrators/owners and legacy AOC Admins need verified
+email and a successfully verified MFA session within 12 hours. A role promotion
+requires step-up immediately. Password-only factor replacement, privileged disable
+and trusted-device bypass are denied. Lost-device recovery uses single-use backup
+codes. Password reset revokes account sessions, preserves enrollment/memberships
+and never changes tenant scope. Workspace deactivation keeps other workspaces.
+Operator-only global authorization denial is distinct from provider credential ban.
+
+## S14-D02 — extend existing invitations; do not create duplicate identities
+
+Retain Stage 13's 24-hour intended-user/agency/client/role record and acceptance
+authority checks. Add a hashed random link, atomic single use and reissue rotation.
+The UUID-only entry rejects; the old membership implementation becomes internal.
+No public sign-up, real invitation or staffing-derived access is introduced.
+
+In security mode, Client Administrator Members & Access requests an existing
+account's Viewer/Member invitation. Unknown/ineligible addresses get the same
+response. Agency approval is explicit, audited and required before any link or
+membership; Client Admin cannot elevate roles or approve specialist assignments.
+An Agency Administrator can approve/resend in the existing staff view. Existing
+same-agency members still use authorized client assignment instead of invitations.
+This retains Stage 13A's approval boundary and avoids shared temporary passwords.
+
+## S14-D03 — local capture is not a selected production mail service
+
+Use AUTH_MAIL_MODE=capture and a private ignored AUTH_TEST_MAIL_DIR only with a
+synthetic loopback database/origin and .invalid addresses. Token fragments are
+removed before rendering/submission; no raw token goes to audit, logs or storage.
+Real users complete their own email verification, password setup and authenticator
+enrollment. Never request passwords, OTPs, device seeds or recovery codes in chat.
+
+Before privileged production use, decisions remain: real mail service and verified
+sender domain, approved callback origins/recipients, legacy @portal-users.invalid
+email enrollment, all-factors-lost identity reproof/authorized operator procedure,
+and encryption-key rotation/restore. No silent MFA reset or impersonation fallback.
+The service is not chosen here; no unused live-provider variable was invented.
+
+The application attests successful provider MFA to a FORCE-RLS ledger. This does
+not turn the shared legacy service login into a universal tenant-RLS identity.
+Hosted AI/privacy, CDN/private-cache, live provider consent, deployed runtime and
+pooler mapping, scheduler and rotation checks remain pending. Local Stage 14 can
+close without enabling external agencies. Stop before Stage 15; no push.

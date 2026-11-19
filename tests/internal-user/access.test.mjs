@@ -23,6 +23,8 @@ let pagedAuditRuns = null;
 let pagedAuditEvents = null;
 const profileUpdates = [];
 const db = { query: async (query, values) => {
+  // This adapter models the pre-011 schema; real MFA checks use disposable PG.
+  if (query.includes("to_regprocedure('agency_platform.account_status")) return { rows: [{ready:false}] };
   if (['BEGIN', 'COMMIT', 'ROLLBACK', 'LOCK TABLE portal_internal_user_roles IN SHARE ROW EXCLUSIVE MODE'].includes(query)) {
     return { rows: [] };
   }

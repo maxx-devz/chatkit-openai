@@ -1,5 +1,11 @@
 # Agency Platform context
 
+> Latest: Stage 14 locally completed from `4bbc4e0` in AI\portal on
+> feat/agency-platform. Invitations, recovery, verification and privileged MFA
+> are locally verified; synthetic review port 3003. External access and
+> privileged production stay HOLD. Stop before Stage 15; see latest PROGRESS
+> and STAGE14_ACCOUNT_SECURITY.md. Historical stage notices follow.
+
 > Stage 13A local specialist delivery is implemented from `4316efd` in AI\portal
 > on feat/agency-platform. Separate engagements, explicit agency approval, scoped
 > actions/files/expiry and revocation are locally verified. Review port 3002;
@@ -722,3 +728,29 @@ and [private setup/cutover boundaries](STAGE04_REHEARSAL.md). A real migration
 needs its own approved snapshot, ownership review, window and final approval.
 Earlier unrelated SQL skips remain unclaimed. No new routes/mode were enabled;
 the Stage 11 gate remains intact. Stop before Stage 05.
+
+## Stage 14 closeout — 2026-11-19 (latest account-security state)
+
+Continue on feat/agency-platform in AI\portal from the local Stage 14 commit
+recorded in git log, based on 4bbc4e0. Additive 011 extends Better Auth 1.7.2 with
+single-use intended-account invitation links, private local email capture,
+verification/recovery, privileged TOTP/backup-code assurance and current-session
+checks in both runtimes. Members & Access can request an existing-account
+invitation; an Agency Administrator explicitly approves it before delivery/access.
+Stage 13A specialist approval/expiry and all external agency gates remain intact.
+
+Latest actual results: 16 Stage 14 DB/provider checks; 8 Chrome account-security
+scenarios; earlier Stage 03–13A database/browser regressions and ordinary runtime
+guards passed on synthetic disposable WSL PostgreSQL. Full build, repository lint,
+focused lint, 372 general, 115 Internal and 40 source/index tests pass. Python
+reports 185 tests, 9 opt-in skips. These supersede earlier historical build limits,
+not the pending deployed/provider claims. See PROGRESS and STAGE14_ACCOUNT_SECURITY.
+
+Port 3003 is a separate retained synthetic review with ignored .env.auth-review
+and .tmp/auth-review/accounts.json; earlier 3000–3002 reviews are preserved.
+No real email transport exists yet; capture refuses real recipients/remote DBs.
+Privileged production use awaits a selected email service/sender, real-email
+enrollment for legacy synthetic addresses, supported hosted-cookie/proxy checks,
+rotation/restore and approved all-factors-lost handling. External AI/privacy and
+CDN/cache checks remain critical release blockers. Neon untouched; stop before
+Stage 15, no push. No temporary source directory is the final implementation.

@@ -1,5 +1,6 @@
 import { toNextJsHandler } from "better-auth/next-js";
 
+import { accountSecurityEnabled } from "@/lib/account-security-policy";
 import { auth, isPortalAuthConfigured } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -19,6 +20,7 @@ function unavailable() {
 
 function protectedHandler(method) {
   return function handleAuthRequest(request) {
+    if (accountSecurityEnabled() && method === "GET" && /\/(?:verify-email|reset-password)(?:\/|$)/.test(new URL(request.url).pathname)) return new Response(null, { status: 404, headers: { "Cache-Control": "private, no-store" } });
     if (!isPortalAuthConfigured()) return unavailable();
     return handlers[method](request);
   };

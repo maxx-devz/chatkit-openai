@@ -499,3 +499,45 @@ The approved business-file/context selection is explicit; no automatic classifie
 of every human-entered sentence/file is claimed. Old Google freshness/revocation
 and BFCache/browser/deployed cache limitations remain. Local engineering complete;
 external rollout HOLD; stop before Stage 14. No push.
+
+## Stage 14 — local account-security evidence (2026-11-19)
+
+Baseline 4bbc4e0; actual project AI\portal on feat/agency-platform. Ordinary
+guarded Node/Next/Python runtime and separate operator on fresh synthetic loopback
+WSL PG18.3; production Next build, Chrome157. Better Auth1.7.2, Node22/Python3.13.
+All test configurations excluded .env.local/provider settings; Neon untouched.
+
+| Boundary | Status | Actual evidence |
+| --- | --- | --- |
+| Migration/auth prerequisite | **passed** | Official provider migration creates factor schema; 011 applies twice with matching checksum and no duplicates |
+| Invitations | **passed** | Intended identity/agency/client/role binding, foreign field/hash/account denial, expired/revoked inviter, atomic concurrent replay, old UUID/internal entry denial, same existing identity retained |
+| Members & Access approval | **passed (database)** | Client Admin request deduplicates without grant; cannot approve/elevate or target foreign client; Agency Admin approval then recipient acceptance grants only the bound client and preserves other agency |
+| Privileged sessions/MFA | **passed** | Password-only/stale/unverified sessions deny; provider enrollment rotates session, signed challenge withholds login, wrong OTP/trust bypass/factor replacement/privileged disable deny; recovery code consumed once |
+| Recovery/verification | **passed; mail captured locally** | Actual provider reset expiry/replay rejection, session invalidation, MFA and membership preservation; generic known/unknown recovery responses, trusted-origin rejection and database rate limit |
+| Database/runtime/Python | **passed** | 16 TAP checks including parent; FORCE-RLS ledger reads deny; pooled role remains clean; both connectors reject ownership of new factor table; Python envelope check denies unassured privilege; specialist expiry still denies |
+| Browser | **passed** | 8 Chrome scenarios: MFA/direct API denial then authorized/foreign check; intended invite/replay/same-tab fragment; password reset/replay; other-session revocation; no token in URL/storage; UI email verification/TOTP enrollment/recovery code; account-switch concealment/old-code removal; explicit recipient/client approval and acceptance |
+| Existing regressions | **passed** | Stage03 9 scenarios; Stage04 9; Stage05 5; Stage06/07 11; Stage08 1 real DB/mock model; Stage09 6; Stage10 9; Stage11 runtime6 and matrix9; Stage12 11; Stage13 11; Stage13A11. Earlier browser matrix9, agency9, specialist7 and platform7 passed in the initial full run |
+| Offline / build / lint | **passed** | General372, Internal115, source/index40; Python185 reported with9 opt-in skips; official repository lint + changed-file/test lint; complete production build with unreachable synthetic build DSN |
+| Live mail / hosted account controls | **not run / blocked for production** | No live transport selected or real mail sent. HTTPS cookie/proxy/CSRF deployment, real-email enrollment, all-factors-lost procedure and rotation/restore require approved setup |
+| Existing external isolation | **not run / external HOLD** | Hosted AI/privacy and deployed private CDN/cache remain critical. Provider consent/revocation, deployed roles/pooler, scheduler and supported-browser/real BFCache checks stay pending |
+
+Commands use the repository's test:account-security:database and :browser scripts
+with matching private disposable fixtures, existing earlier-stage tests, Python
+unittest discovery, official npm lint target, and Next build. The private isolated
+orchestrator is .tmp/stage14/sql-focused.py in the original workspace; it runs
+repository paths from AI\portal, then removes the acceptance database/server.
+Initial full-run earlier-browser evidence was retained; focused retries did not
+relabel those as newly repeated. Provider cryptography/PostgreSQL/browser checks
+are real local executions; email transport is local capture, sources/AI are
+fixtures/mocks. No local count means a live staging/provider security pass.
+
+Exploratory `eslint .` also scanned an ignored pre-existing React bundle and an
+unrelated existing openrouter test: 16 errors/1 warning outside the configured
+repository lint target. No Stage 14 lint failure remains. Official npm lint target
+and focused changed tests pass. The raw exploratory failure is not a new build
+failure or an excuse to alter unrelated files.
+
+**Verdict:** Stage 14 local engineering complete; privileged production and
+external agency rollout remain HOLD. The local port-3003 review uses separate
+generated accounts; no automatic promotion of real administrators. No Stage 15
+work, real message/payment, remote database write or push.

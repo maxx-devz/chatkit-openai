@@ -13,6 +13,7 @@ export function proxy(request) {
   if (request.nextUrl.pathname.startsWith("/api/")) {
     const response = NextResponse.next({ request: { headers: requestHeaders } });
     response.headers.set("Cache-Control", "private, no-store");
+  if (request.nextUrl.pathname.startsWith("/account/")) response.headers.set("Referrer-Policy", "no-referrer");
     return response;
   }
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
@@ -51,6 +52,7 @@ export function proxy(request) {
     ? NextResponse.rewrite(debuggerPage.destination, options)
     : NextResponse.next(options);
   response.headers.set("Cache-Control", "private, no-store");
+  if (request.nextUrl.pathname.startsWith("/account/")) response.headers.set("Referrer-Policy", "no-referrer");
   response.headers.set("Content-Security-Policy", policy);
   return response;
 }
