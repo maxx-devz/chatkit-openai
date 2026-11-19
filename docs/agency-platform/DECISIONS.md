@@ -751,3 +751,35 @@ loopback HTTP/synthetic loopback PostgreSQL, plus explicit per-agency governance
 It is not a production rollout switch. /agency, /api/agency and non-AOC client
 entry remain closed. Read actual local evidence and limits in PROGRESS and the
 Stage 13 runbook. No Stage 13A, deployment, real customer grant, message or push.
+
+
+## S13A-D01 — Specialist approval, engagement and delivery scope
+
+Build from 4316efd, preserve the agency/platform/client/Internal boundaries and
+external gates. Use existing active Agency Owners/Agency Administrators as the
+approvers for their own client assignments, coverage and replacements. Whitecap
+management, a staffing engagement, payment, name/employer match or platform role
+does not grant customer data. An engagement can exist without a portal account;
+linking an existing identity still grants no assignment or client membership.
+
+The assignment authorizes only delivery context read, optional explicit client
+file reads and note writes, with exact agency/client/engagement/recipient, review
+owner, approved business scope and finite expiry (max 90 days). No legacy client
+grant or administrative/AI/financial role is created. Replacement is same-client
+and agency, new approval/recipient scope with old assignment invalidated atomically.
+Engagement end revokes its assignments; all requests and work/output recheck.
+Existing independent ordinary grants remain independent of staffing.
+
+Use a whitelist of business delivery fields, not personnel records. Private HR
+canary retrieval/answer checks use fixtures and a deterministic fake model; they
+are not a live hosted AI pass. The new evidence loader is a guarded tool-consumer
+boundary, not a newly enabled specialist ChatKit interface or general AI right.
+Preserve existing client privacy filters and private sources. Future AI/provider
+usage needs a separately approved integration/data destination and fresh checks.
+
+Files use authenticated current-assignment delivery, explicit file IDs, no signed
+bearer URL. Revocation/expiry denies new requests; already downloaded or authorized
+in-flight bytes cannot be recalled. UI access refresh is every 15 seconds/on
+focus/manual check, independent of server enforcement. No new scheduler/queue,
+mail, paid action or HR workflow. Existing source approval/rotation/scheduler/CDN
+and external rollout checks remain pending. Stop before Stage 14, no push.

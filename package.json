@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "specialists:review:seed": "node scripts/seed-specialist-review.mjs",
+    "agency:specialists": "node scripts/migrate-specialist-assignments.mjs",
+    "test:specialists:database": "node --conditions=react-server --experimental-test-module-mocks --import ./tests/internal-user/aliases.mjs --test tests/agency-backfill/specialists.database.test.mjs",
+    "test:specialists:browser": "playwright test --config tests/specialists/playwright.config.mjs",
     "agency:administration": "node scripts/migrate-agency-administration.mjs",
     "agency:review:seed": "node scripts/seed-agency-review.mjs",
     "test:agency:administration": "node --conditions=react-server --experimental-test-module-mocks --import ./tests/internal-user/aliases.mjs --test tests/agency-backfill/agency-admin.database.test.mjs",

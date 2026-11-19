@@ -1,5 +1,11 @@
 # Agency Platform context
 
+> Stage 13A local specialist delivery is implemented from `4316efd` in AI\portal
+> on feat/agency-platform. Separate engagements, explicit agency approval, scoped
+> actions/files/expiry and revocation are locally verified. Review port 3002;
+> prior reviews preserved. No general specialist ChatKit/HR access or external
+> rollout is enabled. Stop before Stage 14; see latest PROGRESS/runbook.
+
 > Stage 13 locally implemented from `b2d36ce` on `feat/agency-platform` in
 > `AI\portal`. Agency-scoped client/staff/settings/usage/audit and protected
 > ownership are verified with two fictional agencies. Local review uses port

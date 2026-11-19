@@ -472,3 +472,30 @@ BFCache/deployed cache limitations are unchanged. Mobile/other browsers unverifi
 and deployed private CDN/cache remain critical external-release checks. Deployed
 runtime/pooler, providers, scheduler and rotation remain deployment verification.
 No Neon, real payments/messages or personnel data. Stop before Stage 13A.
+
+
+## Stage 13A specialist assignments — November 19, 2026
+
+Base 4316efd; actual AI\portal project paths, feat/agency-platform. Separate
+disposable PostgreSQL/synthetic accounts; existing reviews preserved.
+
+| Boundary | Status | Actual evidence |
+| --- | --- | --- |
+| Engagement versus customer authorization | **passed** | 11 real PG/Better Auth/API/Python TAP checks including parent: engagement-only/manager denial, identity-optional engagement and explicit linking without client rights |
+| Agency-approved resource/action scope | **passed** | Foreign agency/client/file and unsupported-action/personnel-field denial; explicit file/note actions; client/agency/platform/Internal roles kept independent |
+| Replacement, expiry, revocation and work | **passed** | Atomic replacement and old URL denial, engagement end, inactive membership, live expiry/session checks; in-flight output denied; transaction rolls back expired write; idempotent notes |
+| File grant lifetime | **passed** | Copied links require current authorized account/assignment; safe private download headers; no signed URL is minted. Authorized in-flight/downloaded bytes remain outside recall |
+| HR/AI evidence boundary | **passed / model mocked** | Actual guarded Python/PostgreSQL loader projects business fields only; private synthetic HR canary absent. Deterministic fake answer uses approved evidence. General client AI denies specialist-only accounts; no live model/privacy pass |
+| Browser permissions and controls | **passed** | 7 Chrome scenarios on actual production build: separate scopes/downloads, manager/Internal denial, notes/actions, engagement/assignment approval, expiry/session removal, replaced context, actual replacement/end controls |
+| Prior regressions | **passed** | Stage 13 11 DB + 9 Chrome, Stage 12 11 DB + 7 Chrome, Stage 11 6 runtime-role + 9 four-client DB + 9 Chrome; earlier Stage 03–10 fixtures repeated |
+| Offline/lint/build | **passed** | 372 top-level, 40 source/index, 115 Internal tests. Python 185 reported, 9 opt-in skips. Full/focused lint and full production build pass with remote env excluded |
+| Retained review setup | **passed** | Fresh synthetic profile/migrations/seed, safe runtime diagnostic and real owner/specialist sign-in/delivery API/page verified on port 3002; prior review servers retained |
+| Live AI/CDN/providers/deployment | **not run / external HOLD** | Existing critical hosted-AI/edge privacy checks and deployment role/pooler/provider/scheduler/rotation checks remain. No specialist ChatKit/queue/mail/payment/HR rollout claimed |
+
+New tables have ENABLE/FORCE-RLS owner controls; raw ordinary runtime ledger reads
+deny. The legacy shared service remains trusted application SQL, not universally
+tenant-restricted RLS. No Neon or real personnel/customer/provider data was used.
+The approved business-file/context selection is explicit; no automatic classifier
+of every human-entered sentence/file is claimed. Old Google freshness/revocation
+and BFCache/browser/deployed cache limitations remain. Local engineering complete;
+external rollout HOLD; stop before Stage 14. No push.

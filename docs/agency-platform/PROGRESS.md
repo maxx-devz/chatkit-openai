@@ -1,6 +1,6 @@
 # Agency Platform progress
 
-> Current primary checkout is `C:\Users\MY PC\Desktop\AI\portal` on `feat/agency-platform`. Stage 13 agency administration is locally verified; external access stays gated. [Stage 13 handoff](#stage-13--agency-scoped-administration)
+> Current primary checkout is `C:\Users\MY PC\Desktop\AI\portal` on `feat/agency-platform`. Stage 13A specialist assignments are locally verified; external access stays gated. [Stage 13A handoff](#stage-13a--scoped-specialist-assignments)
 
 Updated November 19, 2026, Asia/Shanghai.
 
@@ -22,7 +22,8 @@ Updated November 19, 2026, Asia/Shanghai.
 | Stage 11 — isolation evidence | Local engineering PASS; external rollout HOLD | Runtime-role guards and four-client DB/browser matrix; hosted AI/CDN/deployment checks remain. |
 | Stage 12 — platform console | Implemented and locally verified | Explicit platform roles, agency lifecycle/audit, AOC delivery and status-only dual-consent support. |
 | Stage 13 — agency administration | Implemented and locally verified | Two-agency client/staff/settings/usage/audit, ownership and local consent; closed external gate. |
-| Stage 13A onward | Not started | Specialist engagements require a separately supplied task; external gate remains closed. |
+| Stage 13A — specialist assignments | Implemented and locally verified | Separate engagements, agency approval, action/client/file/expiry scope, replacement/revocation and HR exclusion; external hold. |
+| Stage 14 onward | Not started | Requires a separately supplied task; external gate remains closed. |
 
 Older `docs/PHASE_0_*` files describe a separate historical architecture/closeout
 process with outstanding reviews. This stage does not mark that process complete
@@ -1706,3 +1707,172 @@ payments/messages/personnel records and real customer access were untouched.
 exclusion tests for that new model are not implemented in this stage. Resume only
 with a separately supplied Stage 13A task, using this handoff and a fresh approved
 synthetic fixture. No push or external rollout approval.
+
+
+## Stage 13A — scoped specialist assignments
+
+Completed local engineering November 19, 2026 (Asia/Shanghai), from **4316efd**
+on `feat/agency-platform` in **C:\Users\MY PC\Desktop\AI\portal**. Read AGENTS,
+CONTEXT, DECISIONS, Stage 13 handoff, database portability and installed Next
+security/routing guidance; reused the working Admin shell, agency authorization,
+session checks, PostgreSQL library/private download headers and runtime guards.
+The working tree was clean at start. Existing retained review profiles/accounts
+and servers on ports 3000/3001 were preserved. No Neon, real provider, payment,
+message, invitation, personnel import or external agency access occurred.
+
+### Implemented contract and behavior
+
+- Additive migration **010_specialist_assignments** separates staffing engagements,
+  scoped delivery assignments and notes in three ENABLE/FORCE-RLS owner-controlled
+  tables. Narrow fixed-search-path SECURITY DEFINER functions enforce resource and
+  action checks; portable standard PostgreSQL only. Next uses lib/database.js,
+  provisioning lib/postgres.js, migrations short-lived pg and Python its guarded
+  connector. No role-guard bypass, provider SDK or runtime DDL was introduced.
+- A staffing engagement can exist without a portal identity. An agency admin may
+  explicitly link an approved existing account later; neither recording nor
+  linking creates membership/client rights. Employer/payment/name matches are
+  not authorization. A Whitecap manager receives no automatic customer access.
+- Only the active Agency Owner or Agency Administrator approves assignments,
+  temporary coverage, replacements, revocation and engagement end within the
+  chosen agency. Delivery staff, Client Admin, platform-only or specialist roles
+  cannot approve. Each assignment binds exact agency/client/engagement/account,
+  work type, allowed actions, explicit files, delivery role/responsibilities/
+  deliverables/handoff, active agency-admin review owner, approving actor and
+  finite expiry (future, max 90 days). Existing inactive agency membership is not
+  silently reactivated. No legacy client membership, client_access, agency-admin
+  or Internal panel grant is created from specialist approval.
+- Specialist actions are **delivery.read**, optional **delivery.files.read** and
+  **delivery.notes.write** only. Assignments are separate from any independently
+  approved ordinary membership; ending staffing does not silently change unrelated
+  customer grants. General client/agency/platform AI and background job rights
+  are not inferred from the specialist role.
+- Agency UI `/admin/agency/specialists?agency=<slug>` and API provide engagements,
+  account linking/end, explicit assignment approval, replacement and revocation.
+  The existing agency navigation links it for administrators. Specialist `/delivery`
+  shows only active approved assignment choices; `/delivery?assignment=<uuid>`
+  shows that context, permitted files and notes. Switching is explicit and does
+  not reuse another assignment's scope or content.
+- Replacement creates a new scope/recipient and marks the previous assignment
+  replaced atomically, with version/conflict checks. It cannot move work across
+  clients/agencies. Engagement end revokes all its active assignments; past
+  assignment IDs cannot be reopened. Audit retains actor/reason/context. Note
+  writes are idempotent and recheck after lock acquisition and before completion.
+- Every delivery/file/note/evidence request checks the real live session,
+  non-Internal identity, active agency/governance/membership/client, correct
+  engagement, active assignment/review owner, action and clock expiry. Specialist
+  work checks before execution, protected write, after write (transactional) and
+  before output. In-flight revocation denies delivery; expiry rolls back pending
+  writes. This reuses the existing check/write pattern, **not a new queue or
+  scheduler**. Existing report/Hubstaff/source jobs remain unavailable without
+  their separate existing permissions.
+- Downloads use explicit approved file IDs in that client library and existing
+  safe attachment/cache headers. No signed URL/bearer grant is issued: **no residual
+  signed-link lifetime** exists. Copied links need current authorization again.
+  Already authorized in-flight/downloaded bytes cannot be recalled. The UI checks
+  on focus/manual refresh/every 15 seconds, and reloads on persisted restore;
+  this is not instant deletion of previously displayed/downloaded information.
+- Personnel fields/HR tables/coaching/leave/payroll/candidate information/private
+  admin sources are absent from delivery queries and approved evidence projection.
+  Real personnel records were not imported. Synthetic HR canaries are private
+  fixture data only. Approval UI permits business context/files only and rejects
+  arbitrary personnel/privilege fields. Free text/files are untrusted data, not
+  tools/authority; no automatic classifier of all possible human content is claimed.
+
+### AI boundary — explicit implementation limit
+
+New SQL/Next/Python specialist evidence loaders expose a whitelist of approved
+business fields only and recheck the assignment for consumers. **No new specialist
+ChatKit chat, general AI permission or live provider call is enabled.** Existing
+client AI/session/tool/privacy checks remain unchanged and deny specialist-only
+accounts. Actual Python/PostgreSQL evidence retrieval was tested with a private
+HR canary and a deterministic **mocked answer** from allowed deliverables. It is
+not a live AI-answer/hosted-privacy test. Future specialist-aware AI consumers must
+use these guards before tools/write/output, preserve existing response privacy
+filters and obtain separately approved provider/data-destination configuration.
+
+### Actual checks and environment
+
+| Check | Actual result / evidence type |
+| --- | --- |
+| Migration 010 CLI | **First apply + identical checksum repeat passed**, fresh disposable WSL PostgreSQL 18.3, separate ordinary runtime/operator. No existing account/source/workspace promoted |
+| Stage 13A actual DB/API/Python matrix | **11 passed** (10 scenario groups + parent), 0 failed/skipped. Real PG, Better Auth sessions, API handlers and guarded Python connector; model answer mocked |
+| Assignment/permission checks | Engagement-only and employer/manager denial; account-optional engagement/link without data rights; agency-approved exact scope; foreign agency/client/file denial; unsupported action/personnel-field rejection; explicit read-only denies file/note; per-user choices; copied URL/private headers; idempotent notes; untrusted text cannot escalate |
+| Lifecycle/work checks | Actual replacement and old-scope/file denial; expired/revoked membership/engagement; inactive Internal-account exclusion; in-flight output denial; expiry rollback leaves no note; raw runtime ledger denial; general AI/report-job denial; session deletion prevents subsequent access |
+| HR/AI evidence | Actual SQL/Python field projection and recheck pass, private HR canary absent. Deterministic fake answer uses allowed evidence only. Three Python offline tests cover narrow SQL, sanitized denial and unsupported-action/no-query behavior. **No live model test** |
+| Stage 13A Chrome | **7 passed** against actual production build: separate A/B specialist contexts/files, manager/unrelated/Internal denial, note/action scope, engagement + assignment approval UI, expiry/session invalidation, replaced-context denial and actual administrator replacement/engagement-end UI |
+| Prior Stage 13 / 12 / 11 | Stage 13 **11 real DB + 9 Chrome**; Stage 12 **11 real DB + 7 Chrome**; Stage 11 **6 runtime-role + 9 four-client DB + 9 Chrome** passed again. Existing role guards, client isolation, owner controls and external gate preserved |
+| Earlier SQL fixtures | Stage 03 **9 scenarios**; Stage 04 two matching no-write reports, 51 ownership rows/7 quarantines first apply, 0 changes second, preserved all legacy rows/history/sequences; Stage 04 **9**, Stage 05 **5**, Stage 06/07 **11**, Stage 08 **1**, Stage 09 **6**, Stage 10 **9** TAP checks passed again |
+| Offline regressions | **372** top-level Node, **40** source/index, **115** Internal tests passed, no failure/skips in those suites. Python **185 tests reported, 9 opt-in DB skips, exit 0**. Source/provider/AI mocks remain fixture evidence |
+| Lint / production build | Focused + **full frontend lint passed**, exit 0. **Full Next production build passed**, private/remote environment assignments shadowed |
+| Retained review setup | New separate synthetic DB, migration/seed/ordinary runtime diagnostic passed. Actual owner and specialist HTTP sign-ins, scoped delivery/API/page and denial of general AI + external gate verified at port **3002**. No missing local configuration after setup |
+
+Initial Python fixture failures were a missing connector DSN and Windows async
+Proactor loop; fixed using the explicit synthetic DSN and a compatible test event
+loop, without changing runtime guards. The final checks above pass. No production
+database or live API was used to repair a test. Existing AI/source/role results
+are kept separate from the new local evidence. Mobile/other-browser and deployed
+cache/pooler behavior remain unverified.
+
+### Files and private review
+
+| Area | Actual primary project paths |
+| --- | --- |
+| Database / migration | database/agency-platform/010_specialist_assignments.sql; scripts/migrate-specialist-assignments.mjs |
+| Server / consumers | lib/specialist-assignments.js; app/api/admin/agency/specialists/route.js; app/api/delivery/route.js; app/api/delivery/files/[id]/route.js; chatkit_backend/specialist_access.py |
+| Frontend | app/admin/agency/specialists/page.js; app/delivery/page.js; components/agency/specialist-console.js; specialist-delivery.js; administrator-only agency navigation link |
+| Fixtures/review | scripts/specialist-review-fixture.mjs; scripts/seed-specialist-review.mjs; explicit port-3002 support in existing dev-platform-review.mjs; package.json |
+| Tests | tests/agency-backfill/specialists.database.test.mjs; tests/specialists/*; chatkit_backend/tests/test_specialist_access.py |
+| Handoff | STAGE13A_SPECIALISTS.md; CONTEXT.md; DECISIONS S13A-D01; ISOLATION-EVIDENCE.md; this entry |
+
+Final code/tests/docs live in **AI\portal project paths**, not only scratch
+`.tmp/stage13a/src`; hashes/branch/baseline are verified before staging. Existing
+private files/user edits were preserved. No secrets, generated accounts, environment
+profiles, dumps, screenshots, logs, private canaries or temporary helpers are
+included in Git. The separate acceptance database/server were stopped/removed.
+
+**Specialist login: http://127.0.0.1:3002/login**
+
+**Specialist workspace: http://127.0.0.1:3002/delivery**
+
+**Agency approvals: http://127.0.0.1:3002/admin/agency/specialists?agency=s13-harbor**
+
+The retained specialist review server/database remain running; earlier port-3000
+and port-3001 reviews remain running as well. Private **.env.specialist-review**
+was generated for that fresh disposable loopback target with DATABASE_URL (ordinary
+runtime), AGENCY_MIGRATION_DATABASE_URL (separate operator), BETTER_AUTH_URL (3002)
+and BETTER_AUTH_SECRET. Existing .env.local and review profiles were not copied
+or changed. The launcher enables existing LOCAL_AGENCY_ADMIN_REVIEW only under
+the guarded loopback/synthetic contract and scrubs provider/operator settings.
+No new runtime variable/provider secret or .env.example placeholder was needed.
+
+The ignored **.tmp/specialist-review/accounts.json** is open privately in the
+editor. Use **specialists.specialistA.username / specialists.specialistA.password**
+for the two-agency specialist, **accounts.ownerA** for Harbor approvals, ownerB
+for Summit, specialistB for replacements and whitecapManager for the no-access
+example. Do not paste passwords into chat. Open the proper route after login;
+the client root is not the specialist workspace. Cookies are host-scoped across
+ports, so separate browser profiles help when comparing different review DBs.
+
+For a repeat, privately supply the existing operator
+AGENCY_WORKSPACE_TEST_DATABASE_URL, separate runtime DATABASE_URL, synthetic auth,
+LOCAL_AGENCY_ADMIN_REVIEW and prepared AGENCY_ADMIN_FIXTURE; the new test-only
+SPECIALIST_FIXTURE is an ignored matching fixture path. See STAGE13A_SPECIALISTS
+for migration/seed/launcher/test commands and refusal to overwrite existing files.
+No current local prerequisite is missing. No live sign-in/consent was required.
+
+### Remaining checks and stop gate
+
+**Stage 13A local engineering complete; external agency rollout remains HOLD.**
+The public agency paths and non-AOC client entry remain gated. Existing runtime
+role guards and private admin/source controls are unchanged. Hosted-AI privacy
+and deployed private CDN/cache remain critical external-release checks; deployed
+runtime/pooler mapping, provider consent/resource/revocation, scheduler delivery,
+secret rotation/restore and supported browsers remain deployment tasks. Google
+revocation remains the prior next-check / 15-minute source freshness window.
+Specialist ChatKit/provider integration and new queue/mail/payment/HR workflows
+are not claimed. Source publication approval remains Stage 20B.
+
+The intended work and handoff are committed locally (git log -1). No Neon, real
+personnel/customer access, provider upload, paid action, real message or push.
+**Stop before Stage 14.** Resume only after a separately supplied task with these
+limits and approved disposable fixtures. No external invitation/rollout approval.

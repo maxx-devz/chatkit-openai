@@ -7,7 +7,7 @@ async function main() {
   if (process.argv.length > 2 && !agencyReview) throw Error("Unsupported review option.");
   const url = new URL(process.env.DATABASE_URL);
   const origin = process.env.BETTER_AUTH_URL;
-  const permittedOrigin = origin === "http://127.0.0.1:3000" || (agencyReview && origin === "http://127.0.0.1:3001");
+  const permittedOrigin = origin === "http://127.0.0.1:3000" || (agencyReview && ["http://127.0.0.1:3001", "http://127.0.0.1:3002"].includes(origin));
   if (url.hostname !== "127.0.0.1" || url.search || !["postgres:", "postgresql:"].includes(url.protocol) || !/^\/aoc_stage04_rehearsal_[a-f0-9]+$/.test(url.pathname) || !permittedOrigin || (process.env.BETTER_AUTH_SECRET || "").length < 32) throw Error("Configure the disposable local runtime and loopback authentication privately first.");
   const root = new URL("../", import.meta.url), env = {};
   for (const [key, value] of Object.entries(process.env)) if (/^(path|pathext|systemroot|windir|comspec|temp|tmp|userprofile|appdata|localappdata|programdata|programfiles|programfiles\(x86\)|homedrive|homepath|home|lang|lc_all)$/i.test(key)) env[key] = value;
