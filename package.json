@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "agency:administration": "node scripts/migrate-agency-administration.mjs",
+    "agency:review:seed": "node scripts/seed-agency-review.mjs",
+    "test:agency:administration": "node --conditions=react-server --experimental-test-module-mocks --import ./tests/internal-user/aliases.mjs --test tests/agency-backfill/agency-admin.database.test.mjs",
+    "test:agency:administration:browser": "playwright test --config tests/agency-administration/playwright.config.mjs",
     "agency:console": "node scripts/migrate-platform-console.mjs",
     "platform:review:seed": "node scripts/seed-platform-review.mjs",
     "platform:review": "node scripts/dev-platform-review.mjs",

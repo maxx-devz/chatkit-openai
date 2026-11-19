@@ -1,6 +1,6 @@
 # Agency Platform progress
 
-> Current primary checkout is `C:\Users\MY PC\Desktop\AI\portal` on `feat/agency-platform`. Stage 12 local console verification is complete; external access stays gated. [Stage 12 handoff](#stage-12--local-platform-owner-console)
+> Current primary checkout is `C:\Users\MY PC\Desktop\AI\portal` on `feat/agency-platform`. Stage 13 agency administration is locally verified; external access stays gated. [Stage 13 handoff](#stage-13--agency-scoped-administration)
 
 Updated November 19, 2026, Asia/Shanghai.
 
@@ -21,7 +21,8 @@ Updated November 19, 2026, Asia/Shanghai.
 | Stage 10 — background jobs | Implemented and locally verified | Ownership/version fences, leases/retries/fair scheduling; deployment scheduler check pending. |
 | Stage 11 — isolation evidence | Local engineering PASS; external rollout HOLD | Runtime-role guards and four-client DB/browser matrix; hosted AI/CDN/deployment checks remain. |
 | Stage 12 — platform console | Implemented and locally verified | Explicit platform roles, agency lifecycle/audit, AOC delivery and status-only dual-consent support. |
-| Stage 13 onward | Not started | Requires a separately supplied task; external gate remains closed. |
+| Stage 13 — agency administration | Implemented and locally verified | Two-agency client/staff/settings/usage/audit, ownership and local consent; closed external gate. |
+| Stage 13A onward | Not started | Specialist engagements require a separately supplied task; external gate remains closed. |
 
 Older `docs/PHASE_0_*` files describe a separate historical architecture/closeout
 process with outstanding reviews. This stage does not mark that process complete
@@ -1536,3 +1537,172 @@ secure identifier; this does not block the authorized synthetic local console.
 The intended work and handoff are saved in the local Stage 12 commit (`git log
 -1`). Review the runbook and evidence before a separately authorized Stage 13.
 **Stop here: Stage 13 was not started.**
+
+
+## Stage 13 — agency-scoped administration
+
+Completed local engineering November 19, 2026 (Asia/Shanghai), from **b2d36ce**
+on `feat/agency-platform` in **C:\Users\MY PC\Desktop\AI\portal**. The user
+explicitly corrected the accidental specialist-stage paste: **Stage 13 only;
+stop before Stage 13A**. Existing partially prepared Stage 13 edits were preserved
+and completed after interruption. Stage 12 documentation, private account/config
+files, existing local review data and runtime guards were preserved. Read AGENTS,
+CONTEXT, DECISIONS, Stage 12 handoff/runbook, database portability and installed
+Next data-security, route-handler and navigation documentation before editing.
+
+### Implemented behavior
+
+- Added a self-contained `/admin/agency` area with explicit agency selector and
+  client, staff/access, permitted settings, source/connection status, usage and
+  audit pages. It reuses existing Admin components/branding; no Platform Console
+  navigation or authority is inherited. Default legacy Admin navigation remains.
+- Server and SQL checks reuse real Better Auth sessions, trusted host/origin,
+  live request-agency membership, active agency and independent Internal-user
+  protections. Every read/write derives the permitted agency and checks client
+  ownership. Multiple memberships require explicit selection; a URL/header never
+  grants access. Private no-store responses and workspace-specific component
+  keys prevent shared view state. Revocation/downgrade is checked on subsequent
+  API requests and UI refresh/focus; persisted page restore reloads authorization.
+- Owner: own-agency management plus permitted settings, recorded provider costs
+  and ownership transfer. Agency Administrator: own clients and lower staff/client
+  grants, without owner/billing settings or peer promotion. Delivery staff: only
+  explicitly assigned clients and own staff/grant record. Client Administrator
+  never becomes Agency Administrator. Platform role alone grants no delivery
+  access. No HR/specialist role or employment-based access was added.
+- Client creation is agency-owned/idempotent with Stage 04 classification and AI
+  disabled by default. Client edits reuse website/Hubstaff validation; duplicate
+  project links and foreign ownership IDs are denied. Client-to-agency transfer,
+  platform keys, global pricing, billing references and unrestricted source packs
+  are not mass-assignable. New users/credentials/knowledge are not inherited.
+- Staff roles, client assignments and local existing-account invitations are
+  scoped to the agency. An inviter cannot grant a higher role. Recipient acceptance
+  is explicit, finite (24 hours), rechecks current inviter authority and cannot
+  activate a foreign-client grant. Duplicate memberships, expired/revoked invites
+  and unrelated recipients deny without writes. No invitation email was sent.
+- One accountable active Agency Owner is protected by API checks **and deferred
+  database invariants**. Transfer to a different active same-agency administrator
+  requires a reason/current revision/typed slug; old owner loses owner/billing
+  rights. Removing/deactivating/downgrading the final owner, deleting governance,
+  mismatching ownership display or converting that owner into an Internal identity
+  is rejected. No Stage 12 displayed owner was automatically activated/promoted.
+- Staff revocation disables that agency's client grants/memberships and applicable
+  support grants. Other agencies and the global login remain. Reactivation alone
+  does not restore the old client grants; an explicit assignment is required.
+  Existing client-admin protection is retained when editing client grants.
+- Settings expose only support name/email and timezone. Usage is current UTC-month
+  recorded requests/tokens for permitted clients; provider-cost summary belongs
+  only to Agency Owner and preserves unknown amounts. These are not invoices,
+  staffing prices, subscription changes or AOC fee changes. Audit includes scoped
+  administration actions and sanitized existing client operations, no platform/
+  foreign/private payloads. Client/member/audit views are bounded to 100 rows;
+  large-estate pagination remains a refinement, not an unbounded export.
+- Sources adapt approved revision/freshness/connection **status only**, excluding
+  private administrator packs/source titles/bodies/credential fields and foreign
+  scopes. New agencies inherit no AOC knowledge or connections. Client project
+  mappings are configurable; a URL is not live resource validation. New agency
+  OAuth/provider onboarding is still gated and source publication edits/approval
+  remain the later Stage 20B dependency. Existing source checks are preserved.
+- Additive checksum migration **009_agency_administration** creates three ENABLE/
+  FORCE-RLS owner-controlled tables and narrow fixed-search-path SQL functions.
+  Runtime uses lib/database.js; provisioning lib/postgres.js; migrations short-
+  lived pg clients. No SDK, extension, guard-disable switch or runtime DDL added.
+  The legacy shared-service model remains explicit, not universal legacy-table
+  tenant RLS. No existing real account is automatically promoted.
+
+### Closed gate and actual verification
+
+New review entry points are default-closed. Server-only
+`LOCAL_AGENCY_ADMIN_REVIEW` works **only** with a loopback HTTP origin and synthetic
+loopback rehearsal DB with no query override. The template entry is blank. A
+fixture's governance must separately be explicitly enabled. `/agency`,
+`/api/agency`, non-AOC client entry, platform guards and Stage 11 rollout holds
+remain unchanged. This is local engineering approval, not external agency rollout.
+
+| Check | Actual result / type |
+| --- | --- |
+| Migration 009 | **Passed first application and identical repeat**, separate non-owner runtime/operator, fresh disposable WSL PostgreSQL 18.3. No real workspace activated |
+| Stage 13 database/API matrix | **11 passed** (10 scenario groups + parent), 0 failed/skipped. Actual PostgreSQL, Better Auth sessions and actual route handlers; no external provider needed |
+| Two-agency SQL/API coverage | Own client/staff/settings/usage/audit allow, cross-agency denial and same-agency assigned-client restriction; platform/client/Internal role boundaries; host/origin/local gate/foreign runtime target refusal; stale workspace headers; idempotent owned clients; foreign/mass-assignment denial; invitations with separate recipient consent, duplicate/expired/revoked/stale-inviter denial; final-owner database/API checks and scoped transfer; session/role/membership/suspension changes; protected-ledger denial, pool cleanup; concurrent version conflict with only one committed write |
+| Stage 13 Chrome | **9 passed** on the actual production build: both agency views, staff read-only/direct API denial, client creation, platform/client role denial, ownership UI/last owner, workspace switching/stale scope, open-view revocation, invitation UI/recipient acceptance, already-open role downgrade |
+| Stage 12 regression | **11 actual DB/API** and **7 Chrome** checks passed again; platform roles, lifecycle, support consent and AOC delivery remain working |
+| Stage 11 regression | **6 runtime-role**, **9 four-client DB** and **9 Chrome** checks passed again. Actual Next/Python connector role checks retained; original BFCache limitations unchanged |
+| Earlier real SQL fixtures | Stage 03 **9 scenario groups**; Stage 04 two identical no-write reports and two applies (51 rows / 7 quarantines first, 0 changed second), identical legacy rows/history/sequences; Stage 04 **9**, Stage 05 **5**, Stage 06/07 **11**, Stage 08 **1**, Stage 09 **6**, Stage 10 **9** TAP checks passed again |
+| Offline regressions | **372** top-level Node, **40** source/index and **115** Internal tests passed, no failures/skips in those suites. Python **182 tests reported, 9 opt-in DB skips, exit 0**. Provider/source/AI mocks remain explicitly fixture evidence, not live service checks |
+| Lint / full build | Focused lint and **full frontend lint passed**, exit 0. **Full Next production build passed** with private/remote variables shadowed |
+| Actual review setup | Fresh separate synthetic DB prepared via existing migrations/seed/launcher. Ordinary runtime role diagnostic passed. Real HTTP owner login, agency API/page and closed external gate verified on **port 3001**. No real provider or mail |
+
+The interrupted preparation had no finished Stage 13 database verification.
+Real checks caught a fixture numeric parameter ambiguity and source-table alias
+ambiguity; both were corrected. Browser select accessibility/locator issues were
+corrected with explicit accessible control names. Final tests above pass without
+weakening authorization. Screenshot inspection used synthetic pages only. Mobile,
+other browsers, real hosted AI/provider/CDN/production transport remain unverified.
+
+### Actual files, private configuration and local review
+
+| Area | Actual project paths |
+| --- | --- |
+| Database / operator | database/agency-platform/009_agency_administration.sql; scripts/migrate-agency-administration.mjs |
+| Server | lib/agency-administration.js; app/api/admin/agency/route.js; app/api/admin/agency/invitations/route.js |
+| Frontend | app/admin/agency/page.js; app/admin/agency/[view]/page.js; app/admin/agency/invitations/page.js; components/agency/*; optional agency labels/navigation in existing Admin shell/sidebar |
+| Local fixture/review | scripts/agency-review-fixture.mjs; scripts/seed-agency-review.mjs; scripts/dev-platform-review.mjs --agency-admin; package.json; blank local-only flag in .env.example |
+| Tests | tests/agency-backfill/agency-admin.database.test.mjs; tests/agency-administration/playwright.config.mjs; tests/agency-administration/browser/agency.spec.mjs |
+| Handoff | STAGE13_AGENCY_ADMINISTRATION.md; CONTEXT.md; DECISIONS S13-D01; ISOLATION-EVIDENCE.md; this entry |
+
+Final application/tests are in the **actual AI\portal paths**, hash-checked against
+reviewed preparation files; no runtime imports a `.tmp/stage13/src` mirror. Those
+scratch mirrors, logs, dumps, browser artifacts, generated credentials and local
+environment files remain ignored and outside the commit. Existing edits were
+preserved. No push.
+
+**Review login: http://127.0.0.1:3001/login**
+
+**Agency interface: http://127.0.0.1:3001/admin/agency**
+
+Open the private ignored `.tmp/agency-admin-review/accounts.json` in your editor.
+Use **accounts.ownerA.username / accounts.ownerA.password** for fictional Harbor,
+or **accounts.ownerB** for Summit. `staffA`, `staffB`, `adminA`, `multi`, `clientA`
+and `platformOnly` cover the other permission cases. No credentials are in this
+handoff/chat. After login, open the agency URL directly; client-root “no client
+assigned” does not grant or deny agency administration. The Stage 12 owner in
+the separate port-3000 DB is not this test identity.
+
+The retained local profile **.env.agency-stage13** was generated privately with
+**DATABASE_URL** (ordinary loopback runtime), **AGENCY_MIGRATION_DATABASE_URL**
+(separate operator), **BETTER_AUTH_URL** (port 3001) and **BETTER_AUTH_SECRET**.
+No Stage 13 local prerequisite remains missing on this computer. No `.env.local`
+or existing `.env.agency-test` value/file was copied or changed. The launcher
+sets **LOCAL_AGENCY_ADMIN_REVIEW=true** only with explicit `--agency-admin` and
+scrubs provider/operator settings before starting the verified production build.
+For a fresh verification fixture also privately supply existing
+**AGENCY_WORKSPACE_TEST_DATABASE_URL** and ignored **AGENCY_ADMIN_FIXTURE** path;
+they are operator/test inputs, not browser settings. See the new runbook for exact
+commands and resuming/reseeding safeguards. Account file overwrite is refused.
+
+The separate acceptance server/database were stopped/removed. The **retained
+Stage 13 review** server/database remain running at user-review closeout, alongside
+the preserved Stage 12 review on port 3000. Both login pages returned HTTP 200.
+Non-secret status/process metadata and private logs are in the original checkout's
+ignored `.tmp/stage13/`; stop only the recorded processes/cluster. Browser cookies
+share the host across ports: use separate browser profiles when comparing both
+databases, or sign in again with the matching fixture. User-edited original
+Stage 12 accounts and private files were preserved.
+
+### Remaining checks and next permitted stage
+
+**Stage 13 local engineering complete. External agency access remains HOLD.**
+Hosted-AI privacy and deployed private CDN/cache remain critical external-release
+isolation checks. Deployed runtime/pooler mapping, Google/provider consent/resource
+validation/revocation, scheduler registration/delivery, rotation/restore and
+supported browsers remain deployment verification tasks. The previous Google
+next-check / 15-minute freshness revocation window is unchanged. No scheduler,
+provider connection, publication approval workflow, production mail transport or
+live billing integration is claimed here. Real agency activation and new-account
+email invitations need separately approved identities/recipients/transport.
+
+The intended work is committed locally (git log -1). Neon, production, real
+payments/messages/personnel records and real customer access were untouched.
+**Stop before Stage 13A.** Specialist engagements, coverage, assignments and HR
+exclusion tests for that new model are not implemented in this stage. Resume only
+with a separately supplied Stage 13A task, using this handoff and a fresh approved
+synthetic fixture. No push or external rollout approval.

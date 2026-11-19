@@ -441,3 +441,34 @@ no instant recall or new webhook guarantee. Actual BFCache restored-cache covera
 and browser limitations remain as recorded in Stage 11, without weakened headers.
 No real user/password/provider consent, production DB, payment, message or push.
 Stop before Stage 13.
+
+
+## Stage 13 agency administration — November 19, 2026
+
+Base b2d36ce; actual AI\portal project paths on feat/agency-platform. Stage 13
+only, with runtime guards/Stage 11 gates preserved. No real agency activation.
+
+| Boundary | Status | Evidence |
+| --- | --- | --- |
+| Two-agency clients/staff/settings/usage/audit | **passed** | 11 real PG/Better Auth/API TAP checks, including parent; foreign identifiers/fields denied, own scope allowed, delivery assigned-client restriction, owner-only cost view |
+| Ownership and last-owner protection | **passed** | Typed/revision-bound transfer, same-agency active target, former-owner privilege loss; deferred constraints reject final-owner deactivation/governance deletion and inconsistent ownership |
+| Invitations and stale authority | **passed** | Separate recipient consent, higher-role/foreign-client/unrelated-recipient/duplicate/expired/revoked/downgraded-inviter denial; no mail sent |
+| Revoked/stale access and concurrent writes | **passed** | Rechecks session/membership/agency status; reactivation does not restore old grants; per-agency revision lock admits one competing write; no partial denied mutations |
+| Protected tables / pool / local gate | **passed** | Runtime direct ledger read/delete denied; no retained SQL role/context; disabled gate and remote target reject; external agency routes remain closed |
+| Agency Chrome UI and direct APIs | **passed** | 9 actual production-build scenarios: both scopes, staff restrictions, create client, platform/client denial, owner transfer, workspace switch, revocation, consent UI and live downgrade |
+| Prior Stage 12 / 11 | **passed** | Stage 12 11 DB + 7 Chrome; Stage 11 6 runtime-role + 9 four-client DB + 9 Chrome; earlier Stage 03–10 fixtures repeated successfully |
+| Offline regressions | **passed / mocked as specified** | 372 top-level, 40 source/index, 115 Internal tests; Python 182 reported, 9 opt-in skips. No new live AI/provider test |
+| Lint / build | **passed** | Full/focused frontend lint and full production build with remote variables excluded |
+| Retained local review setup | **passed** | Existing migration/seed/launcher created new synthetic identities on separate loopback DB; real owner sign-in/API/page and closed gate verified on port 3001; credentials ignored and opened privately |
+| Live provider/email/CDN/scheduler/rotation/production role mapping | **not run / pending as previously classified** | Local inbox/status/mapping features do not establish live consent, resource ownership, mail transport or external deployment safety |
+
+Sources in the new fictional agencies intentionally have no inherited AOC packs
+or private provider credentials. This stage verifies scoped status views and
+existing source/AI regressions, not a new live source publication workflow. Stage
+20B approval and existing next-check/15-minute revocation limits remain. Browser
+BFCache/deployed cache limitations are unchanged. Mobile/other browsers unverified.
+
+**Stage 13 local engineering complete; external rollout HOLD.** Hosted-AI privacy
+and deployed private CDN/cache remain critical external-release checks. Deployed
+runtime/pooler, providers, scheduler and rotation remain deployment verification.
+No Neon, real payments/messages or personnel data. Stop before Stage 13A.

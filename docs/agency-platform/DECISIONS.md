@@ -715,3 +715,39 @@ remain separately approved decisions. Source/provider consent is never implied.
 Actual evidence and private local review setup are recorded in PROGRESS and
 STAGE12_PLATFORM_CONSOLE.md. No provider credentials are needed for the synthetic
 console checks. Stage 13 requires a new task. No push or production approval.
+
+
+## S13-D01 — Agency administration authority and local review
+
+Build from b2d36ce and preserve Stage 12 platform controls, runtime database role
+guards, source approved revisions and external gates. User explicitly authorized
+Stage 13 only; specialist engagements belong to a separate Stage 13A task.
+
+Use one accountable active Agency Owner, represented by explicit governance and
+matching agency ownership display. Other agency administrators are not owners.
+No automatic activation/promotion of existing Stage 12 display owners. Transfer
+requires the current owner and a different active same-agency administrator,
+reason, revision and typed slug; database constraints protect the final owner.
+Owner has scoped support/timezone settings and recorded provider-cost visibility;
+administrators manage clients/lower staff; delivery staff need explicit client
+grants. Client and Internal roles remain separate; platform privilege is not
+impersonation or agency delivery authority. No billing/pricing mutation is added.
+
+Invitations are local in-portal requests for existing account identifiers, with
+recipient acceptance, 24-hour expiry and live inviter-authority revalidation.
+No real mail or identity registration is inferred. Another agency's user can
+join only through separate explicit consent; foreign client resources cannot be
+attached. New agency/staff identity provisioning and mail delivery need a later
+approved configuration/recipient list. Staffing relationships grant no access.
+
+Revoke agency staff client grants/memberships and applicable support grants in
+the same transaction; reactivation does not implicitly restore old client access.
+Ownership moves between agencies are not an editable client field. Source views
+show scoped revision/connection status only; publication approval stays Stage 20B
+and new live provider onboarding stays gated. No inherited AOC/private pack or key.
+
+New server-only LOCAL_AGENCY_ADMIN_REVIEW is default-closed and accepted only for
+loopback HTTP/synthetic loopback PostgreSQL, plus explicit per-agency governance.
+It is not a production rollout switch. /agency, /api/agency and non-AOC client
+entry remain closed. Read actual local evidence and limits in PROGRESS and the
+Stage 13 runbook. No Stage 13A, deployment, real customer grant, message or push.

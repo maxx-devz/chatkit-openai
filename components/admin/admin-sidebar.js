@@ -36,7 +36,7 @@ function initials(value) {
     .map(part => part[0]).join('').toUpperCase();
 }
 
-export default function AdminSidebar({ admin, active = 'overview', navigation = NAV_ITEMS, platform = false }) {
+export default function AdminSidebar({ admin, active = 'overview', navigation = NAV_ITEMS, platform = false, scopeLabel, workspaceName }) {
   const [open, setOpen] = useState(false);
   const toggle=useRef(null),aside=useRef(null);
   useEffect(()=>{if(!open)return;aside.current?.querySelector('button')?.focus();
@@ -57,7 +57,7 @@ export default function AdminSidebar({ admin, active = 'overview', navigation = 
         onClick={() => setOpen(false)}>×</button>
       <div className={styles.brand}>
         <Image src={aocLogo} alt="Always Open Commerce" priority />
-        <span>{platform?"Platform Operations":"Administrator Portal"}</span>
+        <span>{scopeLabel || (platform?"Platform Operations":"Administrator Portal")}</span>
       </div>
       <nav aria-label="Administrator portal">
         {navigation.map(([icon, label, href, id]) => <Link key={id} href={href} prefetch={false} title={label}
@@ -67,8 +67,8 @@ export default function AdminSidebar({ admin, active = 'overview', navigation = 
         </Link>)}
       </nav>
       <div className={styles.sidebarStatus}>
-        <span><i /> {platform?"External agency access gated":"Connected database"}</span>
-        <p>{platform?"Platform controls require explicit access. Private client content stays in its workspace.":"Local pages may use shared data. Saved changes apply to the configured database."}</p>
+        <span><i /> {workspaceName || (platform?"External agency access gated":"Connected database")}</span>
+        <p>{scopeLabel?"Client and staff access is limited to this active agency.":platform?"Platform controls require explicit access. Private client content stays in its workspace.":"Local pages may use shared data. Saved changes apply to the configured database."}</p>
       </div>
       <div className={styles.adminIdentity}>
         <span>{initials(admin?.name)}</span>

@@ -1,5 +1,11 @@
 # Agency Platform context
 
+> Stage 13 locally implemented from `b2d36ce` on `feat/agency-platform` in
+> `AI\portal`. Agency-scoped client/staff/settings/usage/audit and protected
+> ownership are verified with two fictional agencies. Local review uses port
+> 3001 and a separate synthetic database. External access stays HOLD. Stage 13A
+> is not started; see latest PROGRESS and STAGE13_AGENCY_ADMINISTRATION.md.
+
 > Stage 12 local console is implemented from `0064754` in `AI\portal` on
 > `feat/agency-platform`. Explicit platform owner/operator access, agency metadata
 > and audited lifecycle, scoped AOC delivery and status-only dual-consent support
