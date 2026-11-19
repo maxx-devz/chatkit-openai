@@ -8,10 +8,12 @@ const stages = { discovery: "Checking crawl access and sitemap", crawl: "Checkin
 const tabs = [["overview", "Overview"], ["findings", "Findings"], ["performance", "Performance"], ["search", "Search & keywords"], ["geo", "AI search / GEO"], ["previews", "Page previews"], ["history", "History"]];
 const fmt = (value, digits = 0) => typeof value === "number" && Number.isFinite(value) ? value.toLocaleString(undefined, { maximumFractionDigits: digits }) : "Unavailable";
 const date = value => value ? new Date(value).toLocaleString() : "Not analyzed";
-async function api(path = "", body, signal) {
+async function requestInsights(clientId, path = "", body, signal) {
   const response = await fetch(API + path, { cache: "no-store", ...(signal ? { signal } : {}),
-    ...(body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}) });
+    headers:{ "x-aoc-client":String(clientId),...(body ? { "Content-Type":"application/json" } : {}) },
+    ...(body ? { method: "POST",body:JSON.stringify(body) } : {}) });
   const data = await response.json().catch(() => ({}));
+  signal?.throwIfAborted();
   if (!response.ok) throw new Error(data.error || "Website Insights could not complete this request.");
   return data;
 }
@@ -71,22 +73,25 @@ export default function WebsiteInsights({ clientId, canWrite, canManage, initial
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [detailLoading, setDetailLoading] = useState(true);
   const [auto, setAuto] = useState(true), [adding, setAdding] = useState(false), [previous, setPrevious] = useState(null);
+  const api = useCallback((path,body,signal) => requestInsights(clientId,path,body,signal),[clientId]);
   const selected = websites.find(site => site.id === siteId), result = report?.result;
   const connection = googleConnectionView(google, oauthResult);
-  const reloadSites = useCallback(async signal => { const data = await api("", null, signal); setWebsites(data.websites); return data.websites; }, []);
-  const reloadDetail = useCallback(async (id, signal) => { const data = await api(`?site=${encodeURIComponent(id)}`, null, signal); setHistory(data.history); setGoogle(data.google); setProperties(data.google.properties || []); setProperty(data.google.property || ""); return data; }, []);
+  const reloadSites = useCallback(async signal => { const data = await api("", null, signal); setWebsites(data.websites); return data.websites; }, [api]);
+  const reloadDetail = useCallback(async (id, signal) => { const data = await api(`?site=${encodeURIComponent(id)}`, null, signal); setHistory(data.history); setGoogle(data.google); setProperties(data.google.properties || []); setProperty(data.google.property || ""); return data; }, [api]);
   useEffect(() => {
     const controller = new AbortController();
-    reloadSites(controller.signal).then(sites => setSiteId(current => sites.some(site => site.id === current) ? current : sites[0]?.id || ""))
-      .catch(failure => { if (!controller.signal.aborted) setError(failure.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    api("",null,controller.signal).then(data => {
+      setWebsites(data.websites);
+      setSiteId(current => data.websites.some(site => site.id===current) ? current : data.websites[0]?.id || "");
+    }).catch(failure => { if (!controller.signal.aborted) setError(failure.message); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [clientId, reloadSites]);
+  }, [api]);
   useEffect(() => {
     if (!siteId) return;
     const controller = new AbortController();
-    setDetailLoading(true);
-    setReport(null); setPrevious(null); setProperties([]); setGoogle(null); setError("");
-    reloadDetail(siteId, controller.signal).then(async data => {
+    api(`?site=${encodeURIComponent(siteId)}`,null,controller.signal).then(async data => {
+      setHistory(data.history);setGoogle(data.google);setProperties(data.google.properties || []);setProperty(data.google.property || "");
       if (data.history[0]) {
         const value = await api(`?report=${data.history[0].id}`, null, controller.signal);
         if (!controller.signal.aborted) setReport(value.report);
@@ -94,7 +99,7 @@ export default function WebsiteInsights({ clientId, canWrite, canManage, initial
     }).catch(failure => { if (!controller.signal.aborted) setError(failure.message); })
       .finally(() => { if (!controller.signal.aborted) setDetailLoading(false); });
     return () => controller.abort();
-  }, [siteId, clientId, reloadDetail]);
+  }, [siteId, api]);
   useEffect(() => {
     if (!siteId) return;
     const controller = new AbortController();
@@ -137,7 +142,10 @@ export default function WebsiteInsights({ clientId, canWrite, canManage, initial
       } catch (failure) { if (!controller.signal.aborted) { setError(failure.message); setAuto(false); } }
     }
     run(); return () => controller.abort();
-  }, [reportId, running, auto, canWrite, siteId, reloadDetail, reloadSites]);
+  }, [reportId, running, auto, canWrite, siteId, reloadDetail, reloadSites, api]);
+  function selectSite(id) {
+    setDetailLoading(true);setReport(null);setHistory([]);setPrevious(null);setProperties([]);setGoogle(null);setError("");setSiteId(id);
+  }
   async function action(input) {
     setBusy(true); setError("");
     try { return await api("", input); }
@@ -147,7 +155,7 @@ export default function WebsiteInsights({ clientId, canWrite, canManage, initial
   async function add(event) {
     event.preventDefault();
     const data = await action({ action: "add", ...Object.fromEntries(new FormData(event.currentTarget)) });
-    if (data) { await reloadSites(); setSiteId(data.website.id); setAdding(false); }
+    if (data) { await reloadSites(); selectSite(data.website.id); setAdding(false); }
   }
   async function resumeReport() {
     const data = await action({ action:"advance",report:reportId,retry:true });
@@ -198,14 +206,14 @@ export default function WebsiteInsights({ clientId, canWrite, canManage, initial
       : "The latest Google sign-in was cancelled or did not finish. No new account was connected; any earlier saved authorization was preserved."}</p>}
     {adding && <form onSubmit={add} className={styles.addForm}><label>Website name<input name="name" placeholder="My store" maxLength={120} required /></label><label>Website URL<input name="url" type="url" placeholder="https://your-store.com" maxLength={1000} required /></label><button className={styles.primary} disabled={busy}>Save website</button></form>}
     {loading ? <p role="status">Loading your websites…</p> : !websites.length ? <div className={styles.empty}><span className={styles.emptyIcon}>◎</span><h2>A clearer view starts with your website</h2><p>Add a public HTTPS website, then run a read-only analysis. No Google connection is required to get started.</p>{!canWrite && <p>Your role can read reports. Ask a client member or administrator to add a website.</p>}</div> : <>
-      <div className={styles.siteBar}><label>Website<select value={siteId} onChange={event => setSiteId(event.target.value)} disabled={busy}>{websites.map(site => <option key={site.id} value={site.id}>{site.name} · {new URL(site.url).hostname}</option>)}</select></label>
+      <div className={styles.siteBar}><label>Website<select value={siteId} onChange={event => selectSite(event.target.value)} disabled={busy}>{websites.map(site => <option key={site.id} value={site.id}>{site.name} · {new URL(site.url).hostname}</option>)}</select></label>
         <div className={styles.siteActions}>{canWrite && <button className={styles.secondary} disabled={busy || running || !selected} onClick={async () => {
           const name = window.prompt("Website display name", selected.name); if (!name) return;
           if (await action({ action: "rename", site: siteId, name })) await reloadSites();
         }}>Rename</button>}
         {canManage && <button className={styles.textButton} disabled={busy || running || !selected} onClick={async () => {
           if (!window.confirm("Archive this website and disconnect its Google access? Reports are retained in storage, not permanently deleted.")) return;
-          if (await action({ action: "archive", site: siteId })) { const sites = await reloadSites(); setSiteId(sites[0]?.id || ""); setReport(null); }
+          if (await action({ action: "archive", site: siteId })) { const sites = await reloadSites(); selectSite(sites[0]?.id || ""); }
         }}>Archive</button>}
         {canWrite && <button className={styles.primary} disabled={busy || running || !selected} onClick={analyze}>Analyze Website ↗</button>}</div></div>
       {selected && <p className={styles.domain}><PageLink url={selected.url} /> <span>Public, read-only checks · No changes to your website</span></p>}

@@ -1,5 +1,13 @@
 # Agency Platform context
 
+> Current primary status: Stage 11 local verification and evidence are complete
+> on `feat/agency-platform` in `AI\portal`, starting from `d3c9991`. See the latest
+> PROGRESS entry and [ISOLATION-EVIDENCE](ISOLATION-EVIDENCE.md). The external
+> agency gate stays closed: live provider/CDN/deployment checks and documented
+> runtime-role trust acceptance remain pending. Earlier stage banners below are
+> historical. Neon is unchanged; stop before Stage 12.
+
+
 > Current primary status: Stage 10 is locally implemented and verified on
 > `feat/agency-platform` in `C:\Users\MY PC\Desktop\AI\portal`, following
 > Stage 09 `48a5043` and checkpoint `50c0ee1`. See the latest PROGRESS entry and

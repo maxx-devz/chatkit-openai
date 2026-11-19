@@ -1,5 +1,11 @@
 # Stage 06 server entry-point review
 
+> Stage 11 update: local Chrome access/switch/download/history checks now have
+> real HTTP/database evidence. External agency routes remain gated pending the
+> critical checks and approval in [ISOLATION-EVIDENCE](ISOLATION-EVIDENCE.md).
+> This inventory is historical; the Stage 11 handoff in PROGRESS is current.
+
+
 Baseline commit is `680af5b` on `feat/agency-platform` in the primary `AI\portal` checkout. This inventory covers the existing routes and their server-side authorization paths. Test results and deployment limits are in [PROGRESS](PROGRESS.md#stage-06-server-entry-point-ownership).
 
 The Stage 05 trusted context intersects the live Better Auth session, active agency, client ownership, agency membership, legacy membership and client assignment. A request hint selects among those grants. Platform operator authority, Internal account authority and the finite support grant remain separate. Public agency routes return 404 until Stage 11. Legacy AOC Admin routes require the all-AOC estate.

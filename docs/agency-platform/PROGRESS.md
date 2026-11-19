@@ -1104,3 +1104,147 @@ implementation and this handoff are saved together in the local Stage 10 commit;
 use `git log -1` to identify it. Nothing is pushed.
 **Stop before Stage 11.** Stage 11 requires its own task/approval; do not enable
 agency routes or alter rollout gates as part of this closeout.
+
+
+## Stage 11 - Local isolation matrix and blocked external rollout
+
+Implemented in `C:\Users\MY PC\Desktop\AI\portal` on `feat/agency-platform`
+from clean Stage 10 `d3c9991`. Read AGENTS, CONTEXT, DECISIONS, Stage 10 handoff,
+portability guidance, Stage 06 inventory and installed Next.js security/Playwright
+docs. No local edits existed at the start. This entry supersedes the Stage 10
+stop marker; Stage 12 is not started.
+
+### What changed
+
+- Added [ISOLATION-EVIDENCE](ISOLATION-EVIDENCE.md): explicit passed, failed,
+  mocked, blocked and not-run results, environments/commands, role/resource
+  matrix, trust limits, fixed failures and the external rollout decision.
+- Added a real database/API matrix for Agency A's Orchid/Birch and fictional
+  Agency B's Pine/Cedar. Synthetic staff, client roles, operator, multi-agency
+  user and unrelated identity cover authorized and denied client/agency actions.
+  It tests scoped LOGINs, actual shared-runtime privilege limits, private files,
+  exports, conversations, prepared source canaries and revoked revisions.
+- Added actual Chrome checks against the full loopback portal production build,
+  real Better Auth sign-in and PostgreSQL. They cover libraries/exports, Viewer
+  denial, stale tabs, workspace/account switching, host/selector forgery,
+  revoked membership/session, copied links, the closed agency gate and the
+  client-bound Website Insights UI. No mocked browser API/auth response.
+- Chrome reproduced a stale-tab write: after choosing A2, an old A1 document form
+  returned 201 and wrote to A2. Document list/add/remove and Website Insights now
+  send the original page's x-aoc-client selector, reusing server mismatch checks.
+  The patched stale request returns 409 with no A2 row change. Aborted responses
+  cannot repopulate obsolete list/detail state.
+- Resolved both recorded Website Insights effect lint errors. Initial/detail
+  response callbacks update state asynchronously; site selection clears old
+  report/history/connection data in its event handler. Internal application code,
+  existing role differences and background/provider ownership policies remain.
+- Added guarded npm commands for the new database and browser matrices. No new
+  runtime secret/configuration, production schema, agency route or rollout
+  bypass. Private .env files and .env.example are unchanged.
+
+### Files
+
+| Area | Files |
+| --- | --- |
+| Client fixes | components/portal/client-documents-panel.js; components/portal/website-insights.js |
+| Real DB/API/source fixture | tests/agency-backfill/isolation.database.test.mjs |
+| Actual Chrome matrix | tests/agency-isolation/playwright.config.mjs; tests/agency-isolation/browser/isolation.spec.mjs |
+| Commands | package.json |
+| Handoff/evidence | ISOLATION-EVIDENCE.md; CONTEXT.md; DECISIONS S11-D01; STAGE06_ENTRYPOINTS.md; this entry |
+
+### Computer and private test prerequisites
+
+Node 22.22.2, Python 3.13.17, Next 16.3.3, React 19.2.8, Playwright 1.63.0,
+pg 8.23.0, ESLint 9.39.5, cheerio 1.2.0 and installed Chrome 157.0.8103.79
+were available. Python pip check reported no broken requirements. No installs
+were needed. WSL PostgreSQL binaries and the prior synthetic archive were
+available; each rehearsal used a fresh disposable loopback PostgreSQL 18.3
+cluster. Its local identity was verified before writes.
+
+AGENCY_MIGRATION_DATABASE_URL and AGENCY_WORKSPACE_TEST_DATABASE_URL remain
+absent/empty in the private project environment. Rehearsal URLs and synthetic
+BETTER_AUTH_URL/BETTER_AUTH_SECRET were generated privately; the server received
+a distinct runtime DATABASE_URL for that same disposable database. All other
+private .env assignments were shadowed before build/server startup. Neon was
+untouched. No dev watcher, live provider request, message, payment or real client
+upload occurred. The local server and WSL database were stopped/removed.
+
+AGENCY_ISOLATION_FIXTURE is a new test-only private path under an ignored .tmp
+folder ending in isolation-fixture.json. It contains generated synthetic browser
+credentials. It is not committed, served, copied to runtime env examples or
+needed by the application. On a new computer recreate fixtures from the versioned
+Stage 03-10 runbooks and prepareLegacyFixture; ignored runners/archives/logs are
+not included in Git. Detailed commands and setup requirements are in the evidence.
+
+### Actual results
+
+| Check | Result |
+| --- | --- |
+| New Stage 11 DB/API/source matrix | 8 scenario groups, 9 TAP tests passed; 0 failures/skips |
+| Actual Chrome against production portal | 9 passed; real sign-in, HTTP routes, proxy and synthetic PostgreSQL |
+| Existing Node top-level | 367 passed, 0 failures/skips |
+| Source/Hubstaff index suites | 40 passed, 0 failures/skips |
+| Internal Portal suite | 115 passed, 0 failures/skips |
+| Offline Python suite | 180 tests reported, 8 opt-in database skips, exit 0; scoped Python fixtures also ran through Stage 06/08 |
+| Disposable database regression | Stage 03 nine scenarios; Stage 04 two identical no-write reports/two idempotent applies plus 9 application TAP checks; Stage 05 five; Stage 06/07 eleven; Stage 08 source/tool/stream fixture; Stage 09 six; Stage 10 nine all passed |
+| Build / lint | Full Next production build passed with live values excluded. ESLint passed on changed JS/MJS, including the two formerly failing effects |
+
+See evidence for individual cases. The Chrome matrix closes the previously
+pending local sign-in, role denial, copied-link, switch, stale-tab and history
+navigation checks. It does not establish a genuine BFCache hit, mobile/Safari behavior or live CDN
+caching. A separate request-routing-disabled cache attempt passed account-history
+checks with external HTTPS/WSS blocked by CDP; measured persisted flags stayed
+false, so no restored BFCache snapshot is claimed. No live hosted ChatKit/AI or
+provider integration was demonstrated.
+
+Provider callbacks/refreshes, model/tool wire and job network work used explicitly
+mocked responses with actual SQL permissions/transactions. Four client source
+canaries used real encrypted cache/revision checks; B's client knowledge was
+explicitly seeded/reviewed for the fixture and inherited no AOC guidance. Stage
+20B's real publication approval workflow is still pending.
+
+Initial fixture issues were corrected: shared-pool double close, a grant already
+created by adoption triggers, a Next request-context route called outside HTTP,
+ambiguous DOM selectors, login rate-limit state shared across independent cases,
+and minimal old report fixtures selected instead of the new valid report. The
+browser setup clears only synthetic rate-limit rows per case and preserves the
+application's five-attempt limit. The actual stale-tab failure was separately
+reproduced and fixed; these initial failures are not counted as final passes.
+
+### Critical limits, setup and next step
+
+The actual shared legacy app login can raw-read a foreign legacy row; the new
+matrix intentionally records this existing trusted-service exception. Restricted
+agency LOGINs deny raw tables/foreign scopes and new ledgers deny direct access,
+but that is not blanket RLS for the shared app credential. Deployment role
+verification and explicit security acceptance of this architecture, or separately
+reviewed tightening of legacy paths, are prerequisites for external rollout.
+
+The gate remains closed: agency route forms return 404 and non-AOC client UI
+remains explicitly disabled. Positive B scoped DB/source checks do not establish
+a usable B portal. All executed application unauthorized cases deny after the
+fixes; no production isolation certification or pilot approval is granted.
+
+Carry forward:
+
+- Live provider/hosted AI generation, conversation reopen, stream/cache and
+  OAuth consent/refresh/revocation checks. Use only named staging test accounts,
+  resources and redirect URLs; the user signs in/consents privately.
+- Deployed private-file/CDN caching, genuine browser cache restore scenarios,
+  runtime-role/managed-secret custody and rotation/restore. These are critical
+  verification/acceptance gaps before a pilot; local fixtures cannot close them.
+- Scheduler target/registration/delivery. SOURCE_SYNC_SECRET,
+  HUBSTAFF_INDEX_SYNC_SECRET and CRON_SECRET remain absent/empty locally. Configure
+  the existing 32+ character bearer options privately in deployment settings and
+  the named scheduler header before an approved live check. Missing scheduling
+  does not grant cross-tenant access, but unattended sync remains unverified.
+- The Google-side revocation discovery window remains the next provider/source
+  check or 15-minute freshness bound. Already delivered bytes cannot be recalled.
+- Stage 20B publication approval transitions and future agency UI/provider flows.
+
+The intended implementation, tests and handoff are saved together in the local
+Stage 11 commit (use git log -1). No secrets, .env files, synthetic credential
+JSON, logs, screenshots, database archives or temporary runners are committed.
+Nothing is pushed. **Stop before Stage 12.** Resume only from this handoff and a
+separately supplied Stage 12 task; the external gate must remain closed until
+critical evidence gaps are closed and rollout is explicitly approved.

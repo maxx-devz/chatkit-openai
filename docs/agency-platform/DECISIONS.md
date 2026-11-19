@@ -620,3 +620,30 @@ or knowledge inheritance; per-agency bookkeeping does not open Stage 11 routes.
 Stage 08 approved source revisions and private guidance remain unchanged.
 Live scheduler/provider checks, secret rotation, browser/CDN checks and Stage 20B
 publication approval remain later dependencies. Stop before Stage 11.
+
+
+## S11-D01 - Evidence is not external rollout approval
+
+Retain the 404 gate for public agency routes and the non-AOC client portal guard.
+The local four-client matrix and Chrome checks pass after a stale-tab fix, but
+live provider/hosted AI, deployed CDN/private caching, real cache restore and
+managed-secret/runtime-role verification remain unrun. Scheduler target/delivery
+also remains unverified. Do not invite external agencies from fixture evidence.
+Record each evidence status and later dependency in ISOLATION-EVIDENCE.md.
+
+A page's client selector must accompany document and Website Insights requests.
+Switching a shared browser cookie must not let an old tab write into a different
+permitted client. Reuse the existing server x-aoc-client mismatch check; abort
+obsolete reads and clear site-dependent state in selection handlers. Preserve
+Viewer/Member/Admin differences and existing Internal protections.
+
+Continue the documented database model honestly: restricted agency LOGINs and
+new owner-controlled ledgers have tested controls. The shared server application
+login still has raw legacy-table privileges and is not tenant RLS. Explicit
+security acceptance of that trusted-service model and deployed-role verification,
+or a separately reviewed tightening, are required before a pilot. Never expose
+that credential or pretend scoped LOGIN tests protect every legacy table.
+
+No new runtime secret, provider or queue is introduced. AGENCY_ISOLATION_FIXTURE
+is an ignored synthetic test-only credential file, not an application setting.
+Stage 20B publication approval remains separate. Stop before Stage 12.

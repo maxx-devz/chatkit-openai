@@ -9,19 +9,20 @@ export default function ClientDocumentsPanel({ clientId, canContribute }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const reload = useCallback(async () => {
-    const response = await fetch("/api/client-library", { cache: "no-store" });
+  const reload = useCallback(async signal => {
+    const response = await fetch("/api/client-library", { cache:"no-store",headers:{"x-aoc-client":String(clientId)},signal });
     const data = await response.json().catch(() => ({}));
+    signal?.throwIfAborted();
     if (!response.ok) throw new Error(data.error || "Documents could not be loaded.");
     setItems(data.items || []);
     setLoading(false);
-  }, []);
+  }, [clientId]);
   useEffect(() => {
-    let active = true;
-    Promise.resolve().then(() => reload())
-      .catch(failure => { if (active) { setError(failure.message); setLoading(false); } });
-    return () => { active = false; };
-  }, [clientId, reload]);
+    const controller=new AbortController();
+    Promise.resolve().then(() => reload(controller.signal))
+      .catch(failure => { if (!controller.signal.aborted) { setError(failure.message); setLoading(false); } });
+    return () => controller.abort();
+  }, [reload]);
 
   async function addLink(event) {
     event.preventDefault();
@@ -30,7 +31,7 @@ export default function ClientDocumentsPanel({ clientId, canContribute }) {
     setBusy(true); setError("");
     try {
       const response = await fetch("/api/client-library", { method: "POST",
-        headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(new FormData(form))) });
+        headers: { "Content-Type": "application/json","x-aoc-client":String(clientId) }, body: JSON.stringify(Object.fromEntries(new FormData(form))) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "The reference could not be added.");
       form.reset(); await reload();
@@ -43,7 +44,7 @@ export default function ClientDocumentsPanel({ clientId, canContribute }) {
     setBusy(true); setError("");
     try {
       const response = await fetch("/api/client-library", { method: "DELETE",
-        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: item.id }) });
+        headers: { "Content-Type": "application/json","x-aoc-client":String(clientId) }, body: JSON.stringify({ id: item.id }) });
       const data = response.status === 204 ? {} : await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "The reference could not be removed.");
       await reload();

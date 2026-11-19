@@ -20,6 +20,8 @@
     "test:agency:database": "node scripts/check-agency-platform-database.mjs",
     "website-insights:migrate": "node --env-file=.env.local scripts/migrate-website-insights.mjs",
     "test:website-insights": "node --test tests/website-insights*.test.mjs",
+    "test:agency-isolation:database": "node --conditions=react-server --experimental-test-module-mocks --import ./tests/internal-user/aliases.mjs --test tests/agency-backfill/isolation.database.test.mjs",
+    "test:agency-isolation:browser": "playwright test --config tests/agency-isolation/playwright.config.mjs",
     "test:website-insights:database": "node --env-file=.env.local scripts/check-website-insights-database.mjs",
     "setup": "node scripts/setup.mjs",
     "setup:preview": "node scripts/setup.mjs --dry-run",
