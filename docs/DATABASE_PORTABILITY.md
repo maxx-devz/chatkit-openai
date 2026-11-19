@@ -128,3 +128,20 @@ An authorized AI usage reset now establishes a per-client reporting cutoff.
 parameterized UPSERTs. Credit and cost reads exclude pre-cutoff usage, retaining
 manual allowances, pricing and raw audit evidence. No provider-specific
 extension, browser database access or external billing mutation is introduced.
+
+## Client Documents setup references
+
+`database/client-document-assignments.sql` adds separate client-bound setup and
+audit tables. The migration runner uses a short-lived `pg.Client`, an explicit
+operator URL, database-name confirmation, a checksum and a transaction/advisory
+lock. Runtime routes use `lib/database.js`. UUID, JSONB, identity, partial unique
+indexes and composite foreign keys are standard PostgreSQL features; no provider
+SDK, extension, Auth change or storage migration is introduced.
+
+The ordinary runtime receives append-only audit grants from this migration.
+Existing elevated logins or broader privileges can override that restriction;
+this feature does not claim database RLS. Current AOC Admin request authorization
+is the access boundary. Original Drive files are neither uploaded nor published
+by saving metadata. Existing clients/history/credit/index tables are not backfilled
+or rewritten. See `CLIENT_DOCUMENTS_SETUP.md` for explicit migration approval and
+private setup requirements.

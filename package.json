@@ -81,7 +81,9 @@
     "test:employee:secrets": "npm run test:internal-user:secrets",
     "test": "node --test \"tests/*.test.mjs\"",
     "test:http": "node scripts/check-builder-http.mjs",
-    "test:ai-reset:database": "node --env-file=.env.local scripts/check-ai-fresh-reset-database.mjs"
+    "test:ai-reset:database": "node --env-file=.env.local scripts/check-ai-fresh-reset-database.mjs",
+    "documents:setup:migrate": "node scripts/migrate-client-document-assignments.mjs",
+    "test:documents": "node --test tests/client-document-assignment-policy.test.mjs"
   },
   "engines": {
     "node": ">=22"
