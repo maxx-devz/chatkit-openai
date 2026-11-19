@@ -118,7 +118,12 @@
     "dev:auth:review": "node --env-file=.env.auth-review scripts/dev-platform-review.mjs --account-security",
     "check:auth:review": "node --env-file=.env.auth-review scripts/check-account-security-review.mjs",
     "test:account-security:database": "node --conditions=react-server --experimental-test-module-mocks --import ./tests/internal-user/aliases.mjs --test tests/agency-backfill/account-security.database.test.mjs",
-    "test:account-security:browser": "playwright test --config tests/account-security/playwright.config.mjs"
+    "test:account-security:browser": "playwright test --config tests/account-security/playwright.config.mjs",
+    "migrate:agency:branding": "node scripts/migrate-agency-branding.mjs",
+    "test:agency:branding:database": "node --conditions=react-server --experimental-test-module-mocks --import ./tests/internal-user/aliases.mjs --test tests/agency-backfill/branding.database.test.mjs",
+    "test:agency:branding:browser": "playwright test --config tests/agency-branding/playwright.config.mjs",
+    "seed:branding:review": "node --env-file=.env.branding-review scripts/seed-branding-review.mjs",
+    "dev:branding:review": "node --env-file=.env.branding-review scripts/dev-platform-review.mjs --branding"
   },
   "engines": {
     "node": ">=22"
@@ -138,6 +143,7 @@
     "read-excel-file": "^9.3.12",
     "robots-parser": "^3.0.1",
     "server-only": "^0.0.1",
+    "sharp": "0.35.4",
     "web-vitals": "^6.2.3"
   },
   "devDependencies": {

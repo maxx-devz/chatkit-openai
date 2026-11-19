@@ -1,5 +1,11 @@
 # Agency Platform context
 
+> Latest: Stage 15 local agency branding is complete from `d3999df` in
+> AI\portal on feat/agency-platform. Harbor/Summit use shared components, scoped
+> owner editing and report identity; review port3004. Stage14 security preserved.
+> External agency/custom-host activation remain HOLD. Stop before Stage16; see
+> latest PROGRESS and STAGE15_AGENCY_BRANDING.md. Earlier notices are historical.
+
 > Latest: Stage 14 locally completed from `4bbc4e0` in AI\portal on
 > feat/agency-platform. Invitations, recovery, verification and privileged MFA
 > are locally verified; synthetic review port 3003. External access and
@@ -754,3 +760,24 @@ enrollment for legacy synthetic addresses, supported hosted-cookie/proxy checks,
 rotation/restore and approved all-factors-lost handling. External AI/privacy and
 CDN/cache checks remain critical release blockers. Neon untouched; stop before
 Stage 15, no push. No temporary source directory is the final implementation.
+
+## Stage 15 current implementation (2026-11-19)
+
+Additive012 stores agency-owned presentation and reserved domain verification.
+It does not own client AI settings or grant customer data. Explicit local
+/portal/<slug>/<screen> routes reuse login/MFA/recovery and agency administration.
+Owner preview/save, raster-logo re-encoding, accessible colors, legal/support/report
+identity and optional attribution are implemented. Public projection is display
+only; private exports and updates recheck current membership, owner status and MFA.
+
+Local8 database +7 Chrome branding checks and16 database +8 Chrome Stage14
+regressions pass on disposable WSL PostgreSQL, plus prior DB fixtures,378 general,
+115 Internal,40 sources/index tests, Python185 reported/9 optional skips, repository
+and focused lint and production build. Vercel adapter tests are fake-provider
+fixtures, not live hosting verification. See PROGRESS for exact evidence/limits.
+
+Separate retained review: port3004, ignored .env.branding-review and
+.tmp/branding-review/accounts.json. Existing review profiles preserved. Live
+hosting-check credentials are intentionally unset; no local prerequisite missing.
+No domain/DNS/production/Neon change or real message. Custom-host routing remains
+closed even when a fixture verification snapshot says verified. Stage16 not begun.

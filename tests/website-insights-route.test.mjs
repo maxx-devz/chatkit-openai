@@ -6,7 +6,7 @@ import { InsightError, resourceId } from "../lib/website-insights/policy.js";
 import { assertClientMutation } from "../lib/client-mutation.js";
 import { reportCsv } from "../lib/website-insights/presentation.js";
 const id = "a010a010-a010-a010-a010-a010a010a010";
-async function endpoint({ role = "member", origin = true, authorized = true } = {}) {
+async function endpoint({ role = "member", origin = true, authorized = true, identity = null } = {}) {
   const key = `insights_${randomUUID()}`, calls = [];
   const context = { client: { id: "1" }, user: { id: "2" } };
   const mocks = {
@@ -15,6 +15,7 @@ async function endpoint({ role = "member", origin = true, authorized = true } = 
     CLIENT_PERMISSIONS: { OVERVIEW_READ: "read", DOCUMENTS_CONTRIBUTE: "write", DOCUMENTS_MANAGE: "manage" },
     assertTrustedOrigin: () => { if (!origin) throw new InsightError("origin", "Untrusted origin", 403); },
     readJsonRequest: request => request.json(), requestSecurityErrorResponse: () => null,
+    clientReportIdentity: async context => { assert.equal(context.client.id,"1"); return identity; },
     portalErrorResponse: error => Response.json({ error: error?.publicDetails?.message || "Unexpected request" }, { status: error?.publicDetails?.status || 500 }), InsightError, resourceId, reportCsv,
     listWebsites: async ctx => { calls.push({ listClient: ctx.client.id }); return []; },
     addWebsite: async (ctx, input) => { calls.push({ addClient: ctx.client.id, input }); return { id }; },
@@ -67,4 +68,12 @@ test("batch advancement binds to the authenticated client and rejects arbitrary 
   assert.equal((await route.POST(request({ action: "advance", report: id, clientId: "other" }))).status, 400);
   assert.equal((await route.POST(request({ action: "advance", report: id }))).status, 200);
   assert.equal(calls.find(value => value.advancedClient).advancedClient, "1");
+});
+
+test("report branding follows authorized report context even when a foreign agency is supplied",async()=>{
+ const identity={portalName:"Allowed Fictional Agency",reportName:"Approved report",legalName:"",supportName:"Support",supportEmail:"help@example.invalid"};
+ const {route}=await endpoint({role:"viewer",identity});
+ const json=await route.GET(request(null,`?report=${id}&download=json&agency=foreign-agency`));assert.equal(json.status,200);assert.equal((await json.json()).identity.portalName,identity.portalName);
+ const csv=await route.GET(request(null,`?report=${id}&download=csv&agency=foreign-agency`));assert.equal(csv.status,200);const text=await csv.text();assert.match(text,/Allowed Fictional Agency/);assert.doesNotMatch(text,/foreign-agency/);
+ const denied=await endpoint({authorized:false,identity});assert.equal((await denied.route.GET(request(null,`?report=${id}&download=json`))).status,403);
 });

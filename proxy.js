@@ -3,6 +3,7 @@ import { requestWorkspaceHeaders, trustedPortalHost } from "./lib/workspace-sele
 import { DEBUGGER_PORTAL_HEADER, debuggerPageRequest } from "./lib/debugger/routing.js";
 
 export function proxy(request) {
+  if (request.headers.get("x-forwarded-host") && request.headers.get("x-forwarded-host").toLowerCase() !== request.headers.get("host")?.toLowerCase()) return new NextResponse("Untrusted forwarded host.", {status:403});
   if (!trustedPortalHost(request.headers.get("host"))) return new NextResponse("Unknown portal host.", { status: 403 });
   // Reserve agency-mode routes until the Stage 11 rollout.
   if (/^\/(?:api\/)?agency(?:\/|$)/.test(request.nextUrl.pathname)) return new NextResponse(null, { status: 404 });
@@ -10,10 +11,11 @@ export function proxy(request) {
   try { requestHeaders = requestWorkspaceHeaders(new URL(request.url), request.headers); }
   catch { return new NextResponse("Invalid workspace selection.", { status: 400 }); }
   requestHeaders.delete(DEBUGGER_PORTAL_HEADER);
+  for(const name of ["x-agency-brand","x-forwarded-host"])requestHeaders.delete(name);
   if (request.nextUrl.pathname.startsWith("/api/")) {
     const response = NextResponse.next({ request: { headers: requestHeaders } });
     response.headers.set("Cache-Control", "private, no-store");
-  if (request.nextUrl.pathname.startsWith("/account/")) response.headers.set("Referrer-Policy", "no-referrer");
+  if (request.nextUrl.pathname.startsWith("/account/") || request.nextUrl.pathname.startsWith("/portal/")) response.headers.set("Referrer-Policy", "no-referrer");
     return response;
   }
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
@@ -52,7 +54,7 @@ export function proxy(request) {
     ? NextResponse.rewrite(debuggerPage.destination, options)
     : NextResponse.next(options);
   response.headers.set("Cache-Control", "private, no-store");
-  if (request.nextUrl.pathname.startsWith("/account/")) response.headers.set("Referrer-Policy", "no-referrer");
+  if (request.nextUrl.pathname.startsWith("/account/") || request.nextUrl.pathname.startsWith("/portal/")) response.headers.set("Referrer-Policy", "no-referrer");
   response.headers.set("Content-Security-Policy", policy);
   return response;
 }

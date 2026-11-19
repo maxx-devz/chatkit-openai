@@ -541,3 +541,44 @@ failure or an excuse to alter unrelated files.
 external agency rollout remain HOLD. The local port-3003 review uses separate
 generated accounts; no automatic promotion of real administrators. No Stage 15
 work, real message/payment, remote database write or push.
+
+## Stage 15 local branding evidence — 2026-11-19
+
+Baseline d3999df; primary AI\portal, feat/agency-platform. WSL PostgreSQL18.3,
+ordinary guarded runtime plus separate operator, synthetic accounts only. Node22,
+Next16.3.3, Better Auth1.7.2, sharp0.35.4, Python3.13, Chrome157. .env.local/remote
+provider values excluded by isolated build/test launcher; Neon untouched.
+
+| Boundary | Result | Actual coverage |
+| --- | --- | --- |
+| Migration012 | **passed** | Repeated checksummed apply on disposable DB; no duplicate branding/domain records |
+| Owner/agency/data boundary | **passed** | 8 real DB/API TAP checks including parent: public presentation-only fields, own/foreign/staff/client checks, owner-only save, bad palette/logo/foreign fields deny without writes, stale revision rejects |
+| Reports/public logos | **passed** | Private scoped agency JSON/CSV, no foreign client fields; prepared PNG/no-store/nosniff; unknown/wrong-revision logo denies; raw ledgers FORCE-RLS deny; ordinary pooled state clean |
+| Domain ownership/status | **passed with provider mocked** | Collision, caller denial, generation/revocation race rejects; exact fixed host/project provider adapter tests, pending/mismatch/redirect rejection. No live domain activated |
+| Stage14 account boundary | **passed** | 16 real provider/DB checks +8 Chrome scenarios repeated before012; new branded flows additionally use same provider sessions/MFA, same-origin callbacks, no arbitrary redirects and immutable invitation-agency matching |
+| Branded browser workflows | **passed** | 7 Chrome scenarios on final production build: two distinct logos/names/palettes,390px mobile/no overflow/computed button color; branded login/MFA/nav/logout; preview/valid raster upload/save/bad logo+contrast; multi-agency switch/exports; recovery identity; Host/forwarded-host/cookie/origin rejection; wrong-brand invite denial then valid acceptance |
+| Visual review | **passed locally** | Fictional public Harbor mobile/Summit desktop screenshots inspected; corrected remaining AOC gradient/button override and added computed-theme assertion. No real client screenshot/credential captured |
+| Other database regressions | **passed** | Stage03 9 scenarios; Stage04 9; Stage05 5; Stage06/07 11; Stage08 1 DB/model mock; Stage09 6; Stage10 9; Stage11 matrix9; Stage12 11; Stage13 11; Stage13A11; review runtime-role diagnostic |
+| Offline/lint/build | **passed** | 378 general,115 Internal,40 sources/index; Python185 reported with9 opt-in skips; official repository and changed-file/test lint; full production build with unreachable synthetic build DSN; native upload trace includes62 sharp-related and21 @img files |
+| Website Insights brand adapter | **passed with auth/report fixture** | Allowed context identity in CSV/JSON ignores supplied foreign agency; denied reads stay denied. Actual live client analytics/provider export not run |
+| Review server | **passed** | New port3004 synthetic database/migrations/seed, separate profile, MFA/own API and foreign denial for each owner. Earlier review profiles preserved |
+| Live domain/DNS/TLS/SSO/hosted cache | **not run / external HOLD** | Provider credentials/setup intentionally absent; no DNS/hosting mutation. Verified fixture status does not enable Host routing. Deployed custom-host cookie/CSRF/proxy/callback/CDN behavior remains critical before activation |
+
+Commands: test:agency:branding:database / :browser against matching private
+AGENCY_WORKSPACE_TEST_DATABASE_URL, DATABASE_URL, ACCOUNT_SECURITY_FIXTURE and
+AGENCY_BRANDING_FIXTURE; repository general/Internal/source tests; Python unittest
+discovery; npm lint target and focused lint; Next production build. Private
+.tmp/stage15/sql.py runs actual AI\portal files, repeats earlier versioned
+fixtures, then removes the acceptance DB/server. Its Vercel transport is mocked;
+real provider/external staging verification is not inferred from local counts.
+
+The earlier6-case runtime/older browser matrices remain their prior evidence;
+they are not relabeled as repeated Stage15 runs. Stage06 deployed/browser and
+CDN/private cache, hosted-AI privacy, provider consent/resource/revocation,
+scheduler, pooler/runtime deployment and rotation checks remain carried forward.
+Google revocation retains next-check /15-minute source freshness. Stage14 live
+email/legacy real-email enrollment and all-factors-lost policy are still pending.
+
+**Verdict:** Stage15 local engineering PASS; external agency/custom-host activation
+HOLD. No platform promotion, AI-settings change, personnel/customer import,
+message/payment, Neon write or push. Stop before Stage16.

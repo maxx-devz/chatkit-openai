@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  // Native image sanitization is loaded only by this upload handler. Include
+  // its runtime assets explicitly; a local next start alone cannot prove tracing.
+  outputFileTracingIncludes: {
+    "/api/admin/agency/brand": ["node_modules/sharp/**/*", "node_modules/@img/**/*"],
+  },
   // Keep same-origin debugger rewrites on the original host. Normalization
   // otherwise changes 127.0.0.1 to localhost, which can become an IPv6 proxy.
   skipProxyUrlNormalize: true,

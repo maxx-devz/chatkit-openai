@@ -1933,7 +1933,7 @@ mail captures, passwords or MFA seeds/codes are included in Git.
   preserves MFA/memberships. Other-agency access remains after scoped removal.
   FORCE-RLS raw ledger reads deny. Both Node/Python reject new factor-table
   ownership; Python envelope denies unassured privilege. Specialist expiry denies.
-* **7/8 Chrome scenarios** on the exact production build: challenge/direct API
+* **8/8 Chrome scenarios** on the exact production build: challenge/direct API
   checks, intended invitation and same-tab reopening/replay, password recovery,
   other-session revocation, fragment/network/storage privacy, actual UI email
   verification/TOTP enrollment/lost-device backup code, account switching
@@ -2019,3 +2019,153 @@ publication approval remains later. No live provider sign-in/consent was needed.
 Resume from this local Stage14 commit only after a separately supplied next-stage
 task, with an approved disposable target. **Stop before Stage15. No push, live
 invitation, real personnel/customer access, paid action or Neon write.**
+
+## Stage 15 closeout — 2026-11-19
+
+**Stage15 local engineering complete. External agencies, non-AOC client mode and
+custom-host activation remain HOLD. Stop before Stage16.** Baseline d3999df on
+feat/agency-platform in C:\Users\MY PC\Desktop\AI\portal. Initial interrupted
+state contained only this task's sharp dependency-manifest edits; prepared code
+was still under the ignored original-workspace .tmp/stage15/src mirror. All final
+code and checks now use actual AI\portal paths. No existing edits, prior handoff
+or private review profiles were overwritten. Final local commit is git log -1.
+
+### Implemented/reused
+
+Agency Owner branding reuses the existing admin shell/sidebar, login, account
+controls and scoped admin data. Portal/report/legal/support identity, validated
+public raster logo, four accessible colors and optional attribution are separate
+from client AI greeting/accent/instructions/model/provider/source configuration.
+Owner preview then explicit save, server scope/MFA/revision checks and audit keep
+presentation changes within one agency. AOC software/platform ownership is intact.
+
+Explicit /portal/<slug>/<screen> local routes show fictional Harbor Studio and
+Summit Collective. Branding does not grant membership: agency/client/platform and
+specialist permissions remain independent. Existing external gates stay closed.
+Login/MFA/recovery/verification/logout destinations retain the chosen brand;
+branded invitation acceptance rejects a substituted agency without consuming the
+link. Host remains exact canonical, mismatched forwarded hosts reject, host-only
+cookies remain; local route brands share same-origin auth with fresh permissions.
+
+Public logo storage is separate from private files; uploaded PNG/JPEG/WebP is
+decoded and re-encoded metadata-free using installed sharp0.35.4, pinned directly.
+SVG/HTML/malformed/oversized/animated/remote logos reject. Both text color pairs
+require4.5:1. Responsive components and text fallbacks are reused. Supported
+authorized agency CSV/JSON and Website Insights CSV/JSON get permitted identity;
+no new PDF generator or live analytics read was introduced.
+
+Domain requests reserve normalized globally unique names. The platform-owner
+read-only inspection path uses the supported fixed Vercel API and rechecks ticket
+generation/status after response. Provider claims cannot set another agency's
+domain. Real registration/DNS/TLS remain pending; even fixture-verified results
+return routingEnabled:false. No custom host or trusted-origin wildcard was enabled.
+
+### Files
+
+| Area | Primary project paths |
+| --- | --- |
+| Migration / policy | database/agency-platform/012_agency_branding.sql; scripts/migrate-agency-branding.mjs; lib/agency-branding-policy.js; agency-branding.js; agency-domains.js; agency-logo.js; brand-callback.js |
+| Routes | app/portal/[slug]/[screen]/page.js; app/api/admin/agency/brand/route.js; app/api/portal-brand/[slug]/logo/route.js; app/api/platform/domains/route.js; existing account/invitation/Website Insights APIs and proxy |
+| UI | components/agency/brand-frame.js; branding-editor.js; branding.module.css; existing agency console/page, admin shell/sidebar, login/account/sign-out controls |
+| Auth / export reuse | lib/auth.js; auth-mail.js; invitation-links.js; agency-administration.js; website-insights/presentation.js; host-only cookie policy |
+| Review/tests | scripts/agency-branding-fixture.mjs; seed-branding-review.mjs; check-branding-review.mjs; guarded dev-platform-review.mjs; next.config.mjs native trace; tests/agency-branding.test.mjs; tests/agency-backfill/branding.database.test.mjs; tests/agency-branding/*; existing Website Insights fixture adapter; package.json/package-lock.json |
+| Handoff/config | STAGE15_AGENCY_BRANDING.md; CONTEXT; DECISIONS S15-D01–03; ISOLATION-EVIDENCE; PROGRESS; blank .env.example hosting-check names |
+
+### Actual results
+
+* **8/8 Stage15 database/API TAP checks**, no skips, on new disposable WSL PG18.3
+  with separate operator/ordinary guarded runtime. Migration012 applied twice.
+  Two-agency/owner/staff/client denial, no partial bad save, stale revision,
+  scoped exports, PNG delivery, RLS/pool reuse, domain collision/caller denial,
+  mocked-provider revocation race, branded recovery and suspension all pass.
+* **7/7 Chrome branded scenarios** on the final full production build. Distinct
+  names/logos/palettes,390px mobile/no overflow and actual computed button color;
+  branded login/MFA/nav/logout; read-only preview until save, invalid colors/logo;
+  authorized multi-membership switching/report identity; safe recovery callback;
+  unknown/unverified/spoofed host, origin and host-only cookie checks; mismatched
+  invitation brand denial then correct-brand acceptance. No real provider/delivery
+  or hosted cross-domain SSO/cookie behavior is claimed.
+* **Stage14 regressions:**16/16 real DB/provider checks and8/8 Chrome scenarios
+  repeated before012. Stage14's earlier7/8 typo above was corrected against its
+  recorded final8-pass run and this repeat; no failed run was relabeled.
+* **Earlier database regressions:** Stage03 9 scenarios; Stage04 9; Stage05 5;
+  Stage06/07 11; Stage08 1 real DB/model mocked; Stage09 6; Stage10 9;
+  Stage11 matrix9; Stage12 11; Stage13 11; Stage13A11. No-write report/snapshot and
+  idempotent legacy adoption still reconcile. The historical6-case role/older
+  browser matrices retain their prior status, not a claim of new Stage15 runs.
+* **Offline:**378 general,115 Internal,40 source/index tests pass. Python reports
+  185 tests with9 opt-in skips. Website Insights brand adapter is a clearly labeled
+  authorized-context/report fixture, not a live analytics/provider check.
+* **Official repository lint and focused changed-file/test lint pass. Full
+  Next16.3.3 production build passes** with private .env assignments shadowed and
+  unreachable synthetic build database, excluding Neon/provider access.
+* Fictional public mobile/desktop screenshots were inspected privately. Visual
+  review found a remaining AOC gradient/button override; fixed palette propagation
+  and added computed-theme regression. The save notice now survives the server
+  revision refresh. Browser execution caught a Turbopack sharp
+  external-import failure despite an earlier passing build; native Node loading
+  fixed it. Narrow output tracing includes62 sharp/native-related files and21
+  @img assets in the upload handler trace, and Chrome performs a valid PNG
+  preview/upload/save. A target-platform deployment is still pending. An obsolete review health-check cookie method was corrected to the
+  supported sign-out API. Final checks above pass; early failures are not ignored.
+
+Acceptance server/database were stopped/removed. A separate fresh synthetic review
+was prepared after the final build. Runtime-role diagnostic and both synthetic
+owners' MFA/login/own-brand APIs/foreign denial passed. Source mirrors, profiles,
+accounts, canaries, mail, logs and screenshots are excluded from Git.
+
+### Local review and private setup
+
+**Harbor login:** http://127.0.0.1:3004/portal/s13-harbor/login
+
+**Summit login:** http://127.0.0.1:3004/portal/s13-summit/login
+
+**Harbor branding:** http://127.0.0.1:3004/portal/s13-harbor/branding
+
+**Summit branding:** http://127.0.0.1:3004/portal/s13-summit/branding
+
+Both share existing components on the same review server; no separate source
+copies. Private .tmp/branding-review/accounts.json: accounts.ownerA for Harbor,
+accounts.ownerB for Summit. Use username/password then its private authenticator
+totpURI or an unused backupCodes entry through Use a recovery code. Credentials,
+OTP/seed/recovery codes stay out of chat. Use separate browser profiles when also
+reviewing older ports, because cookies are host-based rather than port-based.
+
+New .env.branding-review uses generated DATABASE_URL (ordinary runtime), separate
+AGENCY_MIGRATION_DATABASE_URL, BETTER_AUTH_URL (3004), BETTER_AUTH_SECRET,
+PORTAL_ACCOUNT_SECURITY_ENABLED, AUTH_MAIL_MODE=capture and private AUTH_TEST_MAIL_DIR.
+It is not copied from .env.local. The launcher scrubs operator/provider settings
+and does not start source/provider workers. Existing ports3000–3003/profiles are
+preserved; no application behavior claim is inferred just from a health endpoint.
+
+No local setup name is missing. New live-check names are intentionally unset:
+AGENCY_DOMAIN_CHECKS_ENABLED, VERCEL_DOMAIN_TOKEN, VERCEL_DOMAIN_PROJECT_ID,
+VERCEL_DOMAIN_TEAM_ID. They are blank in .env.example and belong only in a later
+approved server/private setup, never browser/chat. A real named domain/provider
+account, scoped project token, correct team, user-completed ownership challenge,
+approved legal/brand assets and DNS/TLS deployment rehearsal are prerequisites
+for dependent live work. No real consent/sign-in was needed for this fixture run.
+
+See STAGE15_AGENCY_BRANDING.md for supported endpoints, migration/review commands,
+private test shell requirements, boundary between verification snapshot and enabled
+routing, and exact pending setup. Tests use disposable synthetic data, not this
+retained review DB. Do not run them with .env.local or Neon credentials.
+
+### Remaining / next permitted stage
+
+Stage15 local engineering is complete. **Custom-domain live registration,
+verification, DNS/TLS, deployed proxy/CSRF/cookie/callback/cache behavior and host
+activation remain pending and gated.** Prepared adapter registration/verify writes
+were not called. Fixture status is not a claim that a real domain is enabled.
+
+Carry forward critical hosted-AI/privacy and deployed private CDN/cache checks;
+external agency rollout stays HOLD. Provider consent/resource/revocation, deployed
+runtime/pooler mapping, scheduler delivery, key rotation/restore and supported
+browser/real BFCache remain pending. Google revocation retains next-check/15-minute
+freshness. Stage14 live mail/legacy real-email enrollment and approved all-factors-
+lost recovery remain pending; real email templates/deliverability not claimed.
+Stage20B publication approval stays later. No Neon, actual personnel/customer
+access, provider upload, real email, paid action, domain purchase or DNS change.
+
+Commit intended changes locally only; no push. **Stop before Stage16.** Resume
+only with a separately supplied next-stage task and approved disposable target.

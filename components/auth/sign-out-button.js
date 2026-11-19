@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { authClient } from "@/lib/auth-client";
 
-export default function SignOutButton({ className = "" }) {
+export default function SignOutButton({ className = "", loginHref = "/login" }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
@@ -13,7 +13,7 @@ export default function SignOutButton({ className = "" }) {
     if (busy) return;
     setBusy(true);
     await authClient.signOut().catch(() => null);
-    router.replace("/login");
+    router.replace(/^\/portal\/[a-z0-9_-]+\/login$/.test(loginHref)?loginHref:"/login");
     router.refresh();
   }
 

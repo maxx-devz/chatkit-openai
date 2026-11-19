@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { authClient } from "@/lib/auth-client";
+import { brandPath } from "@/lib/agency-branding-policy";
 import styles from "./login.module.css";
 
-export default function LoginForm({ configured }) {
+export default function LoginForm({ configured, agencySlug = null }) {
   const router = useRouter();
+  const destination=screen=>agencySlug?brandPath(agencySlug,screen):screen==="clients"?"/":"/account/"+screen;
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
 
@@ -37,9 +39,9 @@ export default function LoginForm({ configured }) {
         return;
       }
 
-      if (result.data?.twoFactorRedirect) { router.replace("/account/mfa"); return; }
+      if (result.data?.twoFactorRedirect) { router.replace(destination("mfa")); return; }
       const security = await fetch("/api/account/security", { cache: "no-store" }).then(r => r.ok ? r.json() : null);
-      router.replace(security?.required && !security.assured ? "/account/security" : "/");
+      router.replace(security?.required && !security.assured ? destination("security") : destination("clients"));
       router.refresh();
     } catch {
       setError("Login is temporarily unavailable. Please try again.");
@@ -89,7 +91,7 @@ export default function LoginForm({ configured }) {
         {status === "submitting" ? "Signing in..." : "Sign in to portal"}
       </button>
 
-      <p><a href="/account/recovery">Recover password or verify email</a> · <a href="/account/security">Account security</a></p>
+      <p><a href={destination("recovery")}>Recover password or verify email</a> · <a href={destination("security")}>Account security</a></p>
       <p className={styles.help}>
         Accounts are created privately by Always Open Commerce. There is no
         public registration page.

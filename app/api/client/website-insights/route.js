@@ -5,6 +5,7 @@ import { assertTrustedOrigin, readJsonRequest, requestSecurityErrorResponse } fr
 import { InsightError, resourceId } from "@/lib/website-insights/policy";
 import { listWebsites, addWebsite, editWebsite, archiveWebsite, reportHistory, getReport, startReport, advanceReport } from "@/lib/website-insights/store";
 import { googleStatus, googleProperties, selectGoogleProperty, disconnectGoogle, websiteSearchData } from "@/lib/website-insights/google";
+import { clientReportIdentity } from "@/lib/agency-branding";
 import { reportCsv } from "@/lib/website-insights/presentation";
 
 export const runtime = "nodejs";
@@ -25,9 +26,10 @@ export async function GET(request) {
     const params = new URL(request.url).searchParams, site = params.get("site"), report = params.get("report");
     if (report) {
       const value = await getReport(context, report);
-      if (params.get("download") === "csv") return new Response(reportCsv(value.result), { headers: { ...headers,
+      const identity=params.has("download")?await clientReportIdentity(context):null;
+      if (params.get("download") === "csv") return new Response(reportCsv(value.result,identity), { headers: { ...headers,
         "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="website-findings-${resourceId(report)}.csv"`, "X-Content-Type-Options": "nosniff" } });
-      if (params.get("download") === "json") return Response.json(value, { headers: { ...headers,
+      if (params.get("download") === "json") return Response.json(identity?{...value,identity}:value, { headers: { ...headers,
         "Content-Disposition": `attachment; filename="website-report-${resourceId(report)}.json"`, "X-Content-Type-Options": "nosniff" } });
       return Response.json({ report: value }, { headers });
     }

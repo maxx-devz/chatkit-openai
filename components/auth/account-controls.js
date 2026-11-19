@@ -3,13 +3,15 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+import { brandPath } from "@/lib/agency-branding-policy";
 import s from "./login.module.css";
-async function account(body) {
-  const response = await fetch("/api/account/security", { method: body ? "POST" : "GET", cache: "no-store", headers: { "Content-Type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}) });
+async function account(body, agencySlug) {
+  const response = await fetch("/api/account/security"+(agencySlug?"?brand="+encodeURIComponent(agencySlug):""), { method: body ? "POST" : "GET", cache: "no-store", headers: { "Content-Type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}) });
   const data = await response.json(); if (!response.ok) throw Error(data.error || "Request unavailable."); return data;
 }
-export default function AccountControls({ mode }) {
+export default function AccountControls({ mode, agencySlug = null }) {
   const router = useRouter();
+  const destination=screen=>agencySlug?brandPath(agencySlug,screen):screen==="login"?"/login":"/account/"+screen;
   const epoch = useRef(0);
   const [obscured, setObscured] = useState(true);
   const [state, setState] = useState(null), [link, setLink] = useState(null), [message, setMessage] = useState(""), [error, setError] = useState(""), [busy, setBusy] = useState(false), [enrollment, setEnrollment] = useState(null), [backup, setBackup] = useState(false);
@@ -52,16 +54,16 @@ export default function AccountControls({ mode }) {
     const ticket = epoch.current;
     const form = new FormData(event.currentTarget), fields = Object.fromEntries(form);
     try {
-      if (mode === "recovery") { const result = await account({ action: fields.action, email: fields.email }); setMessage(result.message); }
+      if (mode === "recovery") { const result = await account({ action: fields.action, email: fields.email },agencySlug); setMessage(result.message); }
       if (mode === "reset") { const result = await account({ action: "reset", token: link?.token, password: fields.password }); setLink(null); setMessage(result.message); }
       if (mode === "verify") { const result = await account({ action: "verify", token: link?.token }); setLink(null); setMessage(result.message); }
       if (mode === "invitation") {
-        const response = await fetch("/api/admin/agency/invitations", { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify(link) });
+        const response = await fetch("/api/admin/agency/invitations"+(agencySlug?"?brand="+encodeURIComponent(agencySlug):""), { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify(link) });
         const result = await response.json(); if (!response.ok) throw Error("Invitation unavailable. Sign in as the intended recipient and use an unexpired link."); setLink(null); setMessage("Invitation accepted. Only the offered workspace membership was added.");
       }
       if (mode === "mfa") {
         const result = backup ? await authClient.twoFactor.verifyBackupCode({ code: fields.code }) : await authClient.twoFactor.verifyTotp({ code: fields.code });
-        if (result.error) throw Error("Second-factor verification failed."); router.replace("/account/security"); router.refresh();
+        if (result.error) throw Error("Second-factor verification failed."); router.replace(destination("security")); router.refresh();
       }
       if (mode === "security") {
         if (fields.action === "enroll") { const result = await authClient.twoFactor.enable({ password: fields.password }); if (result.error) throw Error("MFA setup could not be started. Check your password and current verification."); if (ticket === epoch.current) setEnrollment(result.data); }
@@ -86,6 +88,6 @@ export default function AccountControls({ mode }) {
       {enrollment && <aside><h2>Save privately</h2>{enrollment.totpURI && <><p>Import this URI into your authenticator, then verify its code:</p><code>{enrollment.totpURI}</code></>}<p>Store recovery codes privately. Each code works once; never send them in chat.</p><pre>{enrollment.backupCodes?.join("\n")}</pre><button onClick={() => setEnrollment(null)}>Hide setup details</button></aside>}
       {state.twoFactorEnabled && <form className={s.form} onSubmit={submit}><input type="hidden" name="action" value="codes" />{field("Current password for new recovery codes", "password", "password")}<button disabled={busy || !state.assured}>Replace recovery codes</button></form>}
       <form className={s.form} onSubmit={submit}><input type="hidden" name="action" value="revoke-others" /><button disabled={busy}>Sign out other sessions</button></form><p>Lost your device? Sign in with an unused recovery code. Password reset preserves MFA. If all factors are lost, access stays blocked pending approved identity recovery.</p></>}
-    <p><Link href="/login">Sign in</Link> · <Link href="/account/recovery">Recovery and verification</Link> · <Link href="/platform">Platform</Link> · <Link href="/admin/agency">Agency workspace</Link> · <Link href="/delivery">Specialist delivery</Link></p>
+    <p><Link href={destination("login")}>Sign in</Link> · <Link href={destination("recovery")}>Recovery and verification</Link> · <Link href="/platform">Platform</Link> · <Link href={agencySlug?brandPath(agencySlug,"clients"):"/admin/agency"}>Agency workspace</Link> · <Link href="/delivery">Specialist delivery</Link></p>
   </section></main>;
 }

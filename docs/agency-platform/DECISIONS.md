@@ -836,3 +836,69 @@ not turn the shared legacy service login into a universal tenant-RLS identity.
 Hosted AI/privacy, CDN/private-cache, live provider consent, deployed runtime and
 pooler mapping, scheduler and rotation checks remain pending. Local Stage 14 can
 close without enabling external agencies. Stop before Stage 15; no push.
+
+## S15-D01 — branding is agency presentation, not data ownership or AI settings
+
+Reuse the existing portal components on explicit local /portal/<agency>/<screen>
+routes. Presentation selectors never confer membership, role, support access or
+source permissions. Use synthetic Harbor Studio and Summit Collective while real
+brand assets/legal terms remain undecided. No software ownership, Whitecap or
+platform-brand decision is implied. Legal company/report/support identity and
+optional powered-by are owner-configurable only under approved actual terms.
+
+Use additive012 and guarded PostgreSQL, independent of client assistant greetings,
+accents, instructions and credentials. Support details reuse scoped governance;
+platform keys/pricing stay separate. New tables have FORCE RLS, owner-only data
+policies and narrow functions; legacy trusted-service limitations remain explicit.
+Expose only presentation and sanitized public raster logos before login. Private
+library/AI/generated files are not reclassified as public branding assets.
+
+Require preview before the UI save, server-side owner/MFA/scope/revision/audit and
+4.5:1 contrast validation. Validate PNG/JPEG/WebP, size/dimensions/static page, then
+re-encode metadata-free PNG with installed sharp0.35.4 (pinned directly). Native
+Node loading is used after a Turbopack external import failed in real browser
+verification. No remote image fetch/SVG/executable asset acceptance is added.
+
+## S15-D02 — explicit route branding first; domains remain verification-only
+
+Keep the exact canonical Host allowlist and host-only Better Auth cookies; reject
+unknown hosts and conflicting forwarded hosts. Do not share a parent-domain
+cookie or infer a customer from an unknown host. Local path brands intentionally
+share same-origin auth with fresh workspace permission checks. Login, MFA, recovery,
+verification and logout retain the selected presentation. Branded invitation
+acceptance additionally checks its immutable invitation agency, preventing a
+substituted brand from consuming a valid link. Brand switches cannot grant access.
+
+Reserve globally unique normalized domain names. Only an authorized platform
+owner can record a provider check, bound to exact Vercel project/domain and ticket
+generation. Verify ownership plus domain configuration, reject redirect/branch/
+environment mismatch, recheck agency/status/generation after the provider call.
+Use the supported fixed-origin Vercel REST API adapter and a read-only opt-in
+inspection route. Do not add a database-provider SDK or change portable data.
+
+No application route calls the adapter's prepared hosting registration/verify
+writes in this release. No DNS/purchase/real domain operation occurs. A verified
+snapshot is not an enabled domain: routingEnabled remains false and custom hosts
+stay rejected. Live hosting registration, DNS/TLS, callback/cookie/CSRF/proxy and
+recheck/revocation behavior require a separately approved deployment rehearsal.
+Changing this hold needs explicit rollout work, not an allowlist wildcard.
+
+## S15-D03 — review and release limits
+
+Use two distinct fictional names/logos/palettes on a new disposable review target,
+port3004. No real brand assets or ownership sign-in needed now. New blank server
+names: AGENCY_DOMAIN_CHECKS_ENABLED, VERCEL_DOMAIN_TOKEN,
+VERCEL_DOMAIN_PROJECT_ID, VERCEL_DOMAIN_TEAM_ID. Keep them unset until an approved
+named live status check, with credentials configured privately on that server.
+The local launcher strips provider/operator settings. Never paste tokens in chat.
+
+Report identity follows the authorized agency/client context; permitted agency
+CSV/JSON summaries and Website Insights CSV/JSON are supported. No new PDF engine
+or live customer analytics test is claimed. Email has branded text identity in
+the private capture adapter; real templates/deliverability remain Stage14 setup.
+
+External agency/client mode stays gated. Hosted-AI/privacy and deployed private
+CDN/cache remain critical external release boundaries. Carry forward live email,
+lost-all-factors recovery policy, deployed roles/pooler, OAuth/provider revocation,
+scheduler, secret rotation/restore and supported browsers. Source publication
+approval remains20B. Local Stage15 complete; stop before16. No push.

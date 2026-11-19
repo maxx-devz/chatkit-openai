@@ -1,3 +1,5 @@
+import { publicBrand } from "@/lib/agency-branding";
+import { brandPath } from "@/lib/agency-branding-policy";
 import { auth } from "@/lib/auth";
 import { databasePool } from "@/lib/database";
 import { accountSecurityEnabled, accountStatus } from "@/lib/account-security-policy";
@@ -31,11 +33,14 @@ export async function POST(request) {
     if (!Object.hasOwn(fields, action) || Object.keys(body).some(k => !["action", ...fields[action]].includes(k))) return reply({ error: "Check the submitted fields." }, 400);
     if (["recovery", "verification"].includes(action)) {
       if (typeof body.email !== "string" || body.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) return reply({ error: "Enter a valid email address." }, 400);
+      const selected=new URL(request.url).searchParams.get("brand");
+      if(selected)await publicBrand(selected);
+      const destination=kind=>selected?brandPath(selected,kind):"/account/"+kind;
       const started = Date.now();
       const path = action === "recovery" ? "request-password-reset" : "send-verification-email";
       // Use the HTTP dispatcher so provider database-backed rate limits and
       // origin/CSRF checks also cover these public wrapper endpoints.
-      const result = await auth.handler(new Request(new URL("/api/auth/" + path, process.env.BETTER_AUTH_URL), { method: "POST", headers: request.headers, body: JSON.stringify({ email: body.email, redirectTo: new URL("/account/reset", process.env.BETTER_AUTH_URL).href, callbackURL: new URL("/account/verify", process.env.BETTER_AUTH_URL).href }) }));
+      const result = await auth.handler(new Request(new URL("/api/auth/" + path, process.env.BETTER_AUTH_URL), { method: "POST", headers: request.headers, body: JSON.stringify({ email: body.email, redirectTo: new URL(destination("reset"), process.env.BETTER_AUTH_URL).href, callbackURL: new URL(destination("verify"), process.env.BETTER_AUTH_URL).href }) }));
       await new Promise(resolve => setTimeout(resolve, Math.max(0, 750 - (Date.now() - started))));
       if (result.status === 429) return reply({ error: "Please wait before requesting another message." }, 429);
       // Same message/status for known and unknown accounts, including capture

@@ -36,7 +36,7 @@ function initials(value) {
     .map(part => part[0]).join('').toUpperCase();
 }
 
-export default function AdminSidebar({ admin, active = 'overview', navigation = NAV_ITEMS, platform = false, scopeLabel, workspaceName }) {
+export default function AdminSidebar({ admin, active = 'overview', navigation = NAV_ITEMS, platform = false, scopeLabel, workspaceName, branding }) {
   const [open, setOpen] = useState(false);
   const toggle=useRef(null),aside=useRef(null);
   useEffect(()=>{if(!open)return;aside.current?.querySelector('button')?.focus();
@@ -52,11 +52,11 @@ export default function AdminSidebar({ admin, active = 'overview', navigation = 
     </button>
     {open && <button type="button" className={styles.mobileNavBackdrop}
       aria-label="Close administrator menu" onClick={() => setOpen(false)} />}
-    <aside ref={aside} id="admin-sidebar" role={open?'dialog':undefined} aria-modal={open || undefined} aria-label={open?'Administrator navigation':undefined} className={`${styles.sidebar} ${open ? styles.sidebarOpen : ''}`}>
+    <aside ref={aside} id="admin-sidebar" role={open?'dialog':undefined} aria-modal={open || undefined} aria-label={open?'Administrator navigation':undefined} className={`${styles.sidebar} ${open ? styles.sidebarOpen : ''}`} style={branding?{background:branding.palette.primary,color:branding.palette.onPrimary}:undefined}>
       <button type="button" className={styles.mobileCloseButton} aria-label="Close administrator menu"
         onClick={() => setOpen(false)}>×</button>
       <div className={styles.brand}>
-        <Image src={aocLogo} alt="Always Open Commerce" priority />
+        {branding?<div style={{color:branding.palette.onPrimary}}>{branding.logoUrl&&<Image src={branding.logoUrl} alt={branding.portalName+" logo"} width={64} height={64} unoptimized/>}<strong>{branding.portalName}</strong></div>:<Image src={aocLogo} alt="Always Open Commerce" priority />}
         <span>{scopeLabel || (platform?"Platform Operations":"Administrator Portal")}</span>
       </div>
       <nav aria-label="Administrator portal">
