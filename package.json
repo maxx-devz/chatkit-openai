@@ -4,6 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "agency:console": "node scripts/migrate-platform-console.mjs",
+    "platform:review:seed": "node scripts/seed-platform-review.mjs",
+    "platform:review": "node scripts/dev-platform-review.mjs",
+    "platform:access": "node scripts/set-platform-access.mjs",
+    "test:platform:database": "node --conditions=react-server --experimental-test-module-mocks --import ./tests/internal-user/aliases.mjs --test tests/agency-backfill/platform.database.test.mjs",
+    "test:platform:browser": "playwright test --config tests/platform-console/playwright.config.mjs",
     "agency:plan": "node scripts/migrate-agency-platform.mjs --plan",
     "agency:migrate": "node scripts/migrate-agency-platform.mjs",
     "agency:runtime:check": "node scripts/check-runtime-database-role.mjs",

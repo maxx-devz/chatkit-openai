@@ -1,8 +1,8 @@
 # Agency Platform progress
 
-> Current primary checkout is `C:\Users\MY PC\Desktop\AI\portal` on `feat/agency-platform`. Stage 09 passed local verification. [Stage 09 results and connection setup](#stage-09-business-connection-ownership)
+> Current primary checkout is `C:\Users\MY PC\Desktop\AI\portal` on `feat/agency-platform`. Stage 12 local console verification is complete; external access stays gated. [Stage 12 handoff](#stage-12--local-platform-owner-console)
 
-Updated November 18, 2026, Asia/Shanghai.
+Updated November 19, 2026, Asia/Shanghai.
 
 ## Stage register
 
@@ -18,7 +18,10 @@ Updated November 18, 2026, Asia/Shanghai.
 | Stage 07 — private files and cached content | Implemented and verified locally | Authenticated delivery, copied-link/revocation checks, upload expiry and workspace cache isolation. |
 | Stage 08 — agency AI retrieval and approved revisions | Implemented and verified locally | Scoped source revision adoption, canary retrieval, source/tool/stream revocation checks. |
 | Stage 09 — business connection ownership | Implemented and verified locally | Explicit Google ownership, callback/refresh generation checks, Make connection-test restrictions and secret-rotation plan. |
-| Stage 10 onward | Awaiting separate authorization | Stage 11 remains the planned gate for public agency routes. |
+| Stage 10 — background jobs | Implemented and locally verified | Ownership/version fences, leases/retries/fair scheduling; deployment scheduler check pending. |
+| Stage 11 — isolation evidence | Local engineering PASS; external rollout HOLD | Runtime-role guards and four-client DB/browser matrix; hosted AI/CDN/deployment checks remain. |
+| Stage 12 — platform console | Implemented and locally verified | Explicit platform roles, agency lifecycle/audit, AOC delivery and status-only dual-consent support. |
+| Stage 13 onward | Not started | Requires a separately supplied task; external gate remains closed. |
 
 Older `docs/PHASE_0_*` files describe a separate historical architecture/closeout
 process with outstanding reviews. This stage does not mark that process complete
@@ -1387,3 +1390,149 @@ surfaces. No invitation, public gate change or production approval is granted.
 The intended changes and completed handoff are saved in the local Stage 11 review
 commit (git log -1). Secrets, synthetic credential files, logs, screenshots,
 database archives and temporary runners are excluded. No push. Stop before 12.
+
+
+## Stage 12 — local platform-owner console
+
+Completed November 19, 2026 (Asia/Shanghai), from **0064754**, in the actual
+`C:\Users\MY PC\Desktop\AI\portal` checkout on `feat/agency-platform`. The tree
+was clean at start. User confirmed **synthetic local owner only**; no existing
+administrator or real account was promoted. Read Stage 11 closeout/evidence,
+AGENTS, existing decisions and installed Next data-security/route-handler guides.
+Node 22.22.2, Next 16.3.3, Python 3.13.17, WSL PostgreSQL 18.3 and installed
+Chrome 157.0.8103.79 were available. Provider/default Neon configuration was
+excluded from verification. No secret or `.env` file was copied or edited.
+
+### Changes and boundaries
+
+- `/platform` reuses the existing Admin shell, sidebar and branding with separate
+  navigation. Agency list, literal search, pagination, lifecycle, assigned owner,
+  active count, client count, recorded failed jobs/disconnected bindings, provider
+  cost aggregates and recent platform audit are available. Subscriptions remain
+  explicitly **Not configured**. Costs retain unknown amounts, are scoped by
+  agency/client ownership and UTC month, and are not invoices, AOC fees, staffing
+  prices or invented subscription charges. No private chats, documents, source
+  bodies, encrypted tokens or provider keys are included.
+- Additive checksum migration **008_platform_console** creates four FORCE-RLS
+  owner-controlled console tables and narrow server functions. Platform ownership
+  requires an explicit account assignment; no legacy Admin/multi-agency role,
+  cookie, URL or request parameter confers it. Owner can create/change lifecycle;
+  operator reads metadata and requests scoped support. Real session, trusted host,
+  live role and independent Internal identity checks are enforced server-side.
+  New agency owner display is accountability metadata, not an automatic login,
+  staff/client assignment, connection, knowledge pack or software subscription.
+- Suspension/reactivation has a reason, typed-slug confirmation, optimistic state
+  version, idempotent operation and atomic audit. Suspension fences active job
+  leases, advances connection generations and revokes support. Reactivation does
+  not revive those old authorizations. Data/history/memberships are preserved;
+  billing/refunds/subscription state are not changed. Already delivered bytes
+  cannot be recalled. The platform operator's unrelated memberships stay intact.
+- Added `/admin/aoc` and `/api/admin/aoc-clients`: a narrow AOC-owned client list
+  and audited portal/AI access controls, requiring both active legacy Admin and
+  explicit AOC agency-admin authority. Platform ownership alone is insufficient.
+  Client ownership is locked/rechecked for writes. Existing global `/admin`
+  screens keep their all-AOC-estate restriction; they were not expanded to foreign
+  agencies. Full mixed-estate replacements for the remaining global Admin screens
+  are not claimed. Existing client login/Viewer/Member/Admin paths remain intact.
+- Support request/approval UI/API implements only the existing status-read action
+  for AOC clients. A platform requester, separate agency approver and separate
+  client approver are required. Reasons/tickets, 30-minute expiry, live assignment
+  checks, denial/revocation and allowed/denied use are durable. Approvers can see
+  permitted request metadata and last use. No impersonation or customer-content
+  access exists. Expiry is recorded as a deadline and enforced on checks; no new
+  autonomous expiry-notification/scheduler event is claimed. External agency
+  support remains gated, as do `/agency`, `/api/agency` and non-AOC client entry.
+- Added explicit operator assignment and synthetic review seed/launcher commands.
+  They create no known default password or real owner. Review launcher scrubs
+  remote/provider/operator settings before starting loopback Next; no AI backend
+  or local source/Hubstaff watcher is started. `.tmp` is explicitly ignored.
+
+### Actual verification
+
+| Check | Result / evidence type |
+| --- | --- |
+| Top-level `node --test tests/*.test.mjs` | **372 passed, 0 failed/skipped**, including review-tool remote/query-override refusal; controlled/offline tests |
+| Existing source + Hubstaff indexing suites | **40 passed**, 0 failed/skipped; offline/provider fixtures |
+| Existing Internal Portal suite | **115 passed**, 0 failed/skipped; controlled fixtures |
+| Python offline discovery | **182 tests reported, 9 opt-in DB skips, exit 0**; separate actual Python role SQL covered below |
+| Migration 008 CLI | **Passed first application and identical checksum rerun** on fresh disposable WSL PostgreSQL using separate operator/runtime logins; zero legacy Admin promotions |
+| Stage 12 `test:platform:database` | **11 passed** (10 scenario groups + parent), 0 failed/skipped; actual Better Auth sessions and PostgreSQL, actual API handlers, no provider mocks needed |
+| Stage 12 database matrix | Owner/operator allow; agency/client/legacy Admin deny; forged scope/mass assignment/origin/host deny; idempotent provisioning and concurrent/stale lifecycle conflict; no automatic client/source/connection inheritance; known/unknown per-agency costs; FORCE flags/direct ledger denial; pooled privilege cleanup; revoked/demoted/expired sessions; inactive Internal-account exclusion; dual support consent/self/foreign denial, expiry/denial/revocation; suspension fences jobs/connections/grants and retains history; AOC-scoped writes deny foreign clients |
+| Stage 12 Chrome `test:platform:browser` | **7 passed** against the actual production build: login/list/search/create, operator read-only, agency/client/legacy Admin UI+API denial, confirmed suspension/reactivation/audit, already-open role revocation, AOC delivery in mixed estate, two-account support consent and status-only result |
+| Stage 11 Chrome regression | **9 passed** again; files/exports, stale tabs/workspace switching, revocation, external gate, Website Insights and actual BFCache attempt. No persisted BFCache restore is claimed; previous no-store/cookie limits remain |
+| Actual runtime-role SQL | **6 passed** again, including Next/Python connector rejection of elevated/owner/BYPASSRLS/inherited-owner roles and polluted pooled SET ROLE |
+| Stage 11 four-client PostgreSQL matrix | **9 passed** again on ordinary runtime and restricted agency LOGINs |
+| Stage 03–10 regressions | Foundation **9 SQL scenarios**; two identical no-write backfill reports, two applies (first 51 ownership rows / 7 quarantines; second 0 changes), legacy rows/sequences/history preserved; Stage 04 **9**, Stage 05 **5**, Stage 06/07 **11**, Stage 08 **1**, Stage 09 **6**, Stage 10 **9** TAP checks passed. Source/AI/provider work uses documented fixtures/mocks, not live providers |
+| Synthetic review seed / explicit assignment commands | **Passed** on the disposable DB using canonical lib/postgres.js operator provisioning and the explicit operator-only auth factory; creates fresh random-password owner/contact accounts and audited assignment. Generated private credential artifact was removed after this check |
+| Full lint / focused changed-file lint | **Passed**, exit 0 |
+| Full Next production build | **Passed**, remote/private environment assignments shadowed; new pages/API routes built successfully |
+
+Initial fixture failures were corrected without weakening authorization: legacy
+membership triggers already create agency grants, and Better Auth deletes expired
+sessions, so the fixture now uses compatible upserts and a genuine fresh login.
+Browser selector ambiguity between directory/audit rows and a support select was
+corrected; the final suites above pass. Local screenshot inspection confirmed
+the console uses the existing layout. Mobile/other-browser and live deployment
+verification are not claimed. Manual review launcher success is not a separate
+dev-server/browser pass; Chrome exercised the isolated production server.
+
+All tests ran from the **actual project paths**, after verifying branch/commit
+and copying only reviewed source files from ignored preparation mirrors. No
+application relies on `.tmp/stage12/src`. Independent scratch mirrors/logs are not
+part of the commit. The disposable Next server and WSL cluster were stopped and
+the temporary database cluster removed after the final run.
+
+### Files, private setup and review
+
+| Area | Intended project paths |
+| --- | --- |
+| Database/operator | database/agency-platform/008_platform_console.sql; scripts/migrate-platform-console.mjs; scripts/set-platform-access.mjs |
+| Server/API | lib/platform-console.js; app/api/platform/agencies/route.js; app/api/support/requests/route.js; app/api/admin/aoc-clients/route.js |
+| Frontend | app/platform/page.js; app/support/requests/page.js; app/admin/aoc/page.js; components/platform/*; two optional navigation additions in components/admin/admin-{shell,sidebar}.js |
+| Review commands/tests | scripts/seed-platform-review.mjs; scripts/dev-platform-review.mjs; tests/platform-review.test.mjs; tests/agency-backfill/platform.database.test.mjs; tests/platform-console/*; package.json; .gitignore |
+| Handoff | STAGE12_PLATFORM_CONSOLE.md; ISOLATION-EVIDENCE.md; CONTEXT.md; DECISIONS S12-D01; this entry |
+
+**Manual frontend URL: http://127.0.0.1:3000/platform**. Sign in at `/login` with
+a newly generated synthetic owner, then open that URL; an owner without client
+membership is not silently put into a client or legacy Admin workspace.
+
+The primary checkout has no configured `.env.agency-test` manual review profile.
+Privately configure **DATABASE_URL** (ordinary local runtime),
+**AGENCY_MIGRATION_DATABASE_URL** (separate local operator), **BETTER_AUTH_URL**
+(exact loopback origin above) and **BETTER_AUTH_SECRET** in that ignored file,
+after restarting/preparing a retained migrated synthetic WSL database. Do not
+reuse the default Neon settings. Run migration/seed/review commands in
+[STAGE12_PLATFORM_CONSOLE](STAGE12_PLATFORM_CONSOLE.md); credentials are written
+only to ignored `.tmp/platform-review/accounts.json`. The reviewed seeder does
+not overwrite an existing account file. The acceptance runner's database was
+removed, so its temporary usernames/passwords cannot be used after closeout.
+
+For a test repeat, privately supply existing operator
+**AGENCY_WORKSPACE_TEST_DATABASE_URL**, distinct runtime **DATABASE_URL**,
+synthetic auth, **AGENCY_ISOLATION_FIXTURE** and new test-only
+**PLATFORM_CONSOLE_FIXTURE** paths for the prepared matching fixture. They are
+not production runtime settings or new provider secrets. No `.env.example`
+placeholder is needed for a new runtime setting because none was introduced.
+
+No provider sign-in or live credential was requested/used. Carried forward:
+hosted-AI privacy and deployed private cache/CDN are **critical external-release
+checks**; deployed runtime/pooler role mapping, supported browsers, Google
+scope/resource/refresh/reconnect/revocation, scheduler registration/delivery and
+secret rotation/restore remain deployment verification. The Google revocation
+window remains next provider/source recheck or at most the existing 15-minute
+freshness window; no webhook/instant recall claim is added. Existing
+SOURCE_SYNC_SECRET / HUBSTAFF_INDEX_SYNC_SECRET (or documented CRON_SECRET
+alternative) belong privately in the scheduler and Next deployment when that
+specific live check is approved. See Stage 09/10 setup for provider/rotation names.
+
+### Verdict and resume
+
+**Stage 12 local engineering complete; external agency access remains HOLD.**
+No production/Neon access, real customer document, provider call, payment, real
+message, deployment, external invitation or push occurred. Actual runtime guards
+were preserved. Real initial platform ownership still needs a separately approved
+secure identifier; this does not block the authorized synthetic local console.
+
+The intended work and handoff are saved in the local Stage 12 commit (`git log
+-1`). Review the runbook and evidence before a separately authorized Stage 13.
+**Stop here: Stage 13 was not started.**

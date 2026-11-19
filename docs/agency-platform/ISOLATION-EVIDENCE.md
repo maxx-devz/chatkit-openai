@@ -1,5 +1,9 @@
 # Stage 11 isolation evidence
 
+> Stage 12 local console regression is appended below: local checks pass,
+> external rollout stays HOLD. The following Stage 11 review is dated evidence;
+> the latest PROGRESS and Stage 12 runbook describe the new console.
+
 > Latest review from `817c314`: **Stage 11 local engineering PASS; external
 > rollout HOLD. Stage 12 local development may proceed under the closed gate
 > after a separate task is supplied.** The review/classification at the end of
@@ -406,3 +410,34 @@ still required to recreate fixtures. No new runtime secret or .env example value
 was introduced. Configure passwords privately; do not paste them into chat.
 No Neon query, deployment, real provider request, message, payment or push occurred.
 All disposable database/server processes were stopped and temporary DB data removed.
+
+
+## Stage 12 local console regression — November 19, 2026
+
+Additive console built from `0064754` in actual `AI\portal` project paths. The
+closed external gate, Next/Python runtime guards, source revision checks and
+legacy Admin restrictions remain intact. Synthetic owner only; no real account
+promotion. See [Stage 12 runbook](STAGE12_PLATFORM_CONSOLE.md) and latest PROGRESS.
+
+| Boundary | Status | Actual evidence |
+| --- | --- | --- |
+| Platform owner/operator versus legacy Admin, agency/client roles and inactive Internal identities | **passed** | Stage 12 real Better Auth/PostgreSQL/API matrix (11 TAP checks including parent); owner/operator read; only owner write; direct ledger access denied; live role/session changes take effect |
+| Agency lifecycle, creation, assigned-owner metadata, no inherited knowledge/credentials/client grants | **passed** | Migration first/repeat, idempotent create, malformed/forged field denial, concurrent/stale status conflict, atomic audit; suspended leases/connection generations/support invalidated, history retained |
+| Platform metadata and costs | **passed** | No private canaries/keys/source bodies; AOC/foreign costs reconcile separately; unknown cost is preserved; subscription shown unconfigured; no paid/live-provider action |
+| AOC delivery inside a mixed estate | **passed** | Active legacy Admin plus explicit AOC agency role allow own-client list/access toggles; foreign update and platform-only actor deny. Existing global Admin guard unchanged |
+| Controlled support | **passed** | Distinct requester/agency/client identity checks, both consents, expiry/denial/revocation, revoked assignments, audited status-only result. Seven Chrome workflows include actual separate-account consent UI |
+| New console browser workflows | **passed** | 7 installed-Chrome tests on isolated production server with real synthetic sessions; server blocks unauthorized UI/API use |
+| Prior Stage 11 browser/database/runtime controls | **passed** | 9 Chrome + 9 four-client DB + 6 actual runtime-role TAP checks repeated; Stage 03–10 fixtures repeated successfully |
+| Existing Node/Python regressions | **passed / mocked as specified** | 372 top-level, 40 source/index and 115 Internal tests passed. Python 182 reported, 9 opt-in skips. Source/AI/provider fixture evidence remains distinct from live-provider evidence |
+| Full build and full/focused lint | **passed** | Production build with remote env excluded; lint exit 0 |
+| Synthetic review setup / assignment CLIs | **passed** | Canonical operator provisioning created new random-password owner/contact and audited explicit assignment on disposable loopback DB; private generated artifact cleaned. Remote/mismatched/query-override refusal checks passed |
+| Persistent manual dev-server review / mobile / other browsers | **not run** | Exact local review URL/setup documented; no retained configured manual review database after scratch cleanup |
+| Hosted AI, deployed private CDN/cache | **blocked for external release** | Carried critical isolation checks remain unverified; no live provider or deployment was contacted |
+| Deployed roles/pooler, provider consent/revocation, scheduler, rotation/restore | **deployment verification tasks** | Previous Stage 11 classification unchanged; any failed safety probe becomes a blocker |
+
+**Stage 12 local engineering: complete. External agency rollout: HOLD.**
+Google revocation remains the documented next-check / 15-minute freshness window;
+no instant recall or new webhook guarantee. Actual BFCache restored-cache coverage
+and browser limitations remain as recorded in Stage 11, without weakened headers.
+No real user/password/provider consent, production DB, payment, message or push.
+Stop before Stage 13.

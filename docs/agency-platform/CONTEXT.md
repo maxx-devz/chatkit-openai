@@ -1,5 +1,12 @@
 # Agency Platform context
 
+> Stage 12 local console is implemented from `0064754` in `AI\portal` on
+> `feat/agency-platform`. Explicit platform owner/operator access, agency metadata
+> and audited lifecycle, scoped AOC delivery and status-only dual-consent support
+> are locally verified. Synthetic owner only. External agency access remains HOLD;
+> Stage 13 is not started. See the latest PROGRESS and Stage 12 runbook.
+> Older stage banners below are historical. No Neon changes.
+
 > Latest Stage 11 review from `817c314`: local engineering PASS, external
 > rollout HOLD. Runtime guards reject elevated/owner credentials in adopted
 > databases; the legacy shared-service trust model remains explicit. Chrome

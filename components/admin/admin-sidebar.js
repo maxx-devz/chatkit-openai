@@ -36,7 +36,7 @@ function initials(value) {
     .map(part => part[0]).join('').toUpperCase();
 }
 
-export default function AdminSidebar({ admin, active = 'overview' }) {
+export default function AdminSidebar({ admin, active = 'overview', navigation = NAV_ITEMS, platform = false }) {
   const [open, setOpen] = useState(false);
   const toggle=useRef(null),aside=useRef(null);
   useEffect(()=>{if(!open)return;aside.current?.querySelector('button')?.focus();
@@ -57,18 +57,18 @@ export default function AdminSidebar({ admin, active = 'overview' }) {
         onClick={() => setOpen(false)}>×</button>
       <div className={styles.brand}>
         <Image src={aocLogo} alt="Always Open Commerce" priority />
-        <span>Administrator Portal</span>
+        <span>{platform?"Platform Operations":"Administrator Portal"}</span>
       </div>
       <nav aria-label="Administrator portal">
-        {NAV_ITEMS.map(([icon, label, href, id]) => <Link key={id} href={href} prefetch={false} title={label}
+        {navigation.map(([icon, label, href, id]) => <Link key={id} href={href} prefetch={false} title={label}
           className={active === id ? styles.activeNav : undefined}
           aria-current={active === id ? 'page' : undefined} onClick={() => setOpen(false)}>
           <Icon name={icon} />{label}
         </Link>)}
       </nav>
       <div className={styles.sidebarStatus}>
-        <span><i /> Connected database</span>
-        <p>Local pages may use shared data. Saved changes apply to the configured database.</p>
+        <span><i /> {platform?"External agency access gated":"Connected database"}</span>
+        <p>{platform?"Platform controls require explicit access. Private client content stays in its workspace.":"Local pages may use shared data. Saved changes apply to the configured database."}</p>
       </div>
       <div className={styles.adminIdentity}>
         <span>{initials(admin?.name)}</span>

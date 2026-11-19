@@ -56,3 +56,6 @@ __pycache__/
 /tests/internal-user/ui/.next/
 /tests/internal-user/ui/AGENTS.md
 /tests/internal-user/ui/CLAUDE.md
+
+# Private synthetic fixtures, credentials and browser evidence
+/.tmp/

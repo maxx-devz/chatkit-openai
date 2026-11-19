@@ -1,5 +1,9 @@
 # Agency Platform decisions
 
+> Current implementation: Stage 12 locally verified on `feat/agency-platform`
+> from `0064754`; synthetic owner only, external rollout HOLD. See S12-D01 and
+> latest PROGRESS. Earlier handoff banners are retained as historical records.
+
 > Primary project handoff: use `C:\Users\MY PC\Desktop\AI\portal`. The results below were recorded in the AOC source worktree. Stage 03–04 code has not yet been imported into this primary checkout. See [HANDOFF](HANDOFF.md) for exact Git files, local-only verification limits and the Stage 05 stop gate.
 
 Recorded November 18, 2026. S01 decisions below retain the historical baseline
@@ -675,3 +679,39 @@ new task, disposable fixtures and the closed external gate. Live hosted-AI and
 edge privacy remain external-release isolation blockers. Scheduler availability,
 rotation, role/provider setup and supported-browser checks remain deployment
 verification tasks, not a blanket prohibition on local development.
+
+
+## S12-D01 — Explicit local platform control and narrow support
+
+Build from Stage 11 closeout `0064754` on `feat/agency-platform`. User approved
+synthetic local owner only. Add explicit platform `owner`/`operator` membership;
+never promote a legacy Admin or infer platform control from client/agency roles.
+Only an explicit operator assignment can bootstrap ownership. An agency's named
+owner is accountability metadata and receives no implicit client/platform access.
+External routes and non-AOC entry remain gated. Preserve runtime role guards,
+source ownership/approved revisions and all Stage 11 deployment holds.
+
+Use the existing active agency flag plus a monotonically changing lifecycle
+version. Audit named actor/reason and idempotent operation; require typed slug
+confirmation. Suspension cancels leases, fences connection snapshots and revokes
+support without deleting data, unrelated memberships or changing billing.
+Do not restore old grants on reactivation. No subscription price, fee, staffing
+term, public brand or service promise is created. Show subscription unavailable
+and provider-recorded costs/unknown amounts honestly; no live health claim.
+
+Keep the global legacy Admin all-AOC-estate guard. A separate `/admin/aoc` path
+requires both legacy Admin and explicit AOC agency-admin role and limits its
+list/access toggles to AOC-owned clients. This is not a blanket mixed-estate
+replacement for all global Admin operations or platform-owner impersonation.
+
+Implement only AOC client `support.workspace.status.read` under conservative
+dual consent: distinct agency and client approvers, neither the requester,
+30-minute limit, recheck assignments/expiry at use, explicit revocation and audit.
+No customer content, tools, exports, paid actions or silent impersonation. Expiry
+is an enforced recorded deadline; autonomous expiry notifications are not added.
+Broader actions, real approver delegation/retention and live initial ownership
+remain separately approved decisions. Source/provider consent is never implied.
+
+Actual evidence and private local review setup are recorded in PROGRESS and
+STAGE12_PLATFORM_CONSOLE.md. No provider credentials are needed for the synthetic
+console checks. Stage 13 requires a new task. No push or production approval.
