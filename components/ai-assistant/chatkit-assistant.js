@@ -452,7 +452,7 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
           <button type="button" className={mode === "work" ? styles.modeActive : ""} aria-pressed={mode === "work"} disabled={responseBusy} onClick={() => selectMode("work")}>Work questions</button>
           <button type="button" className={mode === "general" ? styles.modeActive : ""} aria-pressed={mode === "general"} disabled={responseBusy} onClick={() => selectMode("general")}>General chat</button>
         </div>
-        <span className={styles.modeHint}>{mode === "work" ? "Can use your project and Hubstaff context" : "Quick answers without live work data or file tools"}</span>
+        <span className={styles.modeHint}>{mode === "work" ? "Uses permitted business knowledge and available evidence" : "Quick answers without live work data or file tools"}</span>
       </div>
       <div className={styles.toolbar}>
         <div className={styles.tabs} role="tablist" aria-label="Assistant conversations" onKeyDown={(event) => {

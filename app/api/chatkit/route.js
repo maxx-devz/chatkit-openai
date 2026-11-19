@@ -77,10 +77,10 @@ async function handlePOST(request) {
       : { instructions: "", references: [] };
     const hubstaffQuery = mode === "work" ? hubstaffContextQuery(payload, conversationContext) : null;
     // Fresh indexes use SQL only; expired access gets a bounded metadata check.
-    const indexed = mode === "work" && isReplyRequest(payload)
+    const indexed = mode === "work" && Boolean(context.hubstaffProjectUrl) && isReplyRequest(payload)
       ? await debuggerSpan("Project search index", () => indexedHubstaffSnapshot(context.clientId, context.hubstaffProjectUrl,
         {verifyAccess:true,signal:request.signal})) : null;
-    const needsLive = hubstaffQuery !== null && (!indexed?.snapshot?.available || hubstaffMetricsRequested(hubstaffQuery)
+    const needsLive = Boolean(context.hubstaffProjectUrl) && hubstaffQuery !== null && (!indexed?.snapshot?.available || hubstaffMetricsRequested(hubstaffQuery)
       || hubstaffActivityAnalyticsRequested(hubstaffQuery) || hubstaffCredentialAuditRequested(hubstaffQuery)
       || hubstaffTaskReferences(hubstaffQuery).length > 0);
     if (needsLive) send("hubstaff");
@@ -91,7 +91,8 @@ async function handlePOST(request) {
           query: hubstaffQuery,
         }))
       : null;
-    const hubstaff = live ? { ...live, ...(indexed ? {index: indexed.snapshot.index} : {}) } : indexed?.snapshot || null;
+    const unavailableProject=mode==="work"&&!context.hubstaffProjectUrl?{available:false,reason:"no_project_mapping",message:"No Hubstaff project is linked. Tasks, tracked time and budgets are unavailable; business knowledge and saved website evidence may still be used."}:null;
+    const hubstaff = live ? { ...live, ...(indexed ? {index: indexed.snapshot.index} : {}) } : indexed?.snapshot || unavailableProject;
     let url;
     let signedHeaders;
     const body = JSON.stringify({

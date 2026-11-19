@@ -1,3 +1,4 @@
+import {BusinessHome,BusinessProfile} from "./business-home";
 import Image from "next/image";
 import Link from "next/link";
 import WebsiteInsights from "./website-insights";
@@ -48,14 +49,14 @@ function PortalIcon({ name }) {
 
 function PortalSidebar({ portal }) {
   return (
-    <aside className={styles.sidebar}>
+    <aside className={styles.sidebar} style={portal.branding?{background:portal.branding.palette.primary,color:portal.branding.palette.onPrimary}:undefined}>
       <div className={styles.portalBrand}>
-        <Image src={aocLogo} alt="Always Open Commerce" priority />
+        {portal.branding?<><Image src={portal.branding.logoUrl||aocLogo} alt={portal.branding.portalName} width={140} height={70} unoptimized/><strong>{portal.branding.portalName}</strong></>:<Image src={aocLogo} alt="Always Open Commerce" priority />}
         <span>Client Portal</span>
       </div>
 
       <nav className={styles.portalNav} aria-label="Client portal">
-        {clientNavigation(portal.permissions).map(({ icon, label, href, view }) => (
+        {clientNavigation(portal.permissions,{hubstaffConfigured:Boolean(portal.client.hubstaffProjectUrl)}).map(({ icon, label, href, view }) => (
           <Link
             className={view === portal.view ? styles.activeNav : undefined}
             aria-current={view === portal.view ? "page" : undefined}
@@ -89,7 +90,7 @@ function PortalHeader({ portal }) {
         <span>{portal.welcomeMessage}</span>
       </div>
 
-      <PortalPageSearch items={[...clientNavigation(portal.permissions),{label:"Credits & usage",href:"/credits"}]} />
+      <PortalPageSearch items={[...clientNavigation(portal.permissions,{hubstaffConfigured:Boolean(portal.client.hubstaffProjectUrl)}),{label:"Credits & usage",href:"/credits"}]} />
       <details className={styles.notificationAvailability}>
         <summary aria-label="Notification availability"><svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M6 9a6 6 0 0 1 12 0c0 7 3 7 3 7H3s3 0 3-7M10 20h4" />
@@ -134,13 +135,13 @@ function clientInitials(name) {
 }
 
 function PortalData({ portal, children }) {
-  if (!["dashboard", "time", "projects", "ai"].includes(portal.view)) return children;
+  if (!portal.client.hubstaffProjectUrl || !["dashboard", "time", "projects", "ai"].includes(portal.view)) return children;
   return <HubstaffProvider clientName={portal.clientName} key={portal.client.slug}
     projectConfigured={Boolean(portal.client.hubstaffProjectUrl)}>{children}</HubstaffProvider>;
 }
 
 function MobileNavigation({ portal }) {
-  const items = clientNavigation(portal.permissions);
+  const items = clientNavigation(portal.permissions,{hubstaffConfigured:Boolean(portal.client.hubstaffProjectUrl)});
   return <details className={styles.mobileNavigation}>
     <summary>Menu · {items.find(item => item.view === portal.view)?.label || "Client portal"}</summary>
     <nav aria-label="Mobile client portal">{items.map(item => <Link key={item.view} href={item.href}
@@ -155,10 +156,11 @@ export default function ClientPortal({ portalContext, requestedView, initialWebs
     clientInitials: clientInitials(portalContext.client.name),
     accountLabel: portalContext.user.username || "Client Account",
     client: portalContext.client,
+    branding:portalContext.branding,
     memberships: portalContext.memberships,
     permissions: portalContext.permissions,
     user: portalContext.user,
-    view: standalonePage==="credits"?"credits":clientView(requestedView, portalContext.permissions),
+    view: standalonePage==="credits"?"credits":clientView(requestedView, portalContext.permissions,{hubstaffConfigured:Boolean(portalContext.client.hubstaffProjectUrl)}),
   };
   const quickQuestions = [
     `How many hours does ${portal.clientName} have left this month?`,
@@ -169,7 +171,7 @@ export default function ClientPortal({ portalContext, requestedView, initialWebs
   const canUseAi = portal.permissions.includes(CLIENT_PERMISSIONS.AI_USE);
 
   return (
-    <div className={styles.portalShell}>
+    <div className={styles.portalShell} style={portal.branding?{"--agency-primary":portal.branding.palette.primary,"--agency-on-primary":portal.branding.palette.onPrimary,"--agency-background":portal.branding.palette.background,"--agency-text":portal.branding.palette.text}:undefined}>
       <PresenceHeartbeat />
       <PortalSidebar portal={portal} />
       <div className={styles.portalMain}>
@@ -178,15 +180,15 @@ export default function ClientPortal({ portalContext, requestedView, initialWebs
         <PortalData portal={portal}>
           <main className={styles.dashboard} id="dashboard">
             {!["dashboard","credits"].includes(portal.view) && <header className={styles.pageHeading}>
-              <h1>{clientNavigation(portal.permissions).find(item=>item.view===portal.view)?.label}</h1>
+              <h1>{clientNavigation(portal.permissions,{hubstaffConfigured:Boolean(portal.client.hubstaffProjectUrl)}).find(item=>item.view===portal.view)?.label}</h1>
               <p>{portal.clientName} · your client workspace</p>
             </header>}
             {children}
-            {portal.view === "dashboard" && <section className={styles.metrics} aria-label="Account overview">
+            {portal.view === "dashboard" && portal.client.hubstaffProjectUrl && <section className={styles.metrics} aria-label="Account overview">
               <HubstaffMetrics />
             </section>}
 
-            {portal.view === "dashboard" && (canUseAi ? <ResizableDashboardGrid clientId={portalContext.client.id}
+            {portal.view === "dashboard" && portal.client.hubstaffProjectUrl && (canUseAi ? <ResizableDashboardGrid clientId={portalContext.client.id}
               left={<div className={styles.leftColumn}>
                 <div className={styles.overviewColumn}>
                   <div id="monthly-time"><HubstaffMonthGlance /></div>
@@ -208,6 +210,8 @@ export default function ClientPortal({ portalContext, requestedView, initialWebs
               <div id="monthly-time"><HubstaffMonthGlance /></div>
               <div id="project-status"><HubstaffProjectProgress canUseAi={canUseAi} /></div>
             </div>)}
+            {portal.view === "dashboard" && !portal.client.hubstaffProjectUrl && <><BusinessHome key={portal.client.id} clientId={portal.client.id} canUseAi={canUseAi}/>{canUseAi&&<AiAssistantPanel clientId={portal.client.id} clientName={portal.client.name} userId={portal.user.id} height="620px" minHeight={480}/>}</>}
+            {portal.view === "business" && <BusinessProfile key={portal.client.id} clientId={portal.client.id}/>}
             {portal.view === "ai" && <AiAssistantPanel clientId={portalContext.client.id} clientName={portalContext.client.name}
               userId={portalContext.user.id} height="78vh" minHeight={600} />}
             {portal.view === "time" && <HubstaffMonthGlance detailed />}

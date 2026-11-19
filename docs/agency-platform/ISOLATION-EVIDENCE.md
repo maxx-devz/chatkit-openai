@@ -582,3 +582,34 @@ email/legacy real-email enrollment and all-factors-lost policy are still pending
 **Verdict:** Stage15 local engineering PASS; external agency/custom-host activation
 HOLD. No platform promotion, AI-settings change, personnel/customer import,
 message/payment, Neon write or push. Stop before Stage16.
+
+
+## Stage16 - business onboarding without Hubstaff
+
+**Local PASS; external rollout HOLD.** Fresh loopback disposable PostgreSQL18.3,
+ordinary guarded runtime plus separate operator, synthetic AOC-owned no-project
+clients and fictional foreign agencies. Migration013 twice; public records and
+sequences match before/after. Stage16 DB/API8 TAP checks (including parent), actual
+Python evidence authorization/revocation child, and Chrome5 all pass. Same-agency
+foreign client, foreign agency, effective read-only downgrade, Viewer/Member
+writes, mismatched FK and mass assignment deny without partial writes. Completed
+website reports/exports are client-bound; workspace switching partitions form and
+report state. No Hubstaff polling occurs for unmapped dashboards. Stage14 Chrome8,
+Stage15 Chrome7 and prior DB matrices repeat; see PROGRESS for exact counts.
+
+Fixture Work proxy forwarding/General behavior and existing source approval tests
+are deterministic. Saved website findings are synthetic, not live crawl/analytics;
+no live LLM answer or hosted stream privacy claim. Credentials, database profiles,
+reports, mail, logs and scratch supervisors are ignored. Commands/runbook:
+STAGE16_WITHOUT_HUBSTAFF.md and tests/agency-backfill/business.database.test.mjs,
+tests/client-business/playwright.config.mjs; actual primary app files are exercised.
+379 general,115 Internal,40 source/index; Python188 reported/10 optional skips;
+repository/focused lint and production build pass. New Python opt-in DB test is
+executed by the local DB suite. No Neon, real messages, documents or provider use.
+
+Hosted-AI/privacy and deployed private CDN/cache remain critical external release
+boundaries. Stage06 deployed/browser coverage, real BFCache, provider consent/
+resource/revocation, schedulers, runtime/pooler deployment, rotation/restore, live
+mail/recovery and custom-host checks retain earlier status. Google's detection
+window remains next-check/15-minute freshness. Non-AOC client entry stays gated;
+new business evidence is not permission to inherit AOC knowledge. No Stage16A.

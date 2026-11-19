@@ -20,6 +20,7 @@ from security import verify_signature
 from workspace_access import authorize_client, recheck_context
 from debugger_trace import inline_debug_events, verified_debug_context
 from store import Context, PostgresStore
+from business_context import load_business_evidence
 from builder_config import load_config
 from database import connect_database
 from preview import router as preview_router
@@ -198,6 +199,8 @@ async def chatkit(request: Request):
             context.ai_provider = await load_provider_settings(db)
             if not provider_config(context).api_key:
                 raise HTTPException(503, "Backend is not configured")
+            if envelope.chat_mode == "work":
+                context.business_evidence = await load_business_evidence(db, envelope)
             context.ai_model = context.ai_provider.model
             message = getattr(parsed.params, "input", None)
             if message and message.attachments:

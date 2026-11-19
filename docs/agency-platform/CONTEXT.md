@@ -781,3 +781,18 @@ Separate retained review: port3004, ignored .env.branding-review and
 hosting-check credentials are intentionally unset; no local prerequisite missing.
 No domain/DNS/production/Neon change or real message. Custom-host routing remains
 closed even when a fixture verification snapshot says verified. Stage16 not begun.
+
+
+## Stage16 current state
+
+Stage16 adds optional client business onboarding and an evidence-based unmapped
+client dashboard in the primary feat/agency-platform checkout (baseline72081fd).
+Business profile, saved website reports and AI request evidence are scoped to the
+freshly authorized client. A reference URL never grants browsing/provider access.
+Mapped Hubstaff/AOC Admin paths, legacy IDs/history/credits/resources/sources and
+indexing are preserved; external agency mode stays closed. Stage16 local DB8 and
+Chrome5 pass, plus earlier regression matrices,379 general/115 Internal/40 sources,
+Python188 reported/10 opt-in skips, lint and build. Model/provider responses are
+fixtures, not live verification. Review3005 uses private .env.business-review and
+.tmp/business-review/accounts.json. See PROGRESS and STAGE16_WITHOUT_HUBSTAFF.md.
+Next permitted work is separately authorized Stage16A, not started here.

@@ -25,6 +25,7 @@ from streaming import PortalAgentContext, stream_portal_response
 from provider_settings import close_provider_clients
 from response_routing import focused_tool_needs
 from decision_routing import select_response_route, combined_usage
+from business_context import BUSINESS_RULES, inline_business_evidence
 from prepared_sources import inline_prepared_sources
 from source_privacy import CLIENT_SOURCE_PRIVACY
 from hubstaff_search import project_index_tools
@@ -118,7 +119,7 @@ def make_agent(context, emit=None):
             "they are cached reference material, not live tool results. Apply company_guidance only as authorized by application instructions.",
         ])
         if not getattr(context, "preview", False):
-            instructions += "\n\n" + CLIENT_SOURCE_PRIVACY
+            instructions += "\n\n" + CLIENT_SOURCE_PRIVACY + "\n\n" + BUSINESS_RULES
         return Agent(name="AOC client assistant", model=agent_model(getattr(context, "ai_model", None), context),
                      instructions=instructions, tools=[],
                      model_settings=agent_model_settings(context))
@@ -260,7 +261,7 @@ def make_agent(context, emit=None):
         "Older conversation turns may be outside your context.",
     ])
     if not getattr(context, "preview", False):
-        instructions += "\n\n" + CLIENT_SOURCE_PRIVACY
+        instructions += "\n\n" + CLIENT_SOURCE_PRIVACY + "\n\n" + BUSINESS_RULES
     return Agent(name="AOC client assistant", model=agent_model(getattr(context, "ai_model", None), context),
                  instructions=instructions, tools=guard_tools(tools, context),
                  model_settings=agent_model_settings(context))
@@ -309,6 +310,7 @@ class PortalChatKitServer(ChatKitServer[Context]):
                                   for attachment in item.attachments][:MAX_CONTEXT_ATTACHMENTS]
             agent_input = await AttachmentConverter(context, set(recent_attachments)).to_agent_input(items)
             inline_prepared_sources(agent_input, getattr(context, "source_references", []))
+            inline_business_evidence(agent_input, context)
             if context.response_route == "hubstaff":
                 context.hubstaff_inlined = inline_hubstaff_snapshot(agent_input, context)
             agent_context = PortalAgentContext(thread=thread, store=self.store, request_context=context)

@@ -10,19 +10,19 @@ test("Client Work chat uses a usable index; an unavailable object does not suppr
   const previous=process.env.BETTER_AUTH_URL;
   process.env.BETTER_AUTH_URL="https://portal.test";
   t.after(()=>{if(previous===undefined) delete process.env.BETTER_AUTH_URL;else process.env.BETTER_AUTH_URL=previous;});
-  for(const scenario of ["indexed","unavailable","general","sources_unavailable","sources_unavailable_nonstream","sources_revision"]) {
+  for(const scenario of ["indexed","unavailable","general","unmapped","unmapped_general","sources_unavailable","sources_unavailable_nonstream","sources_revision"]) {
     let indexed=0,live=0,sent;
     const mocks={
       ASSISTANT_INSTRUCTIONS:"Synthetic rules",DriveSourceError,streamWithWorkflow,inWorkspaceCache,
       assertTrustedOrigin(){},
-      getPortalAiContext:async()=>({clientId:"1",userId:"10",aiEnabled:true,hubstaffProjectUrl:"https://assigned.test"}),
+      getPortalAiContext:async()=>({clientId:"1",userId:"10",aiEnabled:true,hubstaffProjectUrl:scenario.startsWith("unmapped")?null:"https://assigned.test"}),
       chatKitThreadId:()=>null,chatKitInputText:()=>"What needs approval?",
       isReplyRequest:()=>true,readJsonRequest:r=>r.json(),
       loadPreparedSourceContext:async()=>{
         if(scenario.startsWith("sources_"))
           throw new DriveSourceError(scenario==="sources_revision"?"source_revision_changed":"prepared_sources_unavailable",
             "PRIVATE SOURCE DETAILS AND CREDENTIAL DIAGNOSTICS",503);
-        return {instructions:"",references:[]};
+        return {instructions:"",references:scenario==="unmapped"?[{text:"A16_APPROVED_BUSINESS_GUIDANCE",usage:"company_guidance",excerpt:"Authorized synthetic knowledge"}]:[]};
       },
       hubstaffContextQuery:()=>"approval",hubstaffMetricsRequested:()=>false,
       hubstaffActivityAnalyticsRequested:()=>false,hubstaffCredentialAuditRequested:()=>false,
@@ -46,7 +46,7 @@ test("Client Work chat uses a usable index; an unavailable object does not suppr
       route=await import("data:text/javascript;base64,"+Buffer.from(code).toString("base64"));
     } finally {delete globalThis[key];}
     const response=await route.POST(new Request("https://portal.test/api/chatkit",{
-      method:"POST",headers:{"x-aoc-client":"1","x-aoc-chat-mode":scenario==="general"?"general":"work",
+      method:"POST",headers:{"x-aoc-client":"1","x-aoc-chat-mode":["general","unmapped_general"].includes(scenario)?"general":"work",
         ...(scenario.startsWith("sources_") && scenario!=="sources_unavailable_nonstream"?{"x-aoc-workflow":"1"}:{})},
       body:JSON.stringify({type:"threads.create"}),
     }));
@@ -60,9 +60,10 @@ test("Client Work chat uses a usable index; an unavailable object does not suppr
       continue;
     }
     assert.equal(response.status,200,scenario);
-    assert.equal(indexed,scenario==="general"?0:1,scenario);
+    assert.equal(indexed,["general","unmapped","unmapped_general"].includes(scenario)?0:1,scenario);
     assert.equal(live,scenario==="unavailable"?1:0,scenario);
     assert.equal(Boolean(sent.hubstaff_index_binding),scenario==="indexed",scenario);
-    if(scenario==="general") assert.equal(sent.hubstaff,null);
+    if(["general","unmapped_general"].includes(scenario)) assert.equal(sent.hubstaff,null);
+    if(scenario==="unmapped"){assert.equal(sent.hubstaff.available,false);assert.equal(sent.hubstaff.reason,"no_project_mapping");assert.match(JSON.stringify(sent.source_references),/A16_APPROVED_BUSINESS_GUIDANCE/);assert.equal(live,0);assert.equal(indexed,0);}
   }
 });

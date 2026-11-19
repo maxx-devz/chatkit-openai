@@ -902,3 +902,24 @@ CDN/cache remain critical external release boundaries. Carry forward live email,
 lost-all-factors recovery policy, deployed roles/pooler, OAuth/provider revocation,
 scheduler, secret rotation/restore and supported browsers. Source publication
 approval remains20B. Local Stage15 complete; stop before16. No push.
+
+
+## S16-D01 - optional business setup and preserved client identity
+
+Reuse client display_name; add only a client-owned business profile and draft/
+completion state. Optional website/description/audience/services/goals never
+require an integration. Effective Client Administrator/manage permission controls
+writes; ordinary client read permission controls reads. A business reference URL
+is not an approved browsing domain or OAuth connection. Preserve all legacy IDs,
+credit settings, pricing versions, files, resources, sources and indexing history.
+
+## S16-D02 - evidence and release boundary
+
+Unmapped dashboards omit Hubstaff polling/task/time views and distinguish unknown
+from zero. Saved website reports are dated artifacts, not proof of delivered work
+or sales. Work uses freshly scoped business/website evidence as untrusted data plus
+existing approved knowledge; General keeps its existing no-Hubstaff path. No prompt
+can change tool/agency/client authority. Existing mapped budgets/tasks stay on the
+working path. Stage15 local branding and Stage14 security remain independent.
+Non-AOC client rollout stays gated. No Stage16A/Stage17 feature, fake connection,
+provider credential, source publication or real account promotion is introduced.

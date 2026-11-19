@@ -45,3 +45,11 @@ test("Viewer and Member navigation retains existing permission boundaries",()=>{
   assert.ok(member.some(c=>c.view==="ai"));
   assert.ok(!member.some(c=>["members","audit"].includes(c.view)));
 });
+
+test("No-project navigation omits unavailable Hubstaff views without granting new permissions",()=>{
+ const permissions=clientPermissionsForRole("member");
+ const missing=clientNavigation(permissions,{hubstaffConfigured:false});
+ assert.ok(missing.some(c=>c.view==="business"));assert.ok(missing.some(c=>c.view==="website-insights"));assert.ok(missing.some(c=>c.view==="ai"));
+ assert.ok(!missing.some(c=>["time","projects","members","audit"].includes(c.view)));
+ const mapped=clientNavigation(permissions,{hubstaffConfigured:true});assert.ok(mapped.some(c=>c.view==="time"));assert.ok(mapped.some(c=>c.view==="projects"));
+});

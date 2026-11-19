@@ -2169,3 +2169,142 @@ access, provider upload, real email, paid action, domain purchase or DNS change.
 
 Commit intended changes locally only; no push. **Stop before Stage16.** Resume
 only with a separately supplied next-stage task and approved disposable target.
+
+
+## Stage 16 closeout - useful client portal without Hubstaff (2026-11-19)
+
+Baseline Stage15 **72081fd**, primary **C:\Users\MY PC\Desktop\AI\portal**,
+branch **feat/agency-platform**. Read AGENTS, CONTEXT, DECISIONS, Stage15 handoff,
+installed Next16 route-handler documentation and DATABASE_PORTABILITY first.
+The attached playbook Stage16 matched the explicit request; its later-stage
+instructions were not treated as authorization. Initial working tree was clean.
+Final application/test/docs changes live in actual project paths, not only .tmp.
+
+### Completed scope / files
+
+* Additive013 client_business_profiles, composite agency/client FK, FORCE RLS,
+  session-authorized view/save/evidence functions, effective manage permission,
+  optimistic revision, bounded plain-text fields and metadata-only profile audit.
+  No legacy identifiers or client/settings records are rewritten by migration.
+* Existing agency client creation already permits no project/token and is reused.
+  Client Administrators can save/resume optional business setup or complete it.
+  Website reference remains distinct from approved browsing and provider consent.
+* Unmapped dashboard: business setup, performance evidence, attention, next
+  actions and delivered artifacts. Unavailable metrics are not zero; saved
+  reports are dated observations, not sales or completed task claims. Hide
+  unavailable Hubstaff navigation/polling. Mapped dashboard/budget/task paths stay.
+* Work skips project/index requests when no mapping exists; Python freshly loads
+  permitted business/report context as untrusted request data. Existing approved
+  knowledge, private admin guidance, revision/revocation/privacy guards remain.
+  General keeps its no-Hubstaff behavior and receives no business/report payload.
+* Reuse Stage15 authorized branding, existing Website Insights/reports/exports,
+  Stage14 account controls, workspace switching and role guards. No request/
+  approval control, agency rollout, identity promotion or provider credential added.
+
+| Area | Actual project paths |
+| --- | --- |
+| Schema/operator | database/agency-platform/013_client_business.sql; scripts/migrate-client-business.mjs |
+| Profile API/UI | lib/client-business.js; app/api/client/business/route.js; components/portal/business-home.js; business.module.css |
+| Dashboard/brand | components/portal/client-portal.js; lib/client-navigation.js; lib/agency-branding.js; app/page.js |
+| Chat | app/api/chatkit/route.js; chatkit_backend/app.py; assistant.py; business_context.py; components/ai-assistant/chatkit-assistant.js |
+| Fixtures/review | scripts/business-review-fixture.mjs; seed-business-review.mjs; check-business-review.mjs; dev-platform-review.mjs |
+| Tests | tests/agency-backfill/business.database.test.mjs; tests/client-business/*; tests/client-readiness.test.mjs; tests/hubstaff-index/chat-routing.test.mjs; chatkit_backend/tests/test_business_context.py; test_stage16_business_database.py |
+| Handoff | STAGE16_WITHOUT_HUBSTAFF.md; CONTEXT; DECISIONS S16-D01-02; ISOLATION-EVIDENCE; PROGRESS |
+
+### Actual verification / preservation
+
+**Fresh disposable WSL PostgreSQL18.3 only**, separate operator and ordinary
+runtime on verified loopback. No configured Neon connection loaded. The private
+scratch orchestration .tmp/stage16/sql.py executes actual AI\portal files;
+acceptance cluster/server are removed afterward, separate from retained review.
+
+* **8/8 Stage16 database/API TAP checks**, including the suite parent, no skips.
+  Existing agency creation with no Hubstaff; real Better Auth identities;
+  paragraph/draft persistence and completion; stale-revision conflict;
+  Viewer/Member write denial; same-agency and foreign-agency denial; mass
+  assignment and composite FK rejection without partial changes; Website Insights
+  saved reports/CSV; scoped business evidence; effective grant downgrade, session
+  revocation and agency suspension; direct runtime-table denial and clean pooled
+  role; unchanged legacy client rows. A child Python runtime-role test executes
+  real business_evidence authorization and denies supplied foreign/revoked scopes.
+* **5/5 Chrome scenarios** on the full production build: unmapped dashboard and
+  zero Hubstaff requests; saved/resumed/completed onboarding; saved website
+  report rendered and CSV authorized, foreign report denied; Viewer read-only and
+  390px no overflow; full workspace switching discards foreign profile/report
+  state. External /agency stays404. Browser external network requests are blocked.
+* **Preservation:**013 applied twice. Full public-table record/sequence snapshots
+  immediately before/after migration match. The prior Stage04 dry-runs are
+  read-only/identical, public legacy rows preserved through adoption, second apply
+  changes no ownership rows. Existing legacy client IDs/project fields compare
+  unchanged after profile/site operations. Credit settings, pricing/history,
+  conversations/files, resources, approved sources and indexing records are not
+  reset; prior credit, mapped budget/task/project ownership and authorization
+  regressions below pass. Existing AOC Admin restrictions stay in force; no
+  foreign-estate global admin bypass is added.
+* Earlier database regressions repeated: Stage03 9 scenarios;04 9;05 5;
+  06/07 11;08 1;09 6;10 9;11 matrix9;12 11;13 11;13A11;
+  Stage14 16 and Stage15 8. **Stage14 Chrome8 and Stage15 Chrome7** also repeat.
+  These are local synthetic checks, not additional live-provider checks.
+* Offline: **379 general,115 Internal,40 source/index tests pass**. The proxy
+  fixture additionally checks no-project Work forwarding approved canary guidance
+  without project calls; General carries no Hubstaff. Python discovery reports
+  **188 tests,10 opt-in skips**; the new opt-in Python DB check runs in the real
+  Stage16 database suite. Existing internal account/panel protections are retained.
+* Desktop/mobile review screenshots were inspected. The last visual check found
+  an old Work hint implying Hubstaff context; it now says permitted business
+  knowledge and available evidence. That copy-only change was rebuilt/linted and
+  checked on the fresh retained review server, after the five functional cases.
+* **Official repository lint, changed-file/test lint and full Next16.3.3
+  production build pass.** Build shadows private .env assignment names and uses an
+  unreachable synthetic database; it does not access Neon or a paid provider.
+* Early runs caught and corrected fixture ownership-marker/legacy-trigger
+  assumptions, provider-check ordering, textarea accessible labels that included
+  saved content, incomplete synthetic report shape and an exact-text website
+  selector that ignored its hostname suffix. Final outcomes above are from the
+  corrected run; earlier failures were not relabeled. Provider/model/search data
+  remain mocked/synthetic; no paid AI answer or live website crawl is claimed.
+
+Commands executed through the sanitized private test shell include migration013
+(twice), node --conditions=react-server --experimental-test-module-mocks --import
+./tests/internal-user/aliases.mjs --test tests/agency-backfill/business.database.test.mjs;
+Playwright --config tests/client-business/playwright.config.mjs; existing Stage03-15
+fixture commands; node --test tests/*.test.mjs; Internal/source/index suites;
+Python unittest discovery; repository/focused ESLint; Next production build.
+Logs/canaries/accounts/screenshots/supervisors stay ignored, not in Git.
+
+### Review / setup / limits
+
+Login **http://127.0.0.1:3005/login**; home **http://127.0.0.1:3005/**;
+profile **http://127.0.0.1:3005/?view=business**;
+reports **http://127.0.0.1:3005/?view=website-insights**.
+Private **.tmp/business-review/accounts.json**, accounts.businessA.username/password
+(or businessB, viewer, multi). Use an incognito/separate browser profile because
+local ports share cookie scope. No credentials belong in chat. This is an AOC-owned
+synthetic client experience; non-AOC client mode is still gated.
+
+The separate retained .env.business-review is generated locally, not copied from
+.env.local: DATABASE_URL ordinary runtime, AGENCY_MIGRATION_DATABASE_URL operator,
+BETTER_AUTH_URL/SECRET, PORTAL_ACCOUNT_SECURITY_ENABLED, AUTH_MAIL_MODE=capture,
+AUTH_TEST_MAIL_DIR. No basic-review setup is missing. Review launcher scrubs
+operator/provider values and never starts provider/source jobs. Reports are labeled
+synthetic. Seed/migration/health scripts are committed; private profile/accounts
+are excluded. See STAGE16_WITHOUT_HUBSTAFF.md for restart/setup commands.
+
+**Live AI remains unverified and intentionally disabled in review.** For a later
+approved live check, configure CHATKIT_BACKEND_URL and CHATKIT_BACKEND_SECRET in
+Next, matching secret/DATABASE_URL and approved provider settings in Python
+(OPENAI_API_KEY or OPENROUTER_API_KEY as applicable), privately. No paid credential
+is needed for deterministic authorization tests. Optional PAGESPEED_INSIGHTS_API_KEY
+and WEBSITE_INSIGHTS_GOOGLE_CLIENT_ID, WEBSITE_INSIGHTS_GOOGLE_CLIENT_SECRET plus
+WEBSITE_INSIGHTS_ENCRYPTION_KEY (existing Drive fallback) remain server-only live
+setup; Google consent is separate. No new variable or .env.example placeholder.
+
+Carry forward **critical hosted-AI privacy and deployed private CDN/cache** checks;
+external agency activation remains **HOLD**. Live provider consent/resource/
+revocation, ordinary role/pooler deployment, scheduler delivery, secret rotation/
+restore, real email/legacy enrollment/lost-all-factors policy, custom DNS/TLS/host
+activation and supported-browser/BFCache retain prior pending status. Google
+revocation remains next-check/15-minute freshness. Stage20B approval is later.
+No production/client data, personnel import, provider upload, real email/payment,
+DNS or Neon write. Local commit only, no push. **Stage16 local engineering PASS;
+stop before Stage16A.** Resume only with a separately authorized next-stage task.

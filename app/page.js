@@ -1,3 +1,4 @@
+import {clientPortalBrand} from "@/lib/agency-branding";
 import Image from "next/image";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -75,5 +76,5 @@ export default async function HomePage({ searchParams }) {
     );
   }
 
-  return <ClientPortal key={portalContext.workspaceKey} portalContext={clientShellContext(portalContext)} requestedView={params?.view} initialWebsite={params?.site} connectionResult={params?.connection} />;
+  return <ClientPortal key={portalContext.workspaceKey} portalContext={{...clientShellContext(portalContext),branding:await clientPortalBrand(portalContext)}} requestedView={params?.view} initialWebsite={params?.site} connectionResult={params?.connection} />;
 }
