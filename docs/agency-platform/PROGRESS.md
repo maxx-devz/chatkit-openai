@@ -2308,3 +2308,87 @@ revocation remains next-check/15-minute freshness. Stage20B approval is later.
 No production/client data, personnel import, provider upload, real email/payment,
 DNS or Neon write. Local commit only, no push. **Stage16 local engineering PASS;
 stop before Stage16A.** Resume only with a separately authorized next-stage task.
+
+
+## Saved Stage 16 checkpoint before manual branch switch
+
+**Primary checkout:** C:\Users\MY PC\Desktop\AI\portal.
+**Branch:** feat/agency-platform. **Stage16 implementation commit:**
+`f6c8babf871cc939e7f25c0787cc05cb77a99dfe`.
+All31 changed application, portable migration, test and handoff files were checked
+against that commit in the actual project paths. Nothing intended remains only
+under a scratch mirror. The tracked working tree was clean before this note.
+This documentation-only checkpoint follows the implementation commit; its commit
+is the current `git rev-parse feat/agency-platform` after saving this note.
+
+### Verified results and remaining boundaries
+
+The saved Stage16 evidence and local logs were rechecked:8 database/API TAP
+checks (including suite parent),5 Chrome business scenarios,379 general Node,
+115 Internal,40 source/index tests; Python188 reported with10 opt-in skips.
+The new opt-in Python database check ran within the actual disposable database
+suite. Stage14 Chrome8 and Stage15 Chrome7 also passed, alongside the earlier
+recorded database matrices. Migration013 applied twice, and public-table records/
+sequences reconciled unchanged. Repository/focused lint and full production build
+passed; the final Work/General copy was checked in the fresh review browser.
+Model/provider responses and website observations were synthetic/mocked, not live
+AI/provider verification. No tests/build/migrations were rerun for this note.
+
+Pending critical external-release checks remain hosted-AI privacy and deployed
+private CDN/cache behavior. External agency access stays HOLD. Carry forward live
+provider consent/resource/revocation, deployed ordinary runtime/pooler roles,
+scheduler delivery, rotation/restore, real email/legacy enrollment/lost-all-factors
+policy, custom-host DNS/TLS/activation and supported-browser/BFCache checks.
+Google revocation still has the documented next-check/15-minute freshness bound.
+Stage20B publication approval is later. No new setup variable is introduced;
+server-only live setup names and private locations remain in
+STAGE16_WITHOUT_HUBSTAFF.md. No prerequisite is needed merely to save this checkpoint.
+
+### Review shutdown and private local state
+
+Verified supervisor/launcher/listener ancestry against the AI\portal target before
+requesting the existing graceful shutdown for the six review sessions: Stage12
+platform3000, Stage13 agency3001, Stage13A specialist3002, Stage14 security3003,
+Stage15 branding3004 and Stage16 business3005. All six report stopped; recorded
+launchers/listeners exited and no listeners remain on ports3000-3005. Other
+applications/processes were not targeted. Their owned disposable PostgreSQL
+helpers performed normal temporary-fixture cleanup; Neon was never contacted.
+The historical review links above are now OFFLINE, not currently running services.
+
+Source changes, ignored private environment/account files and other local files
+were preserved. No environment file or database configuration was edited, and no
+migration, production write or new test fixture was started during checkpointing.
+The retained private review profiles refer to stopped disposable targets; do not
+assume those database URLs/accounts are a live review environment after resuming.
+Keep all .env files, private credentials, mail, screenshots, logs and .tmp artifacts
+out of Git and out of any ordinary source transfer. No branch switch, push,
+reset/clean/discard or next-stage work was performed.
+
+### Resume in playbook order
+
+1. Return manually to **feat/agency-platform** in this checkout when ready to
+   continue development. Confirm `git branch --show-current`,
+   `git rev-parse feat/agency-platform` and `git status --short`; the branch tip
+   must include f6c8bab and this checkpoint. Preserve any subsequent local edits.
+2. Read AGENTS.md, CONTEXT.md, DECISIONS.md, this latest PROGRESS entry,
+   ISOLATION-EVIDENCE.md and STAGE16_WITHOUT_HUBSTAFF.md before editing. Recheck
+   dependencies and private test-target identity on the computer being used.
+3. **Stage16A - Role profiles and guided delivery onboarding is next.** It has
+   not started and needs a separately authorized task. Reuse existing Stage16
+   business setup and earlier membership/specialist controls; do not skip to17.
+4. Before any future test writes, establish and verify a fresh approved disposable
+   PostgreSQL target with synthetic data. Follow the existing Stage03-16 runbooks
+   and private test-shell setup. Preserve/archive obsolete private review profiles
+   deliberately before generating replacements; never fall back to configured
+   Neon or copy credentials into chat. No database preparation is part of this
+   checkpoint. Request named live-provider sign-in/consent only when required.
+5. After separately completing Stage16A, follow **Stage17 - Requests, approvals
+   and action center**, then the remaining playbook stages in order. Keep
+   external agency mode closed until its critical release evidence is complete.
+
+Master exists locally and is not checked out in another worktree. No untracked
+public source files or private-file collisions with master were found. After the
+checkpoint commit and clean-status confirmation, a normal manual branch switch
+is safe as a Git operation. Ignored environment/build files stay local across
+branches; review their target before starting an application on another branch.
+This stage stops here; no Stage16A or Stage17 implementation is authorized now.
