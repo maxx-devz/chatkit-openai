@@ -647,3 +647,31 @@ that credential or pretend scoped LOGIN tests protect every legacy table.
 No new runtime secret, provider or queue is introduced. AGENCY_ISOLATION_FIXTURE
 is an ignored synthetic test-only credential file, not an application setting.
 Stage 20B publication approval remains separate. Stop before Stage 12.
+
+
+## S11-D02 - Reject elevated runtime roles; separate local verdict from deployment
+
+The intended legacy model is a private shared service with checked application
+requests, not per-tenant RLS on all legacy tables. Restricted agency LOGINs and
+protected ledgers keep their tested database controls. Role names alone cannot
+establish that a runtime credential is ordinary. Both actual connectors now
+reject owner/elevated roles and leaked SET ROLE on adopted databases. Better Auth
+server factories remain guarded even without Next cookies; explicit operator
+CLIs alone request operatorDatabase. No runtime disable flag is introduced.
+
+Pre-adoption compatibility remains; it is not an agency-readiness claim. Runtime
+role setup/checks must occur independently on an approved staging deployment.
+Do not connect to Neon for this review or silently transfer ownership/grant the
+owner role to repair a missing runtime permission.
+
+Playwright's default BFCache-disabling launch switch is removed in the isolation
+suite. Actual Chrome still evicts private no-store documents and HTTP-only cookie
+changes, with diagnostic reasons recorded. A real persisted restore is not claimed
+and security headers are not weakened to force one.
+
+Classifications and verdict are in the latest ISOLATION-EVIDENCE review. Local
+Stage 11 engineering passes; Stage 12 local development may proceed only under a
+new task, disposable fixtures and the closed external gate. Live hosted-AI and
+edge privacy remain external-release isolation blockers. Scheduler availability,
+rotation, role/provider setup and supported-browser checks remain deployment
+verification tasks, not a blanket prohibition on local development.

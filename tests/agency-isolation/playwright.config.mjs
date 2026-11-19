@@ -10,5 +10,5 @@ if(origin.hostname!=='127.0.0.1'||database.hostname!=='127.0.0.1'||fixture.origi
 export default defineConfig({
   testDir:'./browser',outputDir:'../../.tmp/agency-isolation-browser',workers:1,fullyParallel:false,
   timeout:60000,expect:{timeout:12000},retries:0,reporter:'list',
-  use:{baseURL:origin.origin,channel:'chrome',headless:true,trace:'off',screenshot:'only-on-failure',viewport:{width:1440,height:1000}},
+  use:{launchOptions:{ignoreDefaultArgs:['--disable-back-forward-cache']},baseURL:origin.origin,channel:'chrome',headless:true,trace:'off',screenshot:'only-on-failure',viewport:{width:1440,height:1000}},
 });

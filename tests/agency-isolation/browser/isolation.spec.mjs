@@ -131,6 +131,8 @@ test('Website Insights uses real client-bound requests and discards prior site r
 test('attempt a real browser-cache restore with routing disabled across account changes',async({page,context},info)=>{
   await login(page,'adminA');await documents(page,0);
   const protocol=await context.newCDPSession(page);
+  const notRestored=[];await protocol.send('Page.enable');
+  protocol.on('Page.backForwardCacheNotUsed',event=>notRestored.push(...(event.notRestoredExplanations||[]).map(x=>x.reason)));
   // Keep external HTTPS/WSS requests blocked without Playwright request routing,
   // which otherwise disables the normal HTTP cache for the context.
   await protocol.send('Network.setBlockedURLs',{urls:['https://*','wss://*']});
@@ -149,5 +151,6 @@ test('attempt a real browser-cache restore with routing disabled across account 
     await expect(page.getByText(clients[0].name,{exact:true})).toHaveCount(0);
     restored.push(await page.evaluate(()=>window.__isolationPageShowPersisted===true));
   }
-  await writeFile(info.outputPath('bfcache-observation.json'),JSON.stringify({attempted:true,sameSessionPersisted,afterAccountChangePersisted:restored}));
+  if(!sameSessionPersisted)expect(notRestored.some(reason=>reason.includes('CacheControlNoStore'))).toBe(true);
+  await writeFile(info.outputPath('bfcache-observation.json'),JSON.stringify({attempted:true,sameSessionPersisted,afterAccountChangePersisted:restored,notRestored}));
 });

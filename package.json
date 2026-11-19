@@ -6,6 +6,7 @@
   "scripts": {
     "agency:plan": "node scripts/migrate-agency-platform.mjs --plan",
     "agency:migrate": "node scripts/migrate-agency-platform.mjs",
+    "agency:runtime:check": "node scripts/check-runtime-database-role.mjs",
     "agency:jobs": "node scripts/migrate-agency-jobs.mjs",
     "agency:connections": "node scripts/migrate-agency-connections.mjs",
     "agency:sources": "node scripts/migrate-agency-sources.mjs",

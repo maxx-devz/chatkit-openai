@@ -1,5 +1,12 @@
 # Stage 11 isolation evidence
 
+> Latest review from `817c314`: **Stage 11 local engineering PASS; external
+> rollout HOLD. Stage 12 local development may proceed under the closed gate
+> after a separate task is supplied.** The review/classification at the end of
+> this file supersedes the earlier broad blocker labels. Original results below
+> are retained as dated evidence. No Stage 12 work or external access is enabled.
+
+
 Recorded **November 19, 2026 (Asia/Shanghai)** in
 `C:\Users\MY PC\Desktop\AI\portal`, branch `feat/agency-platform`, starting
 from the clean Stage 10 commit `d3c9991`.
@@ -274,3 +281,128 @@ Therefore the gate remains closed. Stage 11 supplies local evidence and fixes;
 it does not grant external pilot access. Stage 12 is not started and requires
 its own instruction. Later features must rerun the affected cases and update
 this evidence instead of inheriting a blanket isolation certification.
+
+
+## Stage 11 continuation review from 817c314
+
+November 19, 2026. This review distinguishes a demonstrated local isolation
+failure from an unperformed deployment check. A deployment task is not a claim
+that the live feature works, and a critical external-release blocker is not an
+instruction to stop safe local development behind the existing gate.
+
+### Classification of every remaining finding
+
+| Finding | Classification | Reason and disposition |
+| --- | --- | --- |
+| Owner, BYPASSRLS or inherited-owner credentials accepted by runtime connectors | **Critical isolation blocker - resolved locally** | Such roles can bypass protected policies. Actual connectors now fail closed for an adopted portal; real Node/Python tests reject them before application SQL. Deployment must use the reviewed ordinary LOGIN |
+| Shared legacy service LOGIN can read legacy rows across clients | **Deployment verification task / documented trust contract** | Most legacy tables have no tenant RLS; broad service DML is intentional server authority, not an owner bypass. Checked request/DAL paths supply tenant authorization. Confirm the service credential stays server-only and no raw SQL/Data API is exposed; never claim universal RLS |
+| Actual deployed Next/Python role attributes and hosted pooler mapping | **Deployment verification task** | The actual connector paths were tested locally, not against Neon. Run the new diagnostic on a named approved staging target for both services. A failed role check is a critical configuration blocker; there is no guard-disable flag |
+| Live hosted AI/ChatKit conversation reopen, stream and provider-side state/cache isolation | **Critical isolation blocker for external release** | Local SQL/tool/transport fixtures do not demonstrate the hosted privacy boundary. Requires a specifically approved live test account/project; no paid or real-document test was run |
+| Live private-file/CDN behavior | **Critical isolation blocker for external release** | An edge cache can invalidate application privacy assumptions. Local private/no-store headers and authentication pass, but the real deployment must demonstrate no cross-account private replay |
+| Earlier genuine BFCache gap | **Deployment verification task; local investigation completed** | Playwright had disabled BFCache by default. After removing that switch, actual Chrome reported no-store resource and HTTP-only-cookie-change eviction; account history still revealed no prior account. A true persisted restore was not obtained under the current policy. Do not weaken headers merely to obtain a hit |
+| Other browser versions, Safari/mobile and future cache-policy changes | **Deployment verification task** | The supported-browser/deployed-cache matrix must be rerun. Current evidence is installed desktop Chrome, not all browsers. A changed policy or observed stale-account restore reopens a critical defect |
+| Real Google/Hubstaff resource selection, consent, refresh and revocation latency | **Deployment verification task before enabling that integration** | Database scope and refresh-race fixtures pass with mocked provider responses. Real provider account/resource configuration remains unverified; any observed foreign resource attach would be critical |
+| Scheduler registration, bearer/target and actual delivery | **Deployment verification task** | Handler authentication and execution scope are tested. Missing registration affects availability; it does not confer foreign access. Do not claim unattended synchronization works before a named live scheduler check |
+| Managed-secret custody, rotation/restore | **Deployment verification task** | Encryption and role checks pass locally; managed deployment configuration and recovery were not changed. Missing rotation rehearsal is not evidence of a cross-tenant disclosure |
+| Positive Agency B end-to-end administration/client/provider UI | **Deployment verification task before external release** | Deliberately gated, not a failing permission bypass. Scoped B reads and deny tests are implemented; positive public B workflows must be tested in a separately approved controlled rollout plan |
+| Stage 20B publication approval transitions | **Deployment/feature verification task for Stage 20B** | New revisions remain withheld now. No unapproved-publication bypass was found. Do not enable publication transitions without their later implementation/tests |
+| Google-side revocation discovery window and already delivered bytes | **Deployment verification / documented semantics** | Next-provider/source check or the 15-minute freshness bound remains. Already downloaded bytes cannot be recalled. This is not a claim of instant remote revocation |
+
+### Actual runtime investigation and fix
+
+[Runtime role guide](RUNTIME_DATABASE_ROLES.md) records the exact code paths,
+operator/runtime separation, role setup and read-only diagnostic.
+
+Next DAL calls use `lib/database.js`; Better Auth web/server factories use the
+same checked canonical pool by default, including factories without Next cookies.
+Python app/preview use `connect_database`. Both inspect actual database session
+properties rather than trusting a username in configuration. No production URL
+was connected, queried or inferred to be safe from its name.
+
+The guard rejects elevated role membership, owner privileges and leaked SET ROLE
+for an adopted database. Node checks each checkout and discards unsafe/error
+connections; Python checks each new connection and closes on denial. Explicit
+operator CLIs remain separate. No request parameter/environment flag disables
+the guard. Pre-adoption legacy compatibility is preserved and is not pilot-ready
+agency verification. No schema migration/provider-specific SDK was introduced.
+
+The shared service LOGIN still has intentional raw legacy access. The new guard
+prevents an unsafe runtime role from bypassing protected controls; it does not
+turn every legacy table into RLS or sandbox malicious trusted server code.
+Credential compromise remains outside the authenticated request boundary. This
+scope is explicit and is not counted as a foreign-row denial test.
+
+### BFCache attempt and remaining coverage
+
+The installed Playwright bundle included `--disable-back-forward-cache` in its
+normal Chromium launch switches. The updated configuration excludes that switch.
+The dedicated history test removes request routing, blocks external HTTPS/WSS
+through CDP and captures `Page.backForwardCacheNotUsed` diagnostics.
+
+Actual Chrome 157.0.8103.79 returned persisted=false for the same-session restore
+and both measured restores after changing accounts. Reported reasons were:
+
+- MainResourceHasCacheControlNoStore
+- JsNetworkRequestReceivedCacheControlNoStoreResource
+- BrowsingInstanceNotSwapped
+- CacheControlNoStoreHTTPOnlyCookieModified
+
+The private document was not restored into the other account. The regression now
+requires a no-store diagnostic when no same-session persisted hit is observed.
+This is a real protective-eviction result, not a synthetic pageshow event. A true
+persisted snapshot branch remains unexercised because the current policy evicted
+it; other browsers and a differently configured deployed edge remain unverified.
+The application no-store/authentication policy was not weakened.
+
+### Latest actual results
+
+| Check | Status and result |
+| --- | --- |
+| New actual runtime-role DB matrix | **passed**: 5 scenario groups, 6 TAP tests; actual Node DAL/Auth/Python connectors, read-only diagnostic, privileged rejection, pooled SET ROLE discard, inherited owner, BYPASSRLS and portal relation ownership |
+| Existing four-client DB/API/source matrix | **passed**: 9 TAP tests |
+| Actual Chrome matrix with BFCache switch removed | **passed**: 9 tests; real app/auth/SQL; protective eviction reasons captured |
+| Top-level Node | **passed**: 370 tests, 0 failed/skipped |
+| Source/Hubstaff index | **passed**: 40 tests |
+| Internal Portal unit regression | **passed**: 115 tests; SQL/SQLite fixtures explicitly mock role guard, not proof of actual PG role safety |
+| Python offline | **passed**: 182 reported, 9 opt-in DB skips; separate real role probes ran through the DB matrix |
+| Earlier Stage 03-10 real DB fixtures | **passed**: existing dry-run/idempotence, role, client/file, source/tool, OAuth and job regressions rerun |
+| Build / affected JS lint | **passed**: full Next production build and lint, with deployment values excluded |
+| Live providers, real edge, managed rotation, deployed scheduler | **not run**: categorized above, not represented by fixture results |
+
+The unsafe fixture first demonstrated raw protected-table access after granting
+owner membership, then the runtime rejected that same login. The canonical Next
+entry point also rejected owner credentials in a fresh process. Python exercised
+its real connector against the safe/unsafe credentials. Correcting an unsafe
+membership allowed the ordinary role again; no previous safe result was cached.
+
+Initial Internal unit-fixture failures came from mocked/SQLite pools lacking the
+new adapter boundary; they were corrected explicitly in those fixtures. Python
+fixture operator connections are now separate from guarded runtime connections.
+No production Internal feature was changed. Final tests pass.
+
+### Explicit Stage 11 verdict and next permitted work
+
+**PASS for local Stage 11 engineering and the intended server-authorized trust
+model. HOLD for external agency access.** The demonstrated privileged-runtime
+configuration hole is fixed locally. No unresolved critical local application
+failure remains in the executed matrix. This is not blanket RLS certification,
+provider certification or external pilot approval.
+
+**Stage 12 local development can proceed after its own task is supplied**, using
+recreated disposable PostgreSQL, synthetic identities and the same closed public
+agency/non-AOC gates. No Stage 12 work was started. It must preserve these guards
+and rerun affected isolation cases as new features are added.
+
+Exact external blockers are the unverified hosted-AI privacy boundary and deployed
+private-cache behavior, plus the named staging/runtime/provider checks required
+for the features to be enabled. Scheduler and rotation tasks remain deployment
+readiness work; they do not freeze unrelated local development. No external
+invitation or gate change is authorized by this verdict.
+
+Use existing private DATABASE_URL settings for the reviewed ordinary role in
+both services; AGENCY_MIGRATION_DATABASE_URL remains operator-only. The existing
+AGENCY_WORKSPACE_TEST_DATABASE_URL and ignored AGENCY_ISOLATION_FIXTURE path are
+still required to recreate fixtures. No new runtime secret or .env example value
+was introduced. Configure passwords privately; do not paste them into chat.
+No Neon query, deployment, real provider request, message, payment or push occurred.
+All disposable database/server processes were stopped and temporary DB data removed.

@@ -1,6 +1,9 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
+// Unit SQL/SQLite fixture only; real PostgreSQL runtime-role checks have their own database matrix.
+mock.module('../../lib/runtime-database-role.js',{namedExports:{runtimeDatabasePool:pool=>pool}});
+
 let session = { user: { id: 'auth-manager', username: 'fixture.manager', name: 'Fixture Manager' } };
 let roles = ['internal_access_manager'];
 let targetRoles = [];

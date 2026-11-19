@@ -1,5 +1,14 @@
 # Agency Platform context
 
+> Latest Stage 11 review from `817c314`: local engineering PASS, external
+> rollout HOLD. Runtime guards reject elevated/owner credentials in adopted
+> databases; the legacy shared-service trust model remains explicit. Chrome
+> BFCache diagnostics confirm no-store/cookie eviction. Stage 12 local work may
+> proceed after its own task under disposable fixtures and the closed gate.
+> See the latest PROGRESS and ISOLATION-EVIDENCE review; older banners below
+> are historical. Neon is untouched.
+
+
 > Current primary status: Stage 11 local verification and evidence are complete
 > on `feat/agency-platform` in `AI\portal`, starting from `d3c9991`. See the latest
 > PROGRESS entry and [ISOLATION-EVIDENCE](ISOLATION-EVIDENCE.md). The external

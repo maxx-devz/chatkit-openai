@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { internalUserA, internalUserB, hubstaffFixture, testToken } from './fixtures.mjs';
 import { INTERNAL_HR_PANEL_IDS, INTERNAL_PM_PANEL_IDS } from '../../lib/internal-user-positions.js';
 
+// Unit SQL/SQLite fixture only; real PostgreSQL runtime-role checks have their own database matrix.
+mock.module('../../lib/runtime-database-role.js',{namedExports:{runtimeDatabasePool:pool=>pool}});
+
 let session = null;
 let internalUser = null;
 let legacyQueries = 0;

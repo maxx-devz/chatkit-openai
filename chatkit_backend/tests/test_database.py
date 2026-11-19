@@ -8,7 +8,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from database import PortalConnection, connect_database
+from database import PortalConnection, connect_database, RuntimeDatabaseRoleError
 
 
 class DatabaseTests(unittest.IsolatedAsyncioTestCase):
@@ -23,8 +23,17 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(kwargs["prepare_threshold"])
             return sentinel.connection
 
-        with patch.object(PortalConnection, "connect", side_effect=pooler):
+        with patch.object(PortalConnection, "connect", side_effect=pooler), \
+                patch("database.assert_runtime_database_role", new_callable=AsyncMock):
             self.assertIs(await connect_database("test-database"), sentinel.connection)
+
+    async def test_unsafe_runtime_role_closes_connection_before_return(self):
+        connection = AsyncMock()
+        with patch.object(PortalConnection, "connect", return_value=connection), \
+                patch("database.assert_runtime_database_role", side_effect=RuntimeDatabaseRoleError("unsafe")):
+            with self.assertRaises(RuntimeDatabaseRoleError):
+                await connect_database("synthetic")
+        connection.close.assert_awaited_once()
 
     async def test_timeout_is_transaction_local_and_cursor_survives_commit(self):
         events = []

@@ -104,6 +104,7 @@ async function main() {
   const provisioningAuth = createPortalAuth({
     allowAccountCreation: true,
     useNextCookies: false,
+    operatorDatabase: true,
   });
   const email = `${username}@portal-users.invalid`;
   const result = await provisioningAuth.api.signUpEmail({

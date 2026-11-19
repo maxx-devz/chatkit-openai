@@ -128,3 +128,21 @@ An authorized AI usage reset now establishes a per-client reporting cutoff.
 parameterized UPSERTs. Credit and cost reads exclude pre-cutoff usage, retaining
 manual allowances, pricing and raw audit evidence. No provider-specific
 extension, browser database access or external billing mutation is introduced.
+
+
+## Agency-adopted runtime role checks (Stage 11 review)
+
+Next.js lib/database.js and web/server Better Auth factories decorate the existing
+lib/postgres.js pool; Python connect_database checks its actual session before
+returning a connection. Standard PostgreSQL catalogs/pg_has_role reject elevated
+or owner credentials and leaked SET ROLE once agency adoption is installed.
+No provider-specific SDK, extension or schema migration is added. Tests use
+ordinary synthetic roles and separately explicit operator connections.
+
+The legacy shared service role still has server-wide legacy DML; this is not
+blanket tenant RLS. Guard checks occur per Node checkout/Python new connection,
+not an instant revocation guarantee for in-flight work. Hosted transaction-pooler
+role mapping/reset and both deployed DATABASE_URL roles need their own approved
+check. Standalone provisioning stays on lib/postgres.js; only explicit operator
+auth CLIs opt into its unguarded pool. See
+[the runtime role setup](agency-platform/RUNTIME_DATABASE_ROLES.md).

@@ -36,7 +36,7 @@ try {
       const password = await passwordQuestion('New internal user password: ');
       const confirmation = await passwordQuestion('Confirm password: ');
       if (password.length < 12 || password.length > 128 || password !== confirmation) throw new Error();
-      const provisioning = createPortalAuth({ allowAccountCreation: true, useNextCookies: false });
+      const provisioning = createPortalAuth({ allowAccountCreation: true, useNextCookies: false, operatorDatabase: true });
       const email = `${username}@portal-internal-users.invalid`;
       const result = await provisioning.api.signUpEmail({ body: { username, email, name: displayName.trim(), password } });
       if (!result?.user?.id) throw new Error();

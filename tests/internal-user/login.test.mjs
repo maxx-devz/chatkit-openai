@@ -4,6 +4,9 @@ import { randomBytes } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { getMigrations } from 'better-auth/db/migration';
 
+// Unit SQL/SQLite fixture only; real PostgreSQL runtime-role checks have their own database matrix.
+mock.module('../../lib/runtime-database-role.js',{namedExports:{runtimeDatabasePool:pool=>pool}});
+
 // Exercise the actual shared Better Auth configuration against an ephemeral DB.
 const sqlite = new DatabaseSync(':memory:');
 mock.module('pg', { defaultExport: { Pool: class { constructor() { return sqlite; } } } });

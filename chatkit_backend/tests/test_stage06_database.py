@@ -14,7 +14,8 @@ from urllib.parse import urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from httpx2 import ASGITransport, AsyncClient
 from app import app, Envelope, load_client
-from database import connect_database
+from database import connect_database, PortalConnection
+from psycopg.rows import dict_row
 from fastapi import HTTPException
 
 
@@ -31,7 +32,7 @@ class DatabaseBoundaries(unittest.IsolatedAsyncioTestCase):
         self.db = await connect_database(os.environ["DATABASE_URL"])
         bootstrap = urlparse(os.environ["AGENCY_WORKSPACE_TEST_DATABASE_URL"])
         self.assertEqual((bootstrap.hostname,bootstrap.port,bootstrap.path),(url.hostname,url.port,url.path))
-        self.bootstrap = await connect_database(os.environ["AGENCY_WORKSPACE_TEST_DATABASE_URL"])
+        self.bootstrap = await PortalConnection.connect(os.environ["AGENCY_WORKSPACE_TEST_DATABASE_URL"], autocommit=True, row_factory=dict_row, prepare_threshold=None)
         self.http = AsyncClient(transport=ASGITransport(app=app), base_url="http://synthetic.test")
 
     async def asyncTearDown(self):

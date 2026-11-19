@@ -15,7 +15,8 @@ from app import Envelope, load_client
 from assistant import guard_tools
 from agents import function_tool
 from agents.tool_context import ToolContext
-from database import connect_database
+from database import connect_database, PortalConnection
+from psycopg.rows import dict_row
 from store import Context
 from fastapi import HTTPException
 from unittest.mock import AsyncMock, patch
@@ -35,7 +36,7 @@ class SourceTools(unittest.IsolatedAsyncioTestCase):
         self.assertRegex(runtime.path,r"^/aoc_stage04_rehearsal_[a-f0-9]+$")
         self.assertEqual((owner.hostname,owner.port,owner.path),(runtime.hostname,runtime.port,runtime.path))
         db=await connect_database(os.environ["DATABASE_URL"])
-        bootstrap=await connect_database(os.environ["AGENCY_WORKSPACE_TEST_DATABASE_URL"])
+        bootstrap=await PortalConnection.connect(os.environ["AGENCY_WORKSPACE_TEST_DATABASE_URL"], autocommit=True, row_factory=dict_row, prepare_threshold=None)
         try:
             fixture=json.loads(os.environ["STAGE08_BOUNDARY"])
             envelope=Envelope(**fixture)
@@ -80,7 +81,7 @@ class SourceTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((target.hostname,target.port,target.path),(owner.hostname,owner.port,owner.path))
         fixture=json.loads(os.environ["STAGE08_BOUNDARY"])
         fixture["payload"]={"type":"threads.list","params":{}}
-        bootstrap=await connect_database(os.environ["AGENCY_WORKSPACE_TEST_DATABASE_URL"])
+        bootstrap=await PortalConnection.connect(os.environ["AGENCY_WORKSPACE_TEST_DATABASE_URL"], autocommit=True, row_factory=dict_row, prepare_threshold=None)
         async def chunks():
             yield b'data: {"fixture":"PERMITTED_CHUNK"}\n\n'
             await bootstrap.execute("UPDATE portal_source_publications SET enabled=false WHERE owner_id=300 AND audience='clients'")

@@ -1,7 +1,7 @@
 import { getMigrations } from "better-auth/db/migration";
 
 import {
-  auth,
+  createPortalAuth,
   closeAuthDatabase,
   isPortalAuthConfigured,
 } from "../lib/auth.js";
@@ -13,7 +13,7 @@ try {
     );
   }
 
-  const migration = await getMigrations(auth.options);
+  const migration = await getMigrations(createPortalAuth({useNextCookies:false,operatorDatabase:true}).options);
   const changeCount = migration.toBeCreated.length
     + migration.toBeAdded.length
     + migration.toBeAddedIndexes.length;
