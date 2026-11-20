@@ -16,7 +16,7 @@ async function harness({ access = "available", blocked = false, authenticated = 
   const provider = { id: "openai", apiKey: "synthetic-private-key", model: "gpt-6-luna" };
   const state = () => ({ ready, setupMessage: ready ? "" : "Missing migration", activeProvider: "openai",
     providers: [{ id: "openai", model: saved ? "gpt-6-luna" : "old-model", configured: true }] });
-  const mocks = {
+  const mocks = {withAdminAudit:(_operation,handler)=>handler,noteAdminAuditError:()=>{},noteAdminAuditOutcome:()=>{},
     OpenRouterSetupError,
     checkOpenRouterAccount: async () => { throw new Error("OpenAI metadata must not use OpenRouter credentials."); },
     resolveAdminContext: async () => { if (!authenticated) throw { publicDetails: true }; return { admin: { id: 7 } }; },

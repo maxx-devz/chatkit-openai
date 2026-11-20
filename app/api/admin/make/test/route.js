@@ -1,3 +1,4 @@
+import {withAdminAudit} from '@/lib/admin-audited-handler';
 import {
   adminErrorResponse,
   assertTrustedAdminMutation,
@@ -13,7 +14,7 @@ import { startIntegrationRun, finishIntegrationRun } from '@/lib/integration-run
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request) {
+async function auditPOST(request) {
   let runId;
   try {
     assertTrustedAdminMutation(request.headers);
@@ -31,3 +32,5 @@ export async function POST(request) {
     return makeWebhookErrorResponse(error) || adminErrorResponse(error);
   }
 }
+
+export const POST=withAdminAudit("admin.make.test",auditPOST);

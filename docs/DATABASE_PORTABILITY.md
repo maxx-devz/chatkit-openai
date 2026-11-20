@@ -128,3 +128,49 @@ An authorized AI usage reset now establishes a per-client reporting cutoff.
 parameterized UPSERTs. Credit and cost reads exclude pre-cutoff usage, retaining
 manual allowances, pricing and raw audit evidence. No provider-specific
 extension, browser database access or external billing mutation is introduced.
+
+## Client Documents setup references
+
+`database/client-document-assignments.sql` adds separate client-bound setup and
+audit tables. The migration runner uses a short-lived `pg.Client`, an explicit
+operator URL, database-name confirmation, a checksum and a transaction/advisory
+lock. Runtime routes use `lib/database.js`. UUID, JSONB, identity, partial unique
+indexes and composite foreign keys are standard PostgreSQL features; no provider
+SDK, extension, Auth change or storage migration is introduced.
+
+The ordinary runtime receives append-only audit grants from this migration.
+Existing elevated logins or broader privileges can override that restriction;
+this feature does not claim database RLS. Current AOC Admin request authorization
+is the access boundary. Original Drive files are neither uploaded nor published
+by saving metadata. Existing clients/history/credit/index tables are not backfilled
+or rewritten. See `CLIENT_DOCUMENTS_SETUP.md` for explicit migration approval and
+private setup requirements.
+
+Document delivery adds migration `002_delivery` in
+`database/client-document-delivery.sql`: separate encrypted OAuth connections and
+one-time states, version-bound releases, client journey state, and append-only
+publication/milestone/connection audit. The original `001_assignments` checksum and
+tables remain unchanged. Ordinary runtime privileges and standard PostgreSQL
+constraints/transactions are used; no provider SDK/extension or RLS claim is added.
+Original Drive files stay in Drive and are read on demand, with no file-storage
+migration or AI-source publication.
+
+## Fresh local Supabase development setup
+
+On 2026-11-20 the user chose a fresh Supabase development database for the
+`client-documents` checkout instead of importing Neon records. Neon and hosted
+Vercel configuration were left intact. See [fresh setup and verification](SUPABASE_FRESH_SETUP.md).
+
+`database/portal-runtime-grants.sql` records standard PostgreSQL access grants for
+the separately provisioned, non-owner `aoc_portal_runtime` login. Optional
+Supabase API-role grants are revoked only when those roles exist. No provider SDK,
+SQL extension, Supabase Auth/Storage switch or tenant RLS claim is introduced.
+Use the private operator URL for future DDL, then reapply the runtime grants.
+
+
+Client plans use the versioned `database/client-plans.sql` migration and a shared
+standard PostgreSQL balance view. Runtime access remains server-only through the
+existing Node/Python connectors. A separate operator connection applies reviewed
+DDL/grants; no new provider SDK, browser grant or tenant-RLS claim is introduced.
+Legacy reporting entries remain immutable history rather than subscription debits.
+See `docs/CLIENT_PLANS.md` for paid activation, per-request locking and limits.

@@ -146,7 +146,7 @@ test("Duplicate/concurrent submissions are owner-scoped and guarded", async () =
 
 test("Endpoint authenticates AOC Admin and validates origin before reading sources", async () => {
   const route = await readFile(new URL("../app/api/admin/source-connections/test/route.js", import.meta.url), "utf8");
-  const post = route.slice(route.indexOf("export async function POST"));
+  const post = route.slice(route.indexOf("async function auditPOST"));
   assert.ok(post.indexOf("assertTrustedOrigin") < post.indexOf("resolveAdminContext"));
   assert.ok(post.indexOf("resolveAdminContext") < post.indexOf("readJsonRequest"));
   assert.ok(post.indexOf("resolveAdminContext") < post.indexOf("runTest(admin.id"));

@@ -1,5 +1,6 @@
 "use client";
 
+import ActionCue from "@/components/portal-ui/action-cue";
 import { useEffect, useRef, useState } from "react";
 import { selectedProviderModel } from "../../lib/provider-configuration.js";
 import { modelBlocked, modelAvailabilityLabel } from "../../lib/model-availability.js";
@@ -108,7 +109,8 @@ export default function ProviderSettings() {
     finally { if (mounted.current) setBusy(""); }
   }
 
-  return <section className={styles.card} id="ai-provider-settings" aria-labelledby="provider-settings-title">
+  return <section data-action-card="warning" className={styles.card} id="ai-provider-settings" aria-labelledby="provider-settings-title">
+    <ActionCue tone="warning">Caution · Shared AI connection</ActionCue>
     <header className={styles.header}>
       <div><p className={styles.eyebrow}>One connection. Your entire workspace.</p>
         <h2 id="provider-settings-title">AI provider settings</h2>
@@ -206,7 +208,7 @@ export default function ProviderSettings() {
       {notice && <p role="status" className={styles.notice}>{notice}</p>}
       <footer className={styles.actions}>
         <p>{active?.configured ? <>Currently using <strong>{active.model}</strong></> : "No saved provider connection yet."}<br />Existing replies are not interrupted when you switch.</p>
-        <button type="button" className={styles.primary} onClick={save}
+        <button data-action="warning" type="button" className={styles.primary} onClick={save}
           disabled={Boolean(busy) || !draft.verified || !draft.model || !settings?.ready || modelBlocked(selectedModel)
             || (selected === "openrouter" && draft.freeOnly && !selectedModel?.free)}>
           {busy === "save" ? "Saving…" : `Save & activate ${names[selected]}`}

@@ -1,3 +1,4 @@
+import {withAdminAudit} from '@/lib/admin-audited-handler';
 import { ASSISTANT_INSTRUCTIONS } from "@/config/assistant";
 import { resolveAdminContext } from "@/lib/admin-data";
 import { builderHeaders, builderPool, builderResponseError } from "@/lib/builder-data";
@@ -8,7 +9,7 @@ import { loadHubstaffAssistantSnapshot } from "@/lib/hubstaff";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
-export async function POST(request) {
+async function auditPOST(request) {
   try {
     assertTrustedOrigin(request.headers);
     const { admin } = await resolveAdminContext(request.headers);
@@ -47,3 +48,5 @@ export async function POST(request) {
     return Response.json(data, { headers: builderHeaders });
   } catch (error) { return builderResponseError(error); }
 }
+
+export const POST=withAdminAudit("admin.builder.preview",auditPOST);

@@ -8,7 +8,7 @@ import {previewAllowanceAdjustment} from "../lib/admin-credit-pricing.js";
 
 async function route(file,{authorized=true,origin=true,database={}}={}) {
   const calls=[],key=randomUUID();
-  const mocks={
+  const mocks={withAdminAudit:(_operation,handler)=>handler,noteAdminAuditError:()=>{},noteAdminAuditOutcome:()=>{},
     databasePool:database,CreditsConflict:class extends Error {},
     requireClientPermission:async()=>{if(!authorized)throw {publicDetails:{status:403}};return {client:{id:"4"}};},
     resolveAdminContext:async()=>{if(!authorized)throw {publicDetails:{status:403}};return {admin:{id:"9"}};},
@@ -18,6 +18,7 @@ async function route(file,{authorized=true,origin=true,database={}}={}) {
     requestSecurityErrorResponse:e=>e.security?Response.json({error:"Untrusted origin"},{status:403}):null,
     readJsonRequest:r=>r.json(),previewCreditPricing,validateCreditAdjustment,previewAllowanceAdjustment,
     readAdminCreditReport:async(_db,id,period)=>{calls.push({kind:"report",id,period});return {ready:true,pricing:{},allocatedCredits:"1000",creditsUsed:"10",incomplete:true,availableCredits:null};},
+    readClientPlan:async()=>({ready:true,configured:false}),
     readClientCredits:async(_db,id,options)=>{calls.push({kind:"read",id,options});return {ready:true,clientId:id,availableCredits:"5"};},
     readCreditPricingAdmin:async()=>{calls.push({kind:"settings"});return {mode:"reporting_only"};},
     saveCreditPricing:async(_db,input,actor)=>{calls.push({kind:"pricing",input,actor});return {id:"1"};},

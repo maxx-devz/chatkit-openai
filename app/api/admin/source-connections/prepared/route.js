@@ -1,3 +1,4 @@
+import {withAdminAudit} from '@/lib/admin-audited-handler';
 import { resolveAdminContext, adminErrorResponse } from "@/lib/admin-data";
 import { assertTrustedOrigin, readJsonRequest, requestSecurityErrorResponse } from "@/lib/request-security";
 import { preparedSourcesStatus, savePreparedPublication } from "@/lib/prepared-source-store";
@@ -17,14 +18,14 @@ function failure(error) {
     : "Prepared sources are unavailable. Check the connection and try again.", code: "prepared_sources_unavailable" }, { status: 503, headers });
 }
 
-export async function GET(request) {
+async function auditGET(request) {
   try {
     const { admin } = await resolveAdminContext(request.headers);
     return Response.json(await preparedSourcesStatus(admin.id), { headers });
   } catch (error) { return failure(error); }
 }
 
-export async function POST(request) {
+async function auditPOST(request) {
   try {
     assertTrustedOrigin(request.headers);
     const { admin } = await resolveAdminContext(request.headers);
@@ -38,3 +39,7 @@ export async function POST(request) {
     return Response.json({ error: "Choose synchronize, save or disable." }, { status: 400, headers });
   } catch (error) { return failure(error); }
 }
+
+export const GET=withAdminAudit("admin.source_connections.prepared",auditGET);
+
+export const POST=withAdminAudit("admin.source_connections.prepared",auditPOST);

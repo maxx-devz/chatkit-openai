@@ -25,7 +25,8 @@ export default function PortalUsage() {
           signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) });
         const data = await response.json();
         if (!response.ok) throw new Error(data?.error || "Usage could not be refreshed.");
-        if (active) setSnapshot({ data, error: "" });
+        if (active) setSnapshot({ data, error: "", auditWarning: response.headers.get('X-AOC-Audit-Status')==='incomplete'
+          ? 'Usage is available, but this refresh could not be added to the audit log.' : '' });
       } catch (error) {
         if (active) setSnapshot(previous => ({ ...previous,
           error: error.name === "TimeoutError" ? "Usage refresh timed out. Try again." : error.message || "Usage could not be refreshed." }));
@@ -66,9 +67,10 @@ export default function PortalUsage() {
   return (
     <section className={styles.panel} id="portal-usage" aria-labelledby="portal-usage-title">
       <div className={styles.heading}>
-        <div><h2 id="portal-usage-title">AI chat usage & provider status</h2><p>Recorded chat activity and the latest {providerLabel} API result. No portal monthly request cap is enforced.</p></div>
+        <div><h2 id="portal-usage-title">AI chat usage & provider status</h2><p>Recorded chat activity and the latest {providerLabel} API result. Client credit limits follow their active plans.</p></div>
         <button type="button" onClick={() => refreshRef.current?.()}>Refresh usage</button>
       </div>
+      {snapshot.auditWarning && <p className={styles.notice} role="status">{snapshot.auditWarning}</p>}
       {error && <p className={styles.error} role="alert">{error} {data ? "The figures below are from the last successful refresh." : ""}</p>}
       {!data && !error && <p role="status">Loading usage...</p>}
       {data && <>
@@ -82,7 +84,7 @@ export default function PortalUsage() {
         </div>
 
         <div className={styles.metrics}>
-          <div><span>Client AI chats this UTC month</span><strong>{number(combinedUsed)} recorded</strong><small>Cleared chat activity is excluded. No monthly request cap.</small></div>
+          <div><span>Client AI chats this UTC month</span><strong>{number(combinedUsed)} recorded</strong><small>Reporting counts only. Credit limits follow active plans.</small></div>
           <div>
             <span>AI-enabled clients</span>
             <strong>{number(enabledClients.length)}</strong>
@@ -99,7 +101,7 @@ export default function PortalUsage() {
 
         <div className={styles.clientCapacity}>
           <h3>Client AI chat activity</h3>
-          <p>Recorded activity updates after chat requests finish. There is no monthly portal request ceiling.</p>
+          <p>Recorded activity updates after replies finish. Credit limits are managed in each client’s plan.</p>
           <div className={styles.capacityList}>
             {data.clients.map((client, index) => (
               <article key={`${client.name}-${index}`} className={!client.enabled ? styles.paused : ""}>
@@ -107,7 +109,7 @@ export default function PortalUsage() {
                   <strong>{client.name}</strong>
                   <span>{client.enabled ? `${number(client.used)} recorded AI chats` : "AI access paused"}</span>
                 </div>
-                <small>No monthly request cap</small>
+                <small>View credit limits in the client’s plan</small>
               </article>
             ))}
           </div>

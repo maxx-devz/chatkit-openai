@@ -14,6 +14,6 @@ export default async function CreditsPage() {
     return <main><h1>Client workspace access required</h1><Link href="/">Return to portal</Link></main>;
   }
   return <ClientPortal portalContext={context} standalonePage="credits">
-    <CreditsOverview key={context.client.id} clientId={context.client.id}/>
+    <CreditsOverview key={context.client.id} clientId={context.client.id} canRequest={context.permissions.includes("client.ai.use")}/>
   </ClientPortal>;
 }

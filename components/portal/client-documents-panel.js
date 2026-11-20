@@ -1,5 +1,6 @@
 "use client";
 
+import ActionCue from "@/components/portal-ui/action-cue";
 import { useCallback, useEffect, useState } from "react";
 import styles from "./client-access.module.css";
 
@@ -52,7 +53,7 @@ export default function ClientDocumentsPanel({ clientId, canContribute }) {
   }
 
   return <section className={styles.panel} id="client-documents">
-    <h2>Documents</h2><p>References approved for this client workspace.</p>
+    <h2>Additional references</h2><p>Project links and resources shared in this client workspace. Official engagement releases appear above.</p>
     <p>Use reference links for project briefs, guides and other approved resources. Each external resource keeps its own access permissions; adding a link does not change its sharing settings.</p>
     {error ? <p className={styles.error} role="alert">{error}</p> : null}
     {loading ? <p>Loading documents...</p> : items.length ? <ul className={styles.documents}>
@@ -62,18 +63,18 @@ export default function ClientDocumentsPanel({ clientId, canContribute }) {
           <a href={item.type === "file" ? item.downloadUrl : item.url}
             {...(item.type === "file" ? {} : { target: "_blank", rel: "noreferrer" })}>
             {item.type === "file" ? "Download" : "Open"}</a>
-          {item.canRemove ? <button type="button" disabled={busy} onClick={() => remove(item)}>Remove</button> : null}
+          {item.canRemove ? <button data-action="danger" type="button" disabled={busy} onClick={() => remove(item)}>Remove</button> : null}
         </div>
       </li>)}
     </ul> : <p>No documents have been added yet.</p>}
-    {canContribute ? <form className={styles.form} onSubmit={addLink}>
+    {canContribute ? <form data-action-card="add" className={styles.form} onSubmit={addLink}><ActionCue tone="add">Add a shared reference</ActionCue>
       <h3>Add a reference link</h3>
       <div className={styles.fields}>
         <label>Title<input name="title" required maxLength={180} /></label>
         <label>HTTPS URL<input name="url" type="url" required maxLength={1000} /></label>
       </div>
       <label>Description<textarea name="description" maxLength={4000} rows={2} /></label>
-      <button type="submit" disabled={busy}>{busy ? "Saving..." : "Add reference"}</button>
+      <button data-action="add" type="submit" disabled={busy}>{busy ? "Saving..." : "Add reference"}</button>
     </form> : null}
   </section>;
 }

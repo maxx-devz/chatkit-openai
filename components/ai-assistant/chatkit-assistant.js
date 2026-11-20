@@ -454,6 +454,7 @@ export default function ChatKitAssistant({ clientId, clientName, domainKey, nonc
         </div>
         <span className={styles.modeHint}>{mode === "work" ? "Can use your project and Hubstaff context" : "Quick answers without live work data or file tools"}</span>
       </div>
+      {access?.plan?.configured && !access.plan.canGenerate && <p role="status">{access.plan.message} <a href="/credits">Review plan or request credits</a></p>}
       <div className={styles.toolbar}>
         <div className={styles.tabs} role="tablist" aria-label="Assistant conversations" onKeyDown={(event) => {
           if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;

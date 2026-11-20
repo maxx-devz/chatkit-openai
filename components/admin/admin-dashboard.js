@@ -1,24 +1,31 @@
 "use client";
 
+import ActionCue from "@/components/portal-ui/action-cue";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import aocIcon from "@/aoc-icon.png";
-import Link from "next/link";
+import Link from "@/components/portal-ui/navigation-link";
+import dynamic from "next/dynamic";
+import WorkspaceLoading from "@/components/portal-ui/workspace-loading";
 import {useRouter,useSearchParams} from "next/navigation";
 import AdminShell from "./admin-shell";
 import {useAdminDraft} from "./admin-draft-provider";
 import {ADMIN_VIEWS,ADMIN_CLIENT_TABS,adminView,adminClientTab,legacyAdminHash} from "@/lib/admin-navigation";
-import AdminCreditSummary from "@/components/credits/admin-credit-summary";
-import AdminClientWebsites from "./admin-client-websites";
-import AdminAssistant from "@/components/admin/admin-assistant";
-
-import PortalUsage from "@/components/admin/portal-usage";
-import ProviderSettings from "@/components/admin/provider-settings";
-import ClientHubstaffIndex from "@/components/admin/client-hubstaff-index";
+import AdminClientPlan from "@/components/credits/admin-client-plan";
 import styles from "./admin-dashboard.module.css";
 
+const loading=()=> <WorkspaceLoading label="Opening this module" compact/>;
+const AdminClientWebsites=dynamic(()=>import("./admin-client-websites"),{loading});
+const AdminAssistant=dynamic(()=>import("./admin-assistant"),{loading});
+const PortalUsage=dynamic(()=>import("./portal-usage"),{loading});
+const ProviderSettings=dynamic(()=>import("./provider-settings"),{loading});
+const ClientHubstaffIndex=dynamic(()=>import("./client-hubstaff-index"),{loading});
+
 const ICONS = {
+  documents: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5",
+  credits: "M3 5h18v14H3zM3 9h18M7 14h3M15 14h2",
+  sources: "M10 13a5 5 0 0 0 7 .4l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7-.4l-3 3a5 5 0 0 0 7 7l2-2",
   overview: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z",
   clients: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
   spark: "M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5zM19 15l.7 2.3L22 18l-2.3.7L19 21l-.7-2.3L16 18l2.3-.7z",
@@ -121,6 +128,7 @@ export default function AdminDashboard({ initialData,view="overview" }) {
   const createDialogRef = useRef(null);
 
   useEffect(() => {
+    if (!["overview", "clients"].includes(activeView)) return;
     let active = true;
     let requestInFlight = false;
 
@@ -154,7 +162,7 @@ export default function AdminDashboard({ initialData,view="overview" }) {
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, []);
+  }, [activeView]);
 
   const selectedClient = clients.find((client) => client.slug === selectedSlug)
     || null;
@@ -299,22 +307,30 @@ export default function AdminDashboard({ initialData,view="overview" }) {
         <Metric icon="spark" label="AI-enabled clients" value={number(summary.aiEnabledClients)} detail={summary.totalClients-summary.aiEnabledClients+' paused'} tone="cyan"/>
         <Metric icon="activity" label="Recorded AI chats this UTC month" value={number(summary.requestsUsed)} detail="Activity count; no monthly request cap." tone="violet"/>
       </section>
-      <section className={styles.settingsCard}><h2>Open an admin workspace</h2><div className={styles.quickLinks}>
-        <Link href="/admin?view=clients" prefetch={false}>Manage clients</Link><Link href="/admin?view=usage" prefetch={false}>Review AI usage</Link>
-        <Link href="/admin/credits" prefetch={false}>AI Pricing & Credits</Link><Link href="/admin/sources" prefetch={false}>Source Connections</Link>
-      </div><p>Credits remain reporting-only. Request ceilings, provider capacity and reporting allowances are separate controls.</p></section>
+      <section className={styles.overviewWorkspaces} aria-label="Admin workspaces">
+        <header className={styles.workspaceIntro}><div><p className={styles.eyebrow}>YOUR WORKSPACE</p><h2>Manage your portal</h2><p>Choose an area to manage clients, services and access.</p></div><span className={styles.overviewSecure}><Icon name="shield"/> Private admin access</span></header>
+        <div className={styles.workspaceCards}>{[
+          {title:'Clients',description:'Manage client accounts, access and integrations.',href:'/admin?view=clients',icon:'clients',tone:'blue',action:'Manage clients'},
+          {title:'Plans & Credits',description:'Set monthly plans, included credits and approved additions.',href:'/admin/credits',icon:'credits',tone:'teal',action:'Manage plans'},
+          {title:'AI Usage',description:'Review recorded AI activity, provider costs and reporting.',href:'/admin?view=usage',icon:'activity',tone:'violet',action:'Review usage'},
+          {title:'Documents & Journey',description:'Organize approved client documents and verified journey progress.',href:'/admin/client-documents',icon:'documents',tone:'amber',action:'Manage documents'},
+          {title:'Source Connections',description:'Connect and prepare approved company knowledge.',href:'/admin/sources',icon:'sources',tone:'cyan',action:'Review connections'},
+          {title:'Audit Log',description:'Trace administrative actions, outcomes and diagnostic details.',href:'/admin/audit',icon:'shield',tone:'slate',action:'Open activity log'},
+        ].map(item=><Link key={item.title} href={item.href} prefetch={false} className={styles.workspaceCard} data-tone={item.tone}><span className={styles.workspaceIcon}><Icon name={item.icon}/></span><h3>{item.title}</h3><p>{item.description}</p><span className={styles.workspaceAction}>{item.action}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></span></Link>)}</div>
+        <p className={styles.overviewNote}><Icon name="spark"/> Client plans include AI credits. Provider capacity and configured access rules still apply.</p>
+      </section>
     </>}
     {activeView==='usage' && <PortalUsage/>}
     {activeView==='assistant' && <AdminAssistant clients={clients}/>}
     {activeView==='security' && <>
-      <section className={styles.settingsCard}><h2>Client access safeguards</h2><p>Portal and AI access toggles are managed per client. Reporting credit balances do not grant or block access.</p>
+      <section className={styles.settingsCard}><h2>Client access safeguards</h2><p>Portal and AI access toggles are managed per client. Active client plans enforce their own AI credit limits; historical reporting allowances do not grant access.</p>
         <Link href="/admin?view=clients&tab=access" prefetch={false}>Open client access controls</Link></section>
       <ProviderSettings/>
     </>}
     {activeView==='clients' && <section className={styles.workspace} id="clients">
       <aside className={styles.clientDirectory}>
         <div className={styles.directoryHeading}><div><p>Workspaces</p><h2>Clients</h2></div>
-          <button type="button" onClick={()=>{setCreateError('');createDialogRef.current?.showModal();}}><Icon name="plus"/> Add client</button></div>
+          <button data-action="add" type="button" onClick={()=>{setCreateError('');createDialogRef.current?.showModal();}}><Icon name="plus"/> Add client</button></div>
         <label className={styles.clientSearch}><Icon name="search"/><span className="sr-only">Search clients</span>
           <input type="search" placeholder="Search clients…" value={query} onChange={event=>setQuery(event.target.value)}/></label>
         <div className={styles.clientList}>{filteredClients.map(client=><button type="button" key={client.slug}
@@ -331,34 +347,34 @@ export default function AdminDashboard({ initialData,view="overview" }) {
           <div className={styles.headerActions}><span className={selectedClient.portalEnabled?styles.enabled:styles.disabled}>
             {selectedClient.portalEnabled?'Portal active':'Portal paused'}</span>
             {dirty && <button type="button" disabled={Boolean(busy)} onClick={clearDraft}>Discard edits</button>}
-            <button type="submit" disabled={Boolean(busy) || !dirty}>{busy==='save'?'Saving…':'Save client'}</button></div></header>
+            <button data-action="edit" type="submit" disabled={Boolean(busy) || !dirty}>{busy==='save'?'Saving…':'Save client'}</button></div></header>
         {status && feedbackSlug===selectedSlug && <p className={styles.success} role="status">{status}</p>}{error && feedbackSlug===selectedSlug && <p className={styles.error} role="alert">{error}</p>}
         <nav className={styles.clientTabs} aria-label="Selected client sections">{ADMIN_CLIENT_TABS.map(([key,label])=><Link key={key}
           href={'/admin?'+new URLSearchParams({view:'clients',client:selectedClient.slug,tab:key})} prefetch={false} aria-current={tab===key?'page':undefined}>{label}</Link>)}</nav></div>
         <div className={styles.selectedSections}>
           {tab==='overview' && <>
-            <AdminCreditSummary key={selectedClient.id} clientId={selectedClient.id}/>
-            <section className={styles.settingsCard}><h3>Client identity</h3>
+            <AdminClientPlan key={selectedClient.id} clientId={selectedClient.id} summary/>
+            <section data-action-card="edit" className={styles.settingsCard}><ActionCue tone="edit">Edit client details</ActionCue><h3>Client identity</h3>
               <label className={styles.nameField}><span>Client display name</span><input maxLength="120" value={draft.name} disabled={Boolean(busy)} onChange={event=>updateDraft('name',event.target.value)}/></label>
-              <p>Username: <strong>@{selectedClient.slug}</strong> · Created {dateLabel(selectedClient.createdAt)}</p>
+              <p>Client workspace: <strong>@{selectedClient.slug}</strong> · Created {dateLabel(selectedClient.createdAt)}</p>
               <p>Access toggles and provider usage safeguards are in their own sections.</p>
             </section>
           </>}
-          {tab==='access' && <section className={styles.settingsCard}><h3>Access & availability</h3><p>Pause access without deleting conversations or history. Save Client applies these changes.</p>
+          {tab==='access' && <section data-action-card="warning" className={styles.settingsCard}><ActionCue tone="warning">Caution · Changes client access</ActionCue><h3>Access & availability</h3><p>Pause access without deleting conversations or history. Save Client applies these changes.</p>
             <label className={styles.toggleRow}><span><strong>Client portal</strong><small>Allow the client workspace to be accessed.</small></span>
               <input type="checkbox" checked={draft.portalEnabled} disabled={Boolean(busy)} onChange={event=>updateDraft('portalEnabled',event.target.checked)}/><i/></label>
             <label className={styles.toggleRow}><span><strong>AI assistant</strong><small>Allow new AI requests through the selected provider, including OpenAI or OpenRouter.</small></span>
               <input type="checkbox" checked={draft.aiEnabled} disabled={Boolean(busy)} onChange={event=>updateDraft('aiEnabled',event.target.checked)}/><i/></label>
           </section>}
           {tab==='usage' && <>
-            <AdminCreditSummary key={selectedClient.id} clientId={selectedClient.id}/>
+            <AdminClientPlan key={selectedClient.id} clientId={selectedClient.id} summary/>
             <section className={styles.settingsCard} id="ai-controls"><h3>AI chat usage</h3>
-              <p>{number(selectedClient.requestsUsed)} recorded AI chats this UTC month. There is no portal monthly AI request cap.</p>
+              <p>{number(selectedClient.requestsUsed)} recorded AI chats this UTC month. Credit limits follow this client’s active plan.</p>
               <Link href={"/admin?view=usage&usageClient="+selectedClient.id} prefetch={false}>Clear this client&apos;s AI chat usage history</Link>
             </section>
           </>}
           {tab==='integrations' && <>
-            <section className={styles.settingsCard}><h3>Approved AI knowledge & web domain</h3>
+            <section data-action-card="edit" className={styles.settingsCard}><ActionCue tone="edit">Edit permitted knowledge</ActionCue><h3>Approved AI knowledge & web domain</h3>
               <p>Shared company knowledge is managed in Source Connections. The fields below are optional client-specific settings; saving them does not verify remote access.</p>
               <Link href="/admin/sources" prefetch={false}>Open Source Connections</Link>
               <label className={styles.vectorField}><span>Client vector store ID</span><input value={draft.vectorStoreId} placeholder="vs_…" disabled={Boolean(busy)} onChange={event=>updateDraft('vectorStoreId',event.target.value)}/><small>{selectedClient.vectorStoreId?'Saved client knowledge ID · access not checked here':'No client-specific vector store saved'}</small></label>
@@ -366,22 +382,22 @@ export default function AdminDashboard({ initialData,view="overview" }) {
                 <small>AI web search remains restricted to this public domain and its subdomains. Website Insights sites do not widen this restriction.</small></label>
             </section>
             <AdminClientWebsites key={selectedClient.id} clientId={selectedClient.id}/>
-            <section className={styles.settingsCard}><h3>Hubstaff project</h3><p>{selectedClient.hubstaffProjectUrl?'Project mapping saved. Sync status appears below.':'No project mapping saved. Enter this client’s Hubstaff project and save it before syncing.'}</p>
+            <section data-action-card="edit" className={styles.settingsCard}><ActionCue tone="edit">Edit project mapping</ActionCue><h3>Hubstaff project</h3><p>{selectedClient.hubstaffProjectUrl?'Project mapping saved. Sync status appears below.':'No project mapping saved. Enter this client’s Hubstaff project and save it before syncing.'}</p>
               <label className={styles.vectorField}><span>Hubstaff project URL</span><input type="url" value={draft.hubstaffProjectUrl} disabled={Boolean(busy)} placeholder="https://tasks.hubstaff.com/app/organizations/…/projects/…" onChange={event=>updateDraft('hubstaffProjectUrl',event.target.value)}/>
-                <small>Only the mapped project is available to this client. Ownership checks remain enforced by the server.</small></label>
-              <label className={styles.vectorField}><span>Monthly Hubstaff hours fallback</span><input type="number" min="0.01" max="100000" step="0.01" value={draft.hubstaffMonthlyHoursLimit ?? ""} disabled={Boolean(busy)} onChange={event=>updateDraft("hubstaffMonthlyHoursLimit",event.target.value)}/><small>Optional. Used only when Hubstaff provides no hours budget. This does not limit AI chat usage.</small></label>
+                <small style={{display:'none'}}>Only the mapped project is available to this client. Ownership checks remain enforced by the server.</small></label>
+              <label className={styles.vectorField} style={{display:'none'}}><span>Monthly Hubstaff hours fallback</span><input type="number" min="0.01" max="100000" step="0.01" value={draft.hubstaffMonthlyHoursLimit ?? ""} disabled={Boolean(busy)} onChange={event=>updateDraft("hubstaffMonthlyHoursLimit",event.target.value)}/><small>Optional. Used only when Hubstaff provides no hours budget. This does not limit AI chat usage.</small></label>
             </section>
-            <section className={styles.settingsCard}><h3>Project indexing</h3><p>Queue and sync controls are independent of Save Client. They use the saved project mapping.</p>
+            <section data-action-card="info" className={styles.settingsCard}><ActionCue tone="info">Sync saved project data</ActionCue><h3>Project indexing</h3><p>Queue and sync controls are independent of Save Client. They use the saved project mapping.</p>
               <ClientHubstaffIndex key={selectedClient.id+':'+selectedClient.hubstaffProjectUrl+':'+selectedClient.portalEnabled+':'+selectedClient.aiEnabled}
                 clientId={selectedClient.id} projectUrl={selectedClient.hubstaffProjectUrl} enabled={selectedClient.portalEnabled && selectedClient.aiEnabled}
                 mappingChanged={draft.hubstaffProjectUrl.trim()!==(selectedClient.hubstaffProjectUrl || '').trim()}/>
             </section>
-            <section className={styles.settingsCard}><h3>Make automation · portal-wide</h3><p>This is a portal-wide integration, not a saved client mapping. A test sends a real event to the configured Make scenario; Save Client does not run it.</p>
+            <section data-action-card="warning" className={styles.settingsCard}><ActionCue tone="warning">Caution · Sends a real test event</ActionCue><h3>Make automation · portal-wide</h3><p>This is a portal-wide integration, not a saved client mapping. A test sends a real event to the configured Make scenario; Save Client does not run it.</p>
               <p role={makeConnection.state==='error'?'alert':'status'}>{makeConnection.message}</p>
               <button type="button" disabled={Boolean(busy)} onClick={testMakeConnection}>{busy==='make-test'?'Testing…':'Send Make connection test'}</button>
             </section>
           </>}
-          {tab==='activity' && <section className={styles.settingsCard}><h3>Workspace activity</h3><div className={styles.accountStats}>
+          {tab==='activity' && <section data-action-card="info" className={styles.settingsCard}><ActionCue tone="info">View workspace activity</ActionCue><h3>Workspace activity</h3><div className={styles.accountStats}>
             <div><strong>{number(selectedClient.memberCount)}</strong><span>Workspace logins</span></div><div><strong>{number(selectedClient.conversationCount)}</strong><span>ChatKit conversations</span></div>
             <div><strong>{number(selectedClient.approvedKnowledge)}</strong><span>Approved client sources</span></div><div><strong>{number(selectedClient.pendingKnowledge)}</strong><span>Pending client sources</span></div></div>
             <p>Conversation totals include this client’s saved ChatKit threads across all members, in Work and General modes. They exclude the private AOC admin assistant and legacy workspace snapshots. Conversation content is not shown.</p>
@@ -397,7 +413,7 @@ export default function AdminDashboard({ initialData,view="overview" }) {
         <button type="button" onClick={()=>createDialogRef.current?.showModal()}>Add client</button></div>}</section>
     </section>}
       <dialog className={styles.createDialog} ref={createDialogRef}>
-        <form onSubmit={createClient}>
+        <form data-action-card="add" onSubmit={createClient}><ActionCue tone="add">Add a client workspace</ActionCue>
           <header>
             <div><p>Private provisioning</p><h2>Create a client account</h2></div>
             <button type="button" aria-label="Close" onClick={() => createDialogRef.current?.close()}>×</button>
@@ -407,8 +423,8 @@ export default function AdminDashboard({ initialData,view="overview" }) {
             The password is hashed by Better Auth and is never stored in portal tables.
           </p>
           <div className={styles.dialogGrid}>
-            <label><span>Client name</span><input name="name" maxLength="120" required placeholder="ChurchBanners" /></label>
-            <label><span>Username</span><input name="username" minLength="3" maxLength="50" required pattern="[a-z0-9][a-z0-9._-]{2,49}" placeholder="churchbanners" /></label>
+            <label><span>Client name</span><input name="name" maxLength="120" required placeholder="Client Name" /></label>
+            <label><span>Username</span><input name="username" minLength="3" maxLength="50" required pattern="[a-z0-9][a-z0-9._-]{2,49}" placeholder="Username" /></label>
             <label className={styles.dialogWide}><span>Temporary password</span><input name="password" type="password" minLength="12" maxLength="128" required autoComplete="new-password" placeholder="At least 12 characters" /></label>
             <label className={styles.dialogWide}>
               <span>Approved website URL</span>
@@ -424,15 +440,15 @@ export default function AdminDashboard({ initialData,view="overview" }) {
               <input
                 name="hubstaffProjectUrl"
                 type="url"
-                placeholder="https://tasks.hubstaff.com/app/organizations/14952/projects/803599"
+                placeholder="https://tasks.hubstaff.com/app/organizations/####/projects/######"
               />
             </label>
-            <label className={styles.dialogWide}><span>Monthly Hubstaff hours fallback</span><input name="hubstaffMonthlyHoursLimit" type="number" min="0.01" max="100000" step="0.01"/><small>Optional when Hubstaff has no hours budget. Separate from AI usage.</small></label>
+            <label className={styles.dialogWide} style={{display:'none'}}><span>Monthly Hubstaff hours fallback</span><input name="hubstaffMonthlyHoursLimit" type="hidden" min="0.01" max="100000" step="0.01"/><small>Optional when Hubstaff has no hours budget. Separate from AI usage.</small></label>
           </div>
           {createError ? <p className={styles.dialogError} role="alert">{createError}</p> : null}
           <footer>
             <button type="button" onClick={() => createDialogRef.current?.close()}>Cancel</button>
-            <button disabled={busy === "create"} type="submit">
+            <button data-action="add" disabled={busy === "create"} type="submit">
               {busy === "create" ? "Creating client..." : "Create client"}
             </button>
           </footer>

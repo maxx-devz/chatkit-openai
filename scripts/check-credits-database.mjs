@@ -44,6 +44,7 @@ try {
   }
   await event(1,"0.25");await event(1,"0.75");
   let report=await readClientCredits(pool,"1",{period});
+  assert.equal(Number(report.aiUsageCredits),1200);assert.equal(Number(report.fixedFeeCredits),0);
   assert.equal(Number(report.creditsUsed),1200);assert.equal(Number(report.availableCredits),8800);
   assert.equal(Number(report.aocFeeUsd),0.2);assert.equal(Number(report.inputTokens),2000);
   await readClientCredits(pool,"1",{period});
@@ -63,11 +64,22 @@ try {
   assert.equal(adminReport.needsPreparation,true);assert.equal(adminReport.availableCredits,null);
   assert.equal(Number((await db.query("SELECT COUNT(*) AS n FROM portal_ai_credit_entries WHERE client_id=2")).rows[0].n),0,"Admin review must not create fees or usage entries");
   report=await readClientCredits(pool,"2",{period});
+  assert.equal(Number(report.aiUsageCredits),750);assert.equal(Number(report.fixedFeeCredits),2000);assert.equal(Number(report.fixedFeeUsd),2);
   assert.equal(Number(report.creditsUsed),2750);assert.equal(Number(report.aocFeeUsd),2);
   assert.equal(report.availableCredits,null,"No invented opening allowance");
   await readClientCredits(pool,"2",{period});
   assert.equal(Number((await db.query("SELECT COUNT(*) AS n FROM portal_ai_credit_entries WHERE client_id=2 AND kind='fixed_fee'")).rows[0].n),1);
   assert.equal(Number((await readClientCredits(pool,"1",{period})).apiCostUsd),1,"Other tenant costs do not leak");
+  // A configured monthly fee is not AI activity or an assigned allowance.
+  await db.query("INSERT INTO portal_clients VALUES(4,'Synthetic fee only')");
+  const feeOnly=await readClientCredits(pool,"4",{period});
+  assert.equal(feeOnly.allocatedCredits,null);assert.equal(feeOnly.availableCredits,null);assert.equal(feeOnly.overageCredits,null,"No overage is claimed against an unassigned allowance");
+  assert.equal(Number(feeOnly.aiUsageCredits),0);assert.equal(Number(feeOnly.fixedFeeCredits),2000);
+  assert.equal(Number(feeOnly.creditsUsed),2000);assert.equal(Number(feeOnly.apiCostUsd),0);
+  const beforeFeeRead=(await db.query("SELECT COUNT(*) AS n FROM portal_ai_credit_entries WHERE client_id=4")).rows[0].n;
+  const feeAdmin=await readAdminCreditReport(pool,"4",period);
+  assert.equal(Number(feeAdmin.aiUsageCredits),0);assert.equal(Number(feeAdmin.fixedFeeCredits),2000);
+  assert.equal((await db.query("SELECT COUNT(*) AS n FROM portal_ai_credit_entries WHERE client_id=4")).rows[0].n,beforeFeeRead);
   // A committed cost arriving between reconciliation and the aggregate read
   // must not leave the previous available balance looking confirmed.
   let injectPending=true;

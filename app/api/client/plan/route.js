@@ -1,0 +1,9 @@
+import {requireClientPermission,portalErrorResponse} from '@/lib/portal-data';
+import {databasePool} from '@/lib/database';
+import {assertTrustedOrigin,readJsonRequest,requestSecurityErrorResponse} from '@/lib/request-security';
+import {readClientPlan,requestClientPlan,PlanConflict} from '@/lib/client-plan-store';
+export const runtime='nodejs';export const dynamic='force-dynamic';
+const headers={'Cache-Control':'private, no-store'};
+function failure(error){const response=requestSecurityErrorResponse(error)||(error?.publicDetails?portalErrorResponse(error):null);if(response){response.headers.set('Cache-Control','private, no-store');return response;}return Response.json({error:error instanceof TypeError||error instanceof PlanConflict?error.message:'Your plan could not be loaded. Please retry or contact your administrator.'},{status:error instanceof TypeError?400:error instanceof PlanConflict?409:503,headers});}
+export async function GET(request){try{const context=await requireClientPermission(request.headers,'client.overview.read');if(request.headers.get('x-aoc-client')!==context.client.id)return Response.json({error:'Your workspace changed. Reload the page.'},{status:409,headers});return Response.json(await readClientPlan(databasePool,context.client.id),{headers});}catch(error){return failure(error);}}
+export async function POST(request){try{assertTrustedOrigin(request.headers);const context=await requireClientPermission(request.headers,'client.ai.use');if(request.headers.get('x-aoc-client')!==context.client.id)return Response.json({error:'Your workspace changed. Reload the page.'},{status:409,headers});return Response.json(await requestClientPlan(databasePool,context.client.id,context.user.id,await readJsonRequest(request,2000)),{headers});}catch(error){return failure(error);}}

@@ -1,5 +1,6 @@
 "use client";
 
+import ActionCue from "@/components/portal-ui/action-cue";
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./drive-sources.module.css";
 
@@ -87,7 +88,7 @@ export default function PreparedSourceSettings({ connected, onPreview }) {
 
   const instructionCharacters = (status?.documents || []).filter(doc => form.instructionIds.includes(doc.id)).reduce((sum, doc) => sum + doc.characters, 0);
   const automaticParent = audience === "clients" && form.referencePaths.includes("");
-  return <section className={styles.card} aria-labelledby="prepared-heading">
+  return <section data-action-card="warning" className={styles.card} aria-labelledby="prepared-heading"><ActionCue tone="warning">Caution · Controls shared AI guidance</ActionCue>
     <div className={styles.heading}><div><p className={styles.eyebrow}>PREPARE ONCE · RETRIEVE WHEN NEEDED</p>
       <h2 id="prepared-heading">Company knowledge &amp; AI instructions</h2></div>
       <span className={styles.badge}>{status?.ready ? "Prepared sources ready" : "Sources need preparation"}</span></div>

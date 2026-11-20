@@ -1,3 +1,4 @@
+import {auditAdminAuthentication} from '@/lib/admin-auth-audit';
 import { toNextJsHandler } from "better-auth/next-js";
 
 import { auth, isPortalAuthConfigured } from "@/lib/auth";
@@ -20,7 +21,7 @@ function unavailable() {
 function protectedHandler(method) {
   return function handleAuthRequest(request) {
     if (!isPortalAuthConfigured()) return unavailable();
-    return handlers[method](request);
+    return auditAdminAuthentication(request,handlers[method]);
   };
 }
 

@@ -1,3 +1,4 @@
+import {withAdminAudit} from '@/lib/admin-audited-handler';
 import {resolveAdminContext,adminErrorResponse} from "@/lib/admin-data";
 import {assertTrustedOrigin,readJsonRequest,requestSecurityErrorResponse} from "@/lib/request-security";
 import {databasePool} from "@/lib/database";
@@ -19,12 +20,12 @@ function failure(error) {
   return Response.json({error:["42P01","42703"].includes(error?.code)?"AI Credits schema needs an update. Review and run npm run credits:migrate against the intended database."
     :"AI Credits settings could not be processed. No payment was collected."},{status:503,headers});
 }
-export async function GET(request) {
+async function auditGET(request) {
   try {await resolveAdminContext(request.headers);const query=new URL(request.url).searchParams;
     return Response.json(query.has("clientId")?await readAdminCreditReport(databasePool,query.get("clientId"),query.get("month") || undefined):await readCreditPricingAdmin(databasePool),{headers});}
   catch(error){return failure(error);}
 }
-export async function POST(request) {
+async function auditPOST(request) {
   try {
     assertTrustedOrigin(request.headers);
     const {admin}=await resolveAdminContext(request.headers);
@@ -41,3 +42,7 @@ export async function POST(request) {
     return Response.json({error:"Choose pricing, preview or allowance adjustment."},{status:400,headers});
   } catch(error){return failure(error);}
 }
+
+export const GET=withAdminAudit("admin.credits",auditGET);
+
+export const POST=withAdminAudit("admin.credits",auditPOST);

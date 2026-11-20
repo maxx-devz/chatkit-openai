@@ -1,5 +1,6 @@
 "use client";
 
+import ActionCue from "@/components/portal-ui/action-cue";
 import { useCallback, useEffect, useState } from "react";
 import styles from "./client-access.module.css";
 import {auditActionLabel} from "@/lib/portal-presentation";
@@ -81,7 +82,7 @@ export default function ClientMembersPanel({ clientId, currentUserId }) {
     <p><strong>Viewer:</strong> view project and time information, reporting credits and approved documents. <strong>Member:</strong> also use AOC AI and add reference links. Neither role can manage members or change AOC pricing.</p>
     {error ? <p className={styles.error} role="alert">{error}</p> : null}
     {notice ? <p className={styles.success} role="status">{notice}</p> : null}
-    <form className={styles.form} onSubmit={createMember}>
+    <form data-action-card="add" className={styles.form} onSubmit={createMember}><ActionCue tone="add">Add a client login</ActionCue>
       <h3>Create a client login</h3>
       <p>Use a unique username and a temporary password. Existing portal logins cannot be linked here yet.</p>
       <p>This creates a login, not an email invitation. Share the temporary password securely and ask the new user to change it on the Account page.</p>
@@ -95,7 +96,7 @@ export default function ClientMembersPanel({ clientId, currentUserId }) {
           <option value="member">Member</option><option value="client_viewer">Viewer</option>
         </select></label>
       </div>
-      <button disabled={Boolean(busy)} type="submit">{busy === "create" ? "Creating..." : "Create login"}</button>
+      <button data-action="add" disabled={Boolean(busy)} type="submit">{busy === "create" ? "Creating..." : "Create login"}</button>
     </form>
     <div className={styles.list}>
       <h3>Client members</h3>
@@ -108,7 +109,7 @@ export default function ClientMembersPanel({ clientId, currentUserId }) {
               value={member.role} onChange={event => changeMember(member, "role_change", event.target.value)}>
               <option value="member">Member</option><option value="client_viewer">Viewer</option>
             </select>
-            <button type="button" disabled={Boolean(busy)}
+            <button data-action={member.active?"danger":"add"} type="button" disabled={Boolean(busy)}
               onClick={() => changeMember(member, member.active ? "deactivate" : "reactivate")}>
               {member.active ? "Deactivate" : "Reactivate"}
             </button>

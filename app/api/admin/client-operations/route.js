@@ -1,7 +1,9 @@
+import {noteAdminAuditError} from '@/lib/admin-audit-context';
+import {withAdminAudit} from '@/lib/admin-audited-handler';
 import {resolveAdminContext,adminErrorResponse} from "@/lib/admin-data";
 import {databasePool} from "@/lib/database";
 export const dynamic="force-dynamic";
-export async function GET(request) {
+async function auditGET(request) {
   const headers={"Cache-Control":"private, no-store"};
   try {
     await resolveAdminContext(request.headers);
@@ -12,6 +14,8 @@ export async function GET(request) {
     const ready=(await databasePool.query("SELECT to_regclass('portal_website_insights_sites') IS NOT NULL AS ready")).rows[0].ready;
     const websites=ready?(await databasePool.query("SELECT name,url FROM portal_website_insights_sites WHERE client_id=$1 AND archived_at IS NULL ORDER BY created_at,id",[clientId])).rows:[];
     return Response.json({clientId,websitesReady:ready,websites},{headers});
-  }catch(error){if(error?.publicDetails){const response=adminErrorResponse(error);response.headers.set("Cache-Control","private, no-store");return response;}
+  }catch(error){noteAdminAuditError(error);if(error?.publicDetails){const response=adminErrorResponse(error);response.headers.set("Cache-Control","private, no-store");return response;}
     return Response.json({error:"Website integration status could not be loaded."},{status:503,headers});}
 }
+
+export const GET=withAdminAudit("admin.client_operations",auditGET);

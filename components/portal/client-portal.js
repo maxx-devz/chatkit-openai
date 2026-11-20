@@ -1,14 +1,10 @@
 import Image from "next/image";
-import Link from "next/link";
-import WebsiteInsights from "./website-insights";
+import Link from "@/components/portal-ui/navigation-link";
+import {WebsiteInsights,ClientDocumentsPanel,ClientOfficialDocuments,ClientAuditPanel,ClientMembersPanel,ClientPasswordSettings} from "./client-page-modules";
 import { clientNavigation, clientView } from "@/lib/client-navigation";
 
 import AiAssistantPanel from "@/components/ai-assistant/ai-assistant-panel";
 import AccountControls from "@/components/portal/account-controls";
-import ClientDocumentsPanel from "@/components/portal/client-documents-panel";
-import ClientAuditPanel from '@/components/portal/client-audit-panel';
-import ClientMembersPanel from "@/components/portal/client-members-panel";
-import ClientPasswordSettings from "@/components/portal/client-password-settings";
 import HubstaffProvider, {
   HubstaffMetrics,
   HubstaffMonthGlance,
@@ -21,6 +17,7 @@ import aocLogo from "@/aoc-logo.png";
 import { PORTAL_CONFIG } from "@/config/portal";
 import { CLIENT_PERMISSIONS } from "@/lib/client-permissions";
 import styles from "./client-portal.module.css";
+import theme from "@/components/portal-ui/portal-theme.module.css";
 import HeaderCredits from "@/components/credits/header-credits";
 import PortalPageSearch from "./portal-page-search";
 
@@ -89,19 +86,20 @@ function PortalHeader({ portal }) {
         <span>{portal.welcomeMessage}</span>
       </div>
 
-      <PortalPageSearch items={[...clientNavigation(portal.permissions),{label:"Credits & usage",href:"/credits"}]} />
+      <div className={styles.headerSearch}><PortalPageSearch items={[...clientNavigation(portal.permissions),{label:"Credits & usage",href:"/credits"}]} /></div>
       <details className={styles.notificationAvailability}>
         <summary aria-label="Notification availability"><svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M6 9a6 6 0 0 1 12 0c0 7 3 7 3 7H3s3 0 3-7M10 20h4" />
         </svg></summary>
-        <p>No notification feed is connected in this prototype.</p>
+        <p>Notifications are not connected yet. Your project updates are available in the dashboard and activity log.</p>
       </details>
-<HeaderCredits key={portal.client.id} clientId={portal.client.id} active={portal.view==="credits"} />
-      <AccountControls
+      <div className={styles.headerCredits}><HeaderCredits key={portal.client.id} clientId={portal.client.id} active={portal.view==="credits"} /></div>
+      <div className={styles.headerAccount}><AccountControls
+        key={`${portal.client.id}:${portal.user.id}`}
         client={portal.client}
         memberships={portal.memberships}
         user={portal.user}
-      />
+      /></div>
     </header>
   );
 }
@@ -134,7 +132,7 @@ function clientInitials(name) {
 }
 
 function PortalData({ portal, children }) {
-  if (!["dashboard", "time", "projects", "ai"].includes(portal.view)) return children;
+  if (!["dashboard", "time", "projects"].includes(portal.view)) return children;
   return <HubstaffProvider clientName={portal.clientName} key={portal.client.slug}
     projectConfigured={Boolean(portal.client.hubstaffProjectUrl)}>{children}</HubstaffProvider>;
 }
@@ -169,7 +167,7 @@ export default function ClientPortal({ portalContext, requestedView, initialWebs
   const canUseAi = portal.permissions.includes(CLIENT_PERMISSIONS.AI_USE);
 
   return (
-    <div className={styles.portalShell}>
+    <div className={`${styles.portalShell} ${theme.surface}`}>
       <PresenceHeartbeat />
       <PortalSidebar portal={portal} />
       <div className={styles.portalMain}>
@@ -182,6 +180,7 @@ export default function ClientPortal({ portalContext, requestedView, initialWebs
               <p>{portal.clientName} · your client workspace</p>
             </header>}
             {children}
+            {portal.view === "dashboard" && portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_READ) && <ClientOfficialDocuments key={`official-summary:${portalContext.client.id}`} clientId={portalContext.client.id} summary/>}
             {portal.view === "dashboard" && <section className={styles.metrics} aria-label="Account overview">
               <HubstaffMetrics />
             </section>}
@@ -212,10 +211,11 @@ export default function ClientPortal({ portalContext, requestedView, initialWebs
               userId={portalContext.user.id} height="78vh" minHeight={600} />}
             {portal.view === "time" && <HubstaffMonthGlance detailed />}
             {portal.view === "projects" && <HubstaffProjectProgress canUseAi={canUseAi} />}
-            {portal.view === "website-insights" && <WebsiteInsights key={portalContext.client.id} clientId={portalContext.client.id}
+            {portal.view === "website-insights" && <WebsiteInsights embedded key={portalContext.client.id} clientId={portalContext.client.id}
               initialWebsite={initialWebsite} connectionResult={connectionResult}
               canWrite={portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_CONTRIBUTE)}
               canManage={portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_MANAGE)} />}
+        {portal.view === "documents" && <ClientOfficialDocuments key={`official:${portalContext.client.id}`} clientId={portalContext.client.id}/>}
         {portal.view === "documents" && <ClientDocumentsPanel key={`documents:${portalContext.client.id}`} clientId={portalContext.client.id}
           canContribute={portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_CONTRIBUTE)} />}
         {portal.view === "members" && portal.permissions.includes(CLIENT_PERMISSIONS.MEMBERS_MANAGE)
@@ -227,10 +227,10 @@ export default function ClientPortal({ portalContext, requestedView, initialWebs
           </main>
         </PortalData>
         <footer className={styles.footer}>
-          <span>© 2026 Always Open Commerce. Prototype client portal.</span>
+          <span>© {new Date().getUTCFullYear()} Always Open Commerce · Client Portal</span>
           <div className={styles.policyLinks}>
-            <details><summary>Privacy Policy</summary><p>A portal privacy-policy link has not been configured for this prototype. Ask your AOC contact for the current policy.</p></details>
-            <details><summary>Terms of Service</summary><p>Portal terms have not been configured for this prototype. Ask your AOC contact for the applicable terms.</p></details>
+            <details><summary>Privacy Policy</summary><p>Contact AOC for the current privacy policy. A policy link has not been added to this portal yet.</p></details>
+            <details><summary>Terms of Service</summary><p>Contact AOC for the terms that apply to your engagement. A terms link has not been added to this portal yet.</p></details>
           </div>
         </footer>
       </div>

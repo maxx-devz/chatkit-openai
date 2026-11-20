@@ -13,3 +13,5 @@
 .panel .batch { border-top:1px solid #d7e5f2; padding-top:12px; }
 .panel .error { padding:10px; border:1px solid #e4aaa4; border-radius:8px; background:#fff1ef; color:#8f241b; }
 @media(max-width:640px) { .counts { grid-template-columns:repeat(2,minmax(0,1fr)); } .heading button { width:100%; } }
+
+.panel { background:var(--portal-card-background,#f5faff); border-color:var(--portal-card-border,#d7e5f2); }.heading { align-items:center; }.panel button { min-height:40px; }

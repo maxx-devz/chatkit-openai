@@ -20,7 +20,7 @@ test('Signed clear previews reject actor changes, tampering and expiration and r
 });
 async function route({authorized=true,origin=true}={}) {
   const calls=[],key=randomUUID();
-  const mocks={resolveAdminContext:async()=>{if(!authorized)throw {publicDetails:{status:403}};return {admin:{id:'9'}};},
+  const mocks={withAdminAudit:(_operation,handler)=>handler,noteAdminAuditError:()=>{},noteAdminAuditOutcome:()=>{},resolveAdminContext:async()=>{if(!authorized)throw {publicDetails:{status:403}};return {admin:{id:'9'}};},
     adminErrorResponse:()=>Response.json({error:'Denied'},{status:403}),
     assertTrustedOrigin:()=>{if(!origin)throw {security:true};},
     requestSecurityErrorResponse:e=>e.security?Response.json({error:'Origin denied'},{status:403}):null,

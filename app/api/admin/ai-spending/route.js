@@ -1,3 +1,4 @@
+import {withAdminAudit} from '@/lib/admin-audited-handler';
 import { resolveAdminContext, adminErrorResponse } from "@/lib/admin-data";
 import { databasePool } from "@/lib/database";
 import { readClientSpending } from "@/lib/ai-spending-repository";
@@ -6,7 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const headers = { "Cache-Control": "private, no-store" };
 
-export async function GET(request) {
+async function auditGET(request) {
   try {
     await resolveAdminContext(request.headers);
     const period = new URL(request.url).searchParams.get("month") || undefined;
@@ -21,3 +22,5 @@ export async function GET(request) {
     return Response.json({ error: "Client spending could not be loaded. No missing costs have been treated as zero." }, { status: 503, headers });
   }
 }
+
+export const GET=withAdminAudit("admin.ai_spending",auditGET);

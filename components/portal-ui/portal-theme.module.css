@@ -1,0 +1,63 @@
+.surface {
+  --portal-card-background: linear-gradient(135deg, #fff 0%, #fbfdff 62%, #f0f7ff 100%);
+  --portal-card-shadow: 0 4px 20px rgb(24 64 109 / 5%);
+  --portal-card-border: #d7e5f2;
+  --portal-accent: #0768ae;
+  accent-color: var(--portal-accent);
+}
+.surface :where(main, section, article, form, fieldset) { min-width: 0; }
+.surface :where(h1, h2, h3) { letter-spacing: -.025em; text-wrap: balance; }
+.surface :where(p) { text-wrap: pretty; }
+.surface :where(main p, main a, main dd, main td) { overflow-wrap: anywhere; }
+.surface :where(input:not([type=checkbox]):not([type=radio]):not([type=color]), select) {
+  min-height: 42px;
+  line-height: 1.45;
+}
+.surface :where(textarea) { line-height: 1.65; resize: vertical; }
+.surface :where(button, a, input, select, textarea) { touch-action: manipulation; }
+.surface :where(button, input, select, textarea, summary, a):focus-visible {
+  outline: 3px solid #087acb;
+  outline-offset: 3px;
+}
+.surface :where(button) { transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease; }
+.surface :where(table) { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.surface :where(th, td) { vertical-align: middle; line-height: 1.6; }
+.surface :where(summary) { cursor: pointer; }
+.surface :where([role=alert], [role=status]) { line-height: 1.65; }
+@media (prefers-reduced-motion: reduce) {
+  .surface *, .surface *::before, .surface *::after { animation: none !important; scroll-behavior: auto !important; transition: none !important; }
+}
+
+/* Explicit intent markers only: shared CSS imports in Internal Portal are unaffected. */
+.surface [data-action-card="danger"],.surface [data-action-cue="danger"] { --intent-bg:#fff1f2; --intent-border:#fda4af; --intent-accent:#b42318; --intent-ink:#7f1d1d; }
+.surface [data-action-card="warning"],.surface [data-action-cue="warning"] { --intent-bg:#fffbeb; --intent-border:#fcd34d; --intent-accent:#92400e; --intent-ink:#78350f; }
+.surface [data-action-card="edit"],.surface [data-action-cue="edit"] { --intent-bg:#eff6ff; --intent-border:#93c5fd; --intent-accent:#1d4ed8; --intent-ink:#1e3a8a; }
+.surface [data-action-card="add"],.surface [data-action-cue="add"] { --intent-bg:#ecfdf5; --intent-border:#6ee7b7; --intent-accent:#047857; --intent-ink:#064e3b; }
+.surface [data-action-card="info"],.surface [data-action-cue="info"] { --intent-bg:#f0f9ff; --intent-border:#7dd3fc; --intent-accent:#0369a1; --intent-ink:#0c4a6e; }
+.surface [data-action-card] {
+ background:linear-gradient(120deg,var(--intent-bg),var(--intent-bg) 70%,#fff) !important;
+ border:1px solid var(--intent-border) !important;
+ border-inline-start:5px solid var(--intent-accent) !important;
+ border-radius:14px;
+ box-shadow:0 5px 18px rgb(20 50 80 / 5%);
+ padding:clamp(16px,2vw,24px);
+}
+.surface [data-action-card] > :first-child { margin-top:0; }
+.actionCue { display:inline-flex; align-items:center; gap:7px; width:fit-content; max-width:100%; margin:0 0 12px; padding:6px 10px; border:1px solid var(--intent-border,#7dd3fc); border-radius:8px; color:var(--intent-ink,#0c4a6e); background:var(--intent-bg,#f0f9ff); font-size:12px; font-weight:750; line-height:1.5; letter-spacing:.01em; }
+.actionCue svg { width:18px; height:18px; flex-shrink:0; }
+.surface [data-action="danger"] { --button-bg:#b42318; --button-ink:#fff; --button-border:#b42318; }
+.surface [data-action="danger-preview"] { --button-bg:#fff; --button-ink:#9f1239; --button-border:#be123c; }
+.surface [data-action="warning"] { --button-bg:#92400e; --button-ink:#fff; --button-border:#92400e; }
+.surface [data-action="edit"] { --button-bg:#1d4ed8; --button-ink:#fff; --button-border:#1d4ed8; }
+.surface [data-action="add"] { --button-bg:#047857; --button-ink:#fff; --button-border:#047857; }
+.surface [data-action="info"] { --button-bg:#075985; --button-ink:#fff; --button-border:#075985; }
+.surface [data-action="neutral"] { --button-bg:#fff; --button-ink:#334155; --button-border:#94a3b8; }
+.surface [data-action] { background:var(--button-bg) !important; color:var(--button-ink) !important; border:1px solid var(--button-border) !important; }
+.surface [data-action]:not(:disabled):hover { filter:brightness(.94); }
+.surface [data-action]:disabled { opacity:.5; cursor:not-allowed; }
+.surface [data-action-card="danger"] :where(input:not([type="checkbox"]),select) { border-color:#e7a2a6; background:#fff; }
+@media(forced-colors:active) {
+ .surface [data-action-card],.actionCue,.surface [data-action] { forced-color-adjust:auto; background:Canvas !important; color:CanvasText !important; border-color:CanvasText !important; }
+}
+
+.surface form > .actionCue { grid-column:1 / -1; justify-self:start; }

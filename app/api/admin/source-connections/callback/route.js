@@ -1,3 +1,5 @@
+import {noteAdminAuditError,noteAdminAuditOutcome} from '@/lib/admin-audit-context';
+import {withAdminAudit} from '@/lib/admin-audited-handler';
 import { cookies } from "next/headers";
 import { resolveAdminContext } from "@/lib/admin-data";
 import { driveConfiguration, driveCallbackFailureCode } from "@/lib/drive-source-policy";
@@ -7,7 +9,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export async function GET(request) {
+async function auditGET(request) {
   let config;
   try { config = driveConfiguration(); }
   catch { return Response.json({ error: "Google Drive server configuration is unavailable. Return to AOC Admin and check setup." },
@@ -21,12 +23,14 @@ export async function GET(request) {
     const { admin, session } = await resolveAdminContext(request.headers);
     const params = new URL(request.url).searchParams;
     if (params.has("error")) {
+      noteAdminAuditOutcome("cancelled","request_cancelled");
       result.searchParams.set("connection", "cancelled");
     } else {
       await finishDriveConnection(admin.id, session, params.get("state"), cookieState, params.get("code"));
       result.searchParams.set("connection", "connected");
     }
   } catch (error) {
+    noteAdminAuditError(error);noteAdminAuditOutcome("failed");
     // Never echo OAuth codes, tokens, Google payloads, or provider error objects.
     const code = driveCallbackFailureCode(error);
     console.warn("Google Drive callback failed " + JSON.stringify({ code }));
@@ -35,3 +39,5 @@ export async function GET(request) {
   }
   return new Response(null, { status: 303, headers: { Location: result.href, "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" } });
 }
+
+export const GET=withAdminAudit("admin.source_connections.callback",auditGET);

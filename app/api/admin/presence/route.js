@@ -1,9 +1,10 @@
+import {withAdminAudit} from '@/lib/admin-audited-handler';
 import { adminErrorResponse, loadAdminPresence } from "@/lib/admin-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request) {
+async function auditGET(request) {
   try {
     return Response.json(
       { clients: await loadAdminPresence(request.headers) },
@@ -13,3 +14,5 @@ export async function GET(request) {
     return adminErrorResponse(error);
   }
 }
+
+export const GET=withAdminAudit("admin.presence",auditGET);

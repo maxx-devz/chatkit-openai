@@ -1,3 +1,4 @@
+import {withAdminAudit} from '@/lib/admin-audited-handler';
 import {resolveAdminContext,adminErrorResponse} from '@/lib/admin-data';
 import {assertTrustedOrigin,readJsonRequest,requestSecurityErrorResponse} from '@/lib/request-security';
 import {databasePool} from '@/lib/database';
@@ -6,7 +7,7 @@ import {verifyUsageClearPreview} from '@/lib/ai-usage-clear-policy';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 const headers={'Cache-Control':'private, no-store'};
-export async function POST(request) {
+async function auditPOST(request) {
   try {
     assertTrustedOrigin(request.headers);
     const {admin}=await resolveAdminContext(request.headers);
@@ -24,3 +25,5 @@ export async function POST(request) {
     return Response.json({error:error instanceof TypeError || error.usageSetup?error.message:'AI chat history could not be cleared. Retry the same preview; clearing never changes provider charges.'},{status:error instanceof TypeError?400:503,headers});
   }
 }
+
+export const POST=withAdminAudit("admin.ai_usage.history",auditPOST);

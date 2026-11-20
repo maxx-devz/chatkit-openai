@@ -1,3 +1,4 @@
+import {withAdminAudit} from '@/lib/admin-audited-handler';
 import {
   adminErrorResponse,
   assertTrustedAdminMutation,
@@ -8,7 +9,7 @@ import { requestSecurityErrorResponse } from "@/lib/request-security";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request) {
+async function auditPOST(request) {
   try {
     assertTrustedAdminMutation(request.headers);
     await resolveAdminContext(request.headers);
@@ -18,3 +19,5 @@ export async function POST(request) {
     return requestSecurityErrorResponse(error) || adminErrorResponse(error);
   }
 }
+
+export const POST=withAdminAudit("admin.usage",auditPOST);

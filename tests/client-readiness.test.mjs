@@ -16,6 +16,14 @@ test("Balance states distinguish loading, zero, missing allowances, incomplete a
   assert.equal(balancePresentation({...ready,estimatedEvents:1}).detail.includes("estimated"),true);
   assert.notEqual(creditNumber("0.000000000001"),"0");
 });
+test("An unset allowance is not reported as an exhausted or uncertain balance",()=>{
+  const report={ready:true,pricing:{pricingType:"fixed"},allocatedCredits:null,availableCredits:null,incomplete:true,partialHistory:true,creditsUsed:"200000",aiUsageCredits:"0",fixedFeeCredits:"200000"};
+  assert.equal(balancePresentation(report).label,"Allowance not set");
+  assert.equal(balancePresentation(report).state,"unassigned");
+  assert.match(balancePresentation(report).detail,/Pricing does not assign credits/);
+  assert.equal(balancePresentation({...report,allocatedCredits:"0"}).label,"Not confirmed");
+});
+
 test("Pricing examples come from the supplied historical version rather than current defaults",()=>{
   assert.equal(previewCreditPricing({pricingType:"percentage",aocFee:"40",creditsPerUsd:"1000"},"1").creditsUsed,"1400");
   assert.equal(previewCreditPricing({pricingType:"percentage",aocFee:"20",creditsPerUsd:"1000"},"1").creditsUsed,"1200");

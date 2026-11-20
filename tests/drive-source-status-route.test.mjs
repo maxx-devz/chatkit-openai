@@ -6,7 +6,7 @@ import { DriveSourceError } from "../lib/drive-source-policy.js";
 
 async function harness({ authenticated = true } = {}) {
   const calls = [], key = `drive_status_${randomUUID()}`;
-  const mocks = { cookies: async () => ({}), DriveSourceError,
+  const mocks = {withAdminAudit:(_operation,handler)=>handler,noteAdminAuditError:()=>{},noteAdminAuditOutcome:()=>{}, cookies: async () => ({}), DriveSourceError,
     resolveAdminContext: async () => { if (!authenticated) throw { publicDetails: { status: 403 } }; return { admin: { id: "admin-one" } }; },
     adminErrorResponse: () => Response.json({ error: "Not authorized" }, { status: 403 }),
     assertTrustedOrigin: () => {}, readJsonRequest: request => request.json(), requestSecurityErrorResponse: () => null,

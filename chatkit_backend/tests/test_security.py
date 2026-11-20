@@ -100,12 +100,14 @@ class EndpointTests(unittest.IsolatedAsyncioTestCase):
                 patch("app.load_client", new_callable=AsyncMock, return_value={}), \
                 patch("app.load_config", new_callable=AsyncMock, return_value={}), \
                 patch("app.acquire_lease", new_callable=AsyncMock), \
+                patch("app.reserve_plan_reply", new_callable=AsyncMock) as reserve, \
                 patch("app.load_provider_settings", new_callable=AsyncMock, side_effect=ProviderSettingsError("provider_encryption_missing")), \
                 patch("app.server.process", new_callable=AsyncMock) as process:
             status, response = await post(body, [(b"x-chatkit-timestamp", timestamp), (b"x-chatkit-signature", signature)], include_body=True)
             self.assertEqual(status, 503)
             self.assertEqual(response["code"], "provider_encryption_missing")
             process.assert_not_awaited()
+            reserve.assert_awaited_once()
             db.close.assert_awaited_once()
 
     async def test_signed_browser_history_request_reaches_sdk_with_bounded_pagination(self):

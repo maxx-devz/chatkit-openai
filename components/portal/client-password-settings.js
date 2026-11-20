@@ -1,5 +1,6 @@
 "use client";
 
+import ActionCue from "@/components/portal-ui/action-cue";
 import { useState } from "react";
 import { passwordValidationMessage } from "@/lib/input-validation";
 import styles from "./client-access.module.css";
@@ -37,7 +38,7 @@ export default function ClientPasswordSettings({ username }) {
     finally { setBusy(false); }
   }
 
-  return <section className={styles.panel} id="account-security">
+  return <section data-action-card="warning" className={styles.panel} id="account-security"><ActionCue tone="warning">Caution · Account security</ActionCue>
     <h2>Password & sign-in security</h2>
     <p>Signed in as <strong>{username}</strong>. This page changes your password only; it does not edit company details, permissions or other members.</p>
     <p>Change your password using your current password. If you received a temporary password, change it now.</p>
@@ -46,7 +47,7 @@ export default function ClientPasswordSettings({ username }) {
       <label>New password<input type="password" name="newPassword" autoComplete="new-password" required maxLength={128} /></label>
       <label>Confirm new password<input type="password" name="confirmation" autoComplete="new-password" required maxLength={128} /></label>
       <small>Use 12–128 characters and at least three character types. Do not include your username.</small>
-      <button disabled={busy} type="submit">{busy ? "Updating..." : "Update password"}</button>
+      <button data-action="warning" disabled={busy} type="submit">{busy ? "Updating..." : "Update password"}</button>
     </form>
     {error ? <p className={styles.error} role="alert">{error}</p> : null}
     {message ? <p className={styles.success} role="status">{message}</p> : null}

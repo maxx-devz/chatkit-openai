@@ -14,7 +14,7 @@ async function endpoint(authorized) {
   };
   const source = await readFile(new URL("../app/api/admin/ai-spending/route.js", import.meta.url), "utf8");
   try {
-    const code = `const {resolveAdminContext,adminErrorResponse,databasePool,readClientSpending}=globalThis[${JSON.stringify(key)}];\n`
+    const code = `const withAdminAudit=(_operation,handler)=>handler;const {resolveAdminContext,adminErrorResponse,databasePool,readClientSpending}=globalThis[${JSON.stringify(key)}];\n`
       + source.replace(/^import .+;\r?\n/gm, "");
     const route = await import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
     const response = await route.GET(new Request("https://portal.example/api/admin/ai-spending?month=2026-10"));
