@@ -254,7 +254,7 @@ class PortalChatKitServer(ChatKitServer[Context]):
         agent_context = None
         stream_failed = False
         started_at = datetime.now(timezone.utc)
-        cost_request_id = new_cost_request_id()
+        cost_request_id = getattr(context, "plan_run_id", None) or new_cost_request_id()
         started = perf_counter()
         model_started = None
         try:
@@ -283,6 +283,8 @@ class PortalChatKitServer(ChatKitServer[Context]):
             previous_queries = [" ".join(getattr(part, "text", "") for part in item.content)
                                 for item in items if isinstance(item, UserMessageItem)
                                 and item.id != getattr(latest_user_message, "id", None)]
+            if getattr(context, "plan_run_id", None):
+                context.plan_provider_started = True
             context.response_route = await select_response_route(
                 context, latest_query, previous_queries=previous_queries,
                 has_attachment=bool(getattr(latest_user_message, "attachments", [])),

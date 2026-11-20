@@ -88,3 +88,5 @@
     display: none;
   }
 }
+
+.panel { border-color:var(--portal-card-border,#d7e5f2); box-shadow:var(--portal-card-shadow,0 8px 24px #17355b0d); }.header { background:var(--portal-card-background,#fff); }

@@ -1,8 +1,10 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import {useCredits} from "./use-credits";
+import ClientPlanView from "./client-plan-view";
+import CreditBreakdown from "./credit-breakdown";
 import {usd,unpricedReason} from "@/lib/ai-spending-format";
-import {balancePresentation,creditNumber,creditActivity,usageBasis} from "@/lib/credits-presentation";
+import {creditNumber,creditActivity,usageBasis} from "@/lib/credits-presentation";
 import styles from "./credits.module.css";
 
 const utcDate=value=>new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeZone:"UTC"}).format(new Date(value));
@@ -10,12 +12,11 @@ const utcTime=value=>new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeSty
 const tokens=value=>value==null?"Not reported":new Intl.NumberFormat("en-US").format(Number(value));
 function Metric({label,value,detail}) {return <article className={styles.metric}><span>{label}</span><strong>{value}</strong>{detail && <small>{detail}</small>}</article>;}
 
-export default function CreditsOverview({clientId}) {
+export default function CreditsOverview({clientId,canRequest=false}) {
   const [period,setPeriod]=useState(()=>new Date().toISOString().slice(0,7));
   const [group,setGroup]=useState("day"),[offset,setOffset]=useState(0),[asOf,setAsOf]=useState("");
   const root=useRef(null);
   const {data,error,refresh}=useCredits(clientId,{period,group,offset,asOf});
-  const balance=balancePresentation(data,error);
   const changePeriod=value=>{if(!value)return;setPeriod(value);setOffset(0);setAsOf("");};
   const refreshAll=()=>{setOffset(0);setAsOf("");refresh();};
   useEffect(()=>{
@@ -27,6 +28,7 @@ export default function CreditsOverview({clientId}) {
     reveal();window.addEventListener("hashchange",reveal);
     return()=>window.removeEventListener("hashchange",reveal);
   },[data?.ready]);
+  if(data?.mode==="subscription" && data.configured)return <ClientPlanView data={data} clientId={clientId} canRequest={canRequest} refresh={refreshAll}/>;
   return <div ref={root} className={styles.page}>
     <div className={styles.heading}><div><p className={styles.eyebrow}>AI CREDITS</p><h1>Credits & usage</h1>
       <p>Your monthly reporting allowance and recorded AI usage.</p></div>
@@ -47,12 +49,7 @@ export default function CreditsOverview({clientId}) {
           <span className={styles.badge}>{data.incomplete?"Incomplete usage":data.estimatedEvents?"Includes estimates":"Recorded usage"}</span></div>
         <p>{utcDate(data.range.start)} – {utcDate(new Date(Date.parse(data.range.end)-1))} · UTC calendar month<br/>
           <small>Updated <time dateTime={data.fetchedAt}>{utcTime(data.fetchedAt)}</time>. Refreshes automatically while this page is visible.</small></p>
-        <div className={styles.metrics}>
-          <Metric label="Available credits" value={balance.label} detail={balance.detail}/>
-          <Metric label="Credits allocated" value={data.allocatedCredits==null?"Not assigned":creditNumber(data.allocatedCredits)} detail="Allowance additions and manual adjustments for this month."/>
-          <Metric label={data.incomplete?"Known credits used · subtotal":"Credits used"} value={data.creditsUsed==null?"Not configured":creditNumber(data.creditsUsed)}
-            detail={data.incomplete?"Includes only activity with recorded cost details.":"Recorded provider usage plus the applicable AOC fee."}/>
-        </div>
+        <CreditBreakdown data={data}/>
         {data.incomplete && <div className={styles.notice} role="status">
           <strong>We cannot confirm your remaining balance yet.</strong>
           <p>{data.unpricedEvents>0 || data.missingTurns>0
@@ -62,7 +59,7 @@ export default function CreditsOverview({clientId}) {
         </div>}
         {data.usageResetAt && <p className={styles.notice}>AI usage reporting was reset on {utcTime(data.usageResetAt)}. Assigned credits were kept; only usage after that cutoff counts.</p>}
         {data.partialHistory && <p className={styles.notice}>Tracking began {data.trackingStartedAt?utcTime(data.trackingStartedAt):"at an unknown time"}. Earlier activity is not included; figures cover recorded usage only.</p>}
-        {Number(data.overageCredits)>0 && <p>Known usage exceeds this reporting allowance by {creditNumber(data.overageCredits)} credits. This does not trigger payment or block AI access.</p>}
+        {Number(data.overageCredits)>0 && <p>Recorded deductions exceed this reporting allowance by {creditNumber(data.overageCredits)} credits. This does not trigger payment or block AI access.</p>}
         <p>Credits are reporting-only. They measure provider usage and the configured AOC service fee; they are not a prepaid wallet or an invoice.</p>
       </section>
 
@@ -77,7 +74,7 @@ export default function CreditsOverview({clientId}) {
         </table></div>
         {!data.history.length && <p>No API activity recorded for this period.</p>}
         <div className={styles.table}><table><caption>Recorded billing periods · totals retain each period’s pricing</caption>
-          <thead><tr><th>Month (UTC)</th><th>Known credits used</th><th>Known API cost</th><th>Known AOC fee</th><th>Coverage</th></tr></thead>
+          <thead><tr><th>Month (UTC)</th><th>Known total deductions</th><th>Known API cost</th><th>Known AOC fee</th><th>Coverage</th></tr></thead>
           <tbody>{data.months.map(row=><tr key={row.period}><td><button type="button" onClick={()=>changePeriod(row.period)}>{row.period}</button></td>
             <td>{row.used==null?"Not calculated":creditNumber(row.used)}</td><td>{usd(row.api_usd)}</td><td>{usd(row.fee_usd)}</td>
             <td>{Number(row.unpriced)>0 || Number(row.missing)>0 || Number(row.pending)>0?"Incomplete · subtotal":Number(row.estimates)>0?"Includes estimates":"Recorded usage"}</td></tr>)}</tbody>
@@ -107,7 +104,7 @@ export default function CreditsOverview({clientId}) {
           <strong> {data.pricing.pricingType==="fixed"?usd(data.pricing.aocFee)+" once per billing month":creditNumber(data.pricing.aocFee)+"% of provider usage cost"}</strong>.</p>
           {data.pricingExample && <p className={styles.notice}><strong>Illustrative example</strong>{data.pricing.pricingType==="fixed"?" · one billing month":""}: {usd(data.pricingExample.apiCostUsd)} of provider usage
             {" "}+ {usd(data.pricingExample.aocFeeUsd)} AOC fee = {usd(data.pricingExample.totalClientCostUsd)}, or <strong>{creditNumber(data.pricingExample.creditsUsed)} credits</strong>. This example is not an extra charge.</p>}
-          <p>Total reporting cost = recorded provider cost + AOC fee. Credits used = total reporting cost × credits per USD.</p>
+          <p>Total reporting cost = recorded provider cost + AOC fee. Total credit deductions = total reporting cost × credits per USD.</p>
           <details><summary>Pricing version for this period</summary><p>Version {data.pricing.id}, effective from {data.pricing.effectivePeriod}. Opened periods keep their saved version; later pricing changes do not reprice this history.</p></details>
           </>:<p>AOC pricing is not configured for this month. Provider usage can still be viewed; a credit total cannot yet be calculated.</p>}
         <ul>

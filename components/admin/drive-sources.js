@@ -1,5 +1,6 @@
 "use client";
 
+import ActionCue from "@/components/portal-ui/action-cue";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import DriveSourceAiTest from "./drive-source-ai-test";
@@ -115,7 +116,7 @@ export default function DriveSources({embedded=false}) {
           <p>Connect your company Drive once. Publish shared company knowledge for all clients; original documents stay in Drive.</p></div>
         <span className={styles.badge}>Audience-controlled source access</span>
       </header>
-      <section className={styles.card} aria-labelledby="connection-heading">
+      <section data-action-card="warning" className={styles.card} aria-labelledby="connection-heading"><ActionCue tone="warning">Caution · Shared source connection</ActionCue>
         <h2 id="connection-heading">Google Drive · read only</h2>
         <p>You authorize Google as AOC Admin, not as each client. Credentials remain server-only. Publish the shared company pack below so all clients can ask questions without a Google login. Discovery and preview do not alter Drive sharing or send document content to AI; the private AI test remains separate.</p>
         {connection?.setupMessage && <p className={styles.notice}>{connection.setupMessage}</p>}
@@ -126,10 +127,10 @@ export default function DriveSources({embedded=false}) {
         </dl>}
         {connection?.connectionMessage && <p className={styles.notice} role="status">{connection.connectionMessage}</p>}
         <div className={styles.actions}>
-          <button disabled={Boolean(busy) || !connection?.configured} onClick={() => action("connect")}>{connection?.hasAuthorization ? "Reconnect Google Drive" : "Connect Google Drive"}</button>
+          <button data-action="warning" disabled={Boolean(busy) || !connection?.configured} onClick={() => action("connect")}>{connection?.hasAuthorization ? "Reconnect Google Drive" : "Connect Google Drive"}</button>
           <button disabled={Boolean(busy) || !connection?.configured} onClick={() => action("check")}>Check connection</button>
           <button disabled={Boolean(busy) || !connected} onClick={() => action("discover")}>Discover / refresh sources</button>
-          {connected && <button className={styles.secondary} disabled={Boolean(busy)} onClick={() => {
+          {connected && <button data-action="danger" className={styles.secondary} disabled={Boolean(busy)} onClick={() => {
             if (window.confirm("Disconnect this private Drive test and revoke its Google authorization?")) action("disconnect");
           }}>Disconnect</button>}
         </div>
@@ -140,7 +141,7 @@ export default function DriveSources({embedded=false}) {
       {error && <p role="alert" className={styles.error}>{error}</p>}
       {message && <p role="status" className={styles.notice}>{message}</p>}
       <PreparedSourceSettings connected={connected} onPreview={fileId => action("preview", fileId)} />
-      {inventory && <section className={styles.card} aria-labelledby="inventory-heading">
+      {inventory && <section data-action-card="info" className={styles.card} aria-labelledby="inventory-heading"><ActionCue tone="info">View source inventory</ActionCue>
         <h2 id="inventory-heading">{inventory.rootName} · {inventory.files.length} source candidates</h2>
         <p>Metadata checked {new Date(inventory.checkedAt).toLocaleString()}. This list refreshes every minute while visible. The separate private test checks Drive on demand; normal client/admin chat uses only prepared, audience-approved data.</p>
         <p className={styles.small}>Archived, legacy, workspace and reference-only folders are excluded. Source placement alone is not approval. Google Docs, Google Sheets, DOCX and XLSX support text preparation; unsupported formats are reported explicitly.</p>

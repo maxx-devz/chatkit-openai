@@ -45,3 +45,6 @@
   .member, .documents li { align-items: flex-start; flex-direction: column; }
   .actions { flex-wrap: wrap; }
 }
+
+.panel { background:var(--portal-card-background,#fff); border-color:var(--portal-card-border,#d7e5f2); box-shadow:var(--portal-card-shadow); }
+.fields { align-items:end; }.fields label { line-height:1.5; }.member { flex-wrap:wrap; }.form button,.actions button { min-height:42px; }

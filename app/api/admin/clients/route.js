@@ -1,3 +1,4 @@
+import {withAdminAudit} from '@/lib/admin-audited-handler';
 import {
   adminErrorResponse,
   assertTrustedAdminMutation,
@@ -10,7 +11,7 @@ import { readJsonRequest, requestSecurityErrorResponse } from "@/lib/request-sec
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request) {
+async function auditGET(request) {
   try {
     return Response.json(await loadAdminDashboard(request.headers), {
       headers: { "Cache-Control": "no-store" },
@@ -20,7 +21,7 @@ export async function GET(request) {
   }
 }
 
-export async function POST(request) {
+async function auditPOST(request) {
   try {
     assertTrustedAdminMutation(request.headers);
     const body = await readJsonRequest(request, 32_000);
@@ -31,7 +32,7 @@ export async function POST(request) {
   }
 }
 
-export async function PATCH(request) {
+async function auditPATCH(request) {
   try {
     assertTrustedAdminMutation(request.headers);
     const body = await readJsonRequest(request, 32_000);
@@ -41,3 +42,9 @@ export async function PATCH(request) {
     return adminErrorResponse(error);
   }
 }
+
+export const GET=withAdminAudit("admin.clients",auditGET);
+
+export const POST=withAdminAudit("admin.clients",auditPOST);
+
+export const PATCH=withAdminAudit("admin.clients",auditPATCH);

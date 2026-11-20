@@ -1,13 +1,14 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import {useRouter,useSearchParams} from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/portal-ui/navigation-link";
 import {usd} from "@/lib/ai-spending-format";
-import {creditNumber,balancePresentation} from "@/lib/credits-presentation";
+import {creditNumber} from "@/lib/credits-presentation";
 import {normalizeCreditDecimal} from "@/lib/credits-pricing";
 import {activePricingChanged} from "@/lib/admin-credit-pricing";
 import {useAdminDraft} from "@/components/admin/admin-draft-provider";
 import {useAdminCredits} from "./use-admin-credits";
+import CreditBreakdown from "./credit-breakdown";
 import styles from "./credits.module.css";
 
 const currentMonth=()=>new Date().toISOString().slice(0,7);
@@ -22,7 +23,7 @@ function editorBaseline(data) {
 }
 function PriceSummary({title,policy}) {
   return <article className={styles.metric}><span>{title}</span>{policy?<><strong>{policy.pricingType==="percentage"?creditNumber(policy.aocFee)+"% markup":usd(policy.aocFee)+" / month"}</strong>
-    <small>{creditNumber(policy.creditsPerUsd)} credits per USD<br/>{effectiveDate(policy.effectivePeriod)}</small></>:<p>None configured</p>}</article>;
+    <small>US$1 = {creditNumber(policy.creditsPerUsd)} reporting credits<br/>{effectiveDate(policy.effectivePeriod)}</small></>:<p>None configured</p>}</article>;
 }
 export default function AdminCreditPricing({adminId="admin"}) {
   const params=useSearchParams(),router=useRouter();
@@ -35,9 +36,13 @@ export default function AdminCreditPricing({adminId="admin"}) {
   const {value:adjustment,update:setAdjustment,clearIfUnchanged:clearSavedAdjustment}=useAdminDraft("allowance:"+adminId+":"+clientId+":"+period,{direction:"add",amount:"",reason:"",idempotencyKey:""});
   const report=useAdminCredits(clientId,period);
   const editorPeriod=data?.editorPeriod || currentMonth();
+  const fixedPricing=fields.pricingType==="fixed";
+  const conversionRate=Number(fields.creditsPerUsd);
+  const conversionReady=Number.isFinite(conversionRate) && conversionRate>0 && conversionRate<=1000000;
   const pricingPayload={pricingType:fields.pricingType,aocFee:fields.pricingType==="percentage"?fields.percentageFee:fields.fixedFee,creditsPerUsd:fields.creditsPerUsd};
   const activeDirty=activePricingChanged(fields,editorBaseline(data));
-  const signedAmount=adjustment.direction==="subtract"?"-"+adjustment.amount:adjustment.amount;
+  const firstAllowance=report.data?.ready && report.data.allocatedCredits===null;
+  const signedAmount=!firstAllowance && adjustment.direction==="subtract"?"-"+adjustment.amount:adjustment.amount;
   const adjustmentScope=JSON.stringify({clientId,period,amount:signedAmount,reason:adjustment.reason});
   const scopedPreview=adjustmentPreview?.scope===adjustmentScope?adjustmentPreview:null;
   async function load() {
@@ -86,7 +91,7 @@ export default function AdminCreditPricing({adminId="admin"}) {
   }
   const select=(id,month)=>{setAdjustmentPreview(null);setError("");setStatus("");router.push("/admin/credits?"+new URLSearchParams({client:id,month}));};
   return <div className={styles.page+" "+styles.adminPage}>
-    <p className={styles.notice}>Credits are reporting-only. The portal has no monthly AI request cap. No payment collection or credit-based access restriction is enabled.</p>
+    <p className={styles.notice}><strong>1. Set pricing. 2. Assign each client’s allowance.</strong> Pricing sets the service fee and credits per dollar; it does not add credits to any client. Credits are reporting-only. The portal has no monthly AI request cap. No payment collection or credit-based access restriction is enabled.</p>
     {error && <p role="alert" className={styles.error}>{error}</p>}{status && <p role="status" className={styles.notice}>{status}</p>}
     {!data && !error && <p role="status">Loading pricing configuration…</p>}
     <section className={styles.section} aria-label="Current and scheduled pricing">
@@ -102,27 +107,28 @@ export default function AdminCreditPricing({adminId="admin"}) {
           <div className={styles.form}>
             <label>Pricing type<select value={fields.pricingType} disabled={Boolean(busy) || !data} onChange={event=>updateField("pricingType",event.target.value)}>
               <option value="percentage">Percentage markup</option><option value="fixed">Fixed monthly fee</option></select></label>
-            {fields.pricingType==="percentage"?<label>AOC markup · percent<input type="number" required min="0" max="1000" step="any" value={fields.percentageFee} disabled={Boolean(busy) || !data} onChange={event=>updateField("percentageFee",event.target.value)}/></label>
-              :<label>AOC fixed fee · USD per billing month<input type="number" required min="0" max="1000000" step="any" placeholder="Enter a fixed USD fee" value={fields.fixedFee} disabled={Boolean(busy) || !data} onChange={event=>updateField("fixedFee",event.target.value)}/></label>}
-            <label>Credits per USD<input type="number" required min="0.000000000001" max="1000000" step="any" value={fields.creditsPerUsd} disabled={Boolean(busy) || !data} onChange={event=>updateField("creditsPerUsd",event.target.value)}/></label>
+            {fields.pricingType==="percentage"?<label>AOC markup (%)<input type="number" required min="0" max="1000" step="any" value={fields.percentageFee} disabled={Boolean(busy) || !data} onChange={event=>updateField("percentageFee",event.target.value)}/></label>
+              :<label>Monthly AOC fee (USD)<input type="number" required min="0" max="1000000" step="any" placeholder="Enter a monthly fee in USD" value={fields.fixedFee} disabled={Boolean(busy) || !data} onChange={event=>updateField("fixedFee",event.target.value)}/></label>}
+            <label>How many credits per $1 (USD)?<input type="number" required min="0.000000000001" max="1000000" step="any" aria-describedby="credits-conversion-help" value={fields.creditsPerUsd} disabled={Boolean(busy) || !data} onChange={event=>updateField("creditsPerUsd",event.target.value)}/></label>
           </div>
-          <p>Percentage and fixed USD fees are kept separately. Switching type does not convert a percentage into a dollar amount. Fixed fees apply once per client and billing month.</p>
+          <p id="credits-conversion-help"><strong>{conversionReady?<>US$1 of total reporting cost = {creditNumber(fields.creditsPerUsd)} reporting credits.</>:"Enter how many reporting credits equal US$1 of total reporting cost."}</strong>{" "}{fixedPricing?"Provider usage costs plus the fixed monthly AOC fee are converted at this rate.":"Provider usage costs plus the AOC percentage markup are converted at this rate."}{" "}The client’s monthly credit allowance is set separately below.</p>
+          <p>{fixedPricing?"Enter a fixed amount in USD. This fee applies once per client each billing month, in addition to provider usage costs.":"Enter the percentage added to provider usage costs. For example, 20 means a 20% AOC markup."}</p>
           {dirty && <p role="status">{activeDirty?'Unsaved pricing edits':'Alternate fee draft retained; active pricing values match the saved version.'}</p>}
           <div className={styles.actions}>{dirty && <button type="button" disabled={Boolean(busy)} onClick={()=>{clearPricing();setPreview(null);pricingKey.current="";}}>Discard pricing edits</button>}
             <button type="submit" className={styles.primary} disabled={Boolean(busy) || !data || (data.versions.length>0 && !activeDirty)}>Save pricing for {editorPeriod}</button></div>
         </form>
-        <aside className={styles.previewCard} aria-label="Pricing preview"><h3>Preview · {editorPeriod} editor values</h3>
-          <label>Illustrative provider usage · USD<input type="number" min="0" max="1000000" step="any" value={apiCost} disabled={Boolean(busy)}
+        <aside className={styles.previewCard} aria-label="Pricing preview"><h3>{fixedPricing?"Monthly fee preview":"Percentage markup preview"} · {editorPeriod}</h3>
+          <label>{fixedPricing?"Example monthly provider cost (USD)":"Example provider cost (USD)"}<input type="number" min="0" max="1000000" step="any" value={apiCost} disabled={Boolean(busy)}
             onChange={event=>{setApiCost(event.target.value);setPreview(null);}}/></label>
           <button type="button" disabled={Boolean(busy) || !data} onClick={()=>void pricing("preview")}>Calculate pricing preview</button>
-          {preview && <dl aria-label="Calculated pricing preview"><div><dt>Provider cost</dt><dd>{usd(preview.apiCostUsd)}</dd></div><div><dt>AOC fee</dt><dd>{usd(preview.aocFeeUsd)}</dd></div>
-            <div><dt>Total reporting cost</dt><dd>{usd(preview.totalClientCostUsd)}</dd></div><div><dt>Credits</dt><dd>{creditNumber(preview.creditsUsed)}</dd></div></dl>}
+          {preview && <dl aria-label="Calculated pricing preview"><div><dt>{fixedPricing?"Monthly provider cost":"Provider cost"}</dt><dd>{usd(preview.apiCostUsd)}</dd></div><div><dt>{fixedPricing?"Monthly AOC fee":"AOC markup amount"}</dt><dd>{usd(preview.aocFeeUsd)}</dd></div>
+            <div><dt>{fixedPricing?"Monthly reporting total":"Total reporting cost"}</dt><dd>{usd(preview.totalClientCostUsd)}</dd></div><div><dt>Credits for this example</dt><dd>{creditNumber(preview.creditsUsed)}</dd></div></dl>}
           <p>This is arithmetic only. It does not call an AI provider, change current prices or adjust a client balance.</p>
         </aside>
       </div>
     </section>
     <section className={styles.section} id="allowance-adjustments">
-      <h2>Client reporting allowance</h2><p>Adjust one client and one period. Global pricing is saved separately above.</p>
+      <h2>Assign or adjust a client allowance</h2><p>Choose a client and month, enter the credits and a reason, then preview and confirm. This does not change pricing or collect a payment.</p>
       <div className={styles.form}><label>Selected client<select value={clientId} disabled={Boolean(busy) || !data} onChange={event=>select(event.target.value,period)}>
         {!data?.clients.length && <option value="">No clients available</option>}{data?.clients.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <label>UTC billing month<input type="month" value={period} max={currentMonth()} disabled={Boolean(busy)} onChange={event=>{if(event.target.value)select(clientId,event.target.value);}}/></label></div>
@@ -130,21 +136,35 @@ export default function AdminCreditPricing({adminId="admin"}) {
       {report.error && <p role="alert">{report.error}</p>}
       {!report.data && client && !report.error && <p role="status">Loading client allowance…</p>}
       {report.data && !report.data.ready && <p role="status">{report.data.setupMessage}</p>}
-      {report.data?.ready && <><div className={styles.metrics}>
-        <div className={styles.metric}><span>Allocated credits</span><strong>{report.data.allocatedCredits==null?"Not assigned":creditNumber(report.data.allocatedCredits)}</strong></div>
-        <div className={styles.metric}><span>{report.data.incomplete?"Known credits used · subtotal":"Credits used"}</span><strong>{creditNumber(report.data.creditsUsed)}</strong></div>
-        <div className={styles.metric}><span>Available balance</span><strong>{report.data.needsPreparation?"Not prepared":report.data.partialHistory?"Not confirmed":balancePresentation(report.data).label}</strong></div>
-      </div>{(report.data.incomplete || report.data.partialHistory) && <p className={styles.notice}>The full remaining balance cannot be confirmed. Missing or unprepared usage and activity before tracking began stay unknown; an allowance adjustment does not resolve those missing costs.</p>}</>}
+      {report.data?.ready && <><CreditBreakdown data={report.data}/>
+        {firstAllowance && <p className={styles.notice}><strong>No allowance assigned yet.</strong> Enter the monthly credit allowance below. The fixed AOC fee, if configured, is reported separately from AI usage and is included in total deductions.</p>}
+        {!firstAllowance && (report.data.incomplete || report.data.partialHistory) && <p className={styles.notice}>The full remaining balance cannot be confirmed. Missing or unprepared usage and activity before tracking began stay unknown; an allowance adjustment does not resolve those missing costs.</p>}
+      </>}
       {data && !data.reasonsReady && <p className={styles.notice}>Adjustment audit reasons need an additive schema update. Review the configured database, then run <code>npm run credits:migrate</code>. Existing entries and balances are preserved; recording new adjustments is disabled until this is ready.</p>}
       <form onSubmit={event=>{event.preventDefault();void allowance("allocation");}}>
         <div className={styles.form}>
-          <label>Adjustment direction<select value={adjustment.direction} disabled={Boolean(busy)} onChange={event=>updateAdjustment("direction",event.target.value)}><option value="add">Add credits</option><option value="subtract">Subtract credits</option></select></label>
-          <label>Amount · credits<input type="number" min="0.000000000001" max="1000000000" step="any" required value={adjustment.amount} disabled={Boolean(busy)} onChange={event=>updateAdjustment("amount",event.target.value)}/></label>
-          <label>Reason · admin audit trail<input type="text" maxLength={300} required value={adjustment.reason} disabled={Boolean(busy)} onChange={event=>updateAdjustment("reason",event.target.value)}/></label>
+          {!firstAllowance && <label>Adjustment direction<select value={adjustment.direction} disabled={Boolean(busy)} onChange={event=>updateAdjustment("direction",event.target.value)}><option value="add">Add credits</option><option value="subtract">Subtract credits</option></select></label>}
+          <label>{firstAllowance?"Monthly allowance (credits)":"Amount · credits"}<input
+  type="text"
+  inputMode="numeric"
+  pattern="[0-9]+"
+  maxLength={300}
+  placeholder="Enter numbers only"
+  required
+  value={adjustment.amount ?? ""}
+  disabled={Boolean(busy)}
+  onChange={(event) => {
+    const value = event.target.value;
+    if (/^[0-9]*$/.test(value)) {
+      updateAdjustment("amount", value);
+    }
+  }}
+/></label>
+          <label>Reason · admin audit trail<input type="text" maxLength={300} placeholder="e.g. Approved monthly AI allowance" required value={adjustment.reason} disabled={Boolean(busy)} onChange={event=>updateAdjustment("reason",event.target.value)}/></label>
         </div>
         <p>Use a short business reason. Do not include credentials or private prompts. Legacy entries without a reason remain unchanged.</p>
-        <div className={styles.actions}><button type="button" disabled={Boolean(busy) || !report.data?.ready || !adjustment.amount} onClick={()=>void allowance("adjustment_preview")}>Preview allowance adjustment</button>
-          <button type="submit" className={styles.primary} disabled={Boolean(busy) || !data?.reasonsReady || !scopedPreview || !adjustment.reason.trim()}>Record {adjustment.direction==="add"?"addition":"subtraction"} for {period}</button></div>
+        <div className={styles.actions}><button type="button" disabled={Boolean(busy) || !report.data?.ready || !adjustment.amount || !adjustment.reason.trim()} onClick={()=>void allowance("adjustment_preview")}>{firstAllowance?"Preview allowance":"Preview allowance adjustment"}</button>
+          <button type="submit" className={styles.primary} disabled={Boolean(busy) || !data?.reasonsReady || !scopedPreview || !adjustment.reason.trim()}>{firstAllowance?"Assign allowance":"Record "+(adjustment.direction==="add"?"addition":"subtraction")} for {period}</button></div>
         {scopedPreview && <p role="status" className={styles.notice}>Proposed {scopedPreview.change} credits · allocated allowance after: <strong>{creditNumber(scopedPreview.allocatedAfter)}</strong>.
           {" "}Remaining balance after: <strong>{scopedPreview.availableAfter==null?"Not confirmed":creditNumber(scopedPreview.availableAfter)}</strong>. This updates reporting only and does not charge a payment.</p>}
       </form>

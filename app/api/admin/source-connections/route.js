@@ -1,3 +1,4 @@
+import {withAdminAudit} from '@/lib/admin-audited-handler';
 import { cookies } from "next/headers";
 import { resolveAdminContext, adminErrorResponse } from "@/lib/admin-data";
 import { assertTrustedOrigin, readJsonRequest, requestSecurityErrorResponse } from "@/lib/request-security";
@@ -18,14 +19,14 @@ function failure(error) {
     : "The Google read-only connection could not finish. Check server configuration or reconnect. No content was published." }, { status: 503, headers });
 }
 
-export async function GET(request) {
+async function auditGET(request) {
   try {
     const { admin } = await resolveAdminContext(request.headers);
     return Response.json(await driveConnectionStatus(admin.id, { verifyAccess: true, signal: request.signal }), { headers });
   } catch (error) { return failure(error); }
 }
 
-export async function POST(request) {
+async function auditPOST(request) {
   try {
     assertTrustedOrigin(request.headers);
     const { admin, session } = await resolveAdminContext(request.headers);
@@ -44,3 +45,7 @@ export async function POST(request) {
     return Response.json({ error: "Choose a supported source connection action." }, { status: 400, headers });
   } catch (error) { return failure(error); }
 }
+
+export const GET=withAdminAudit("admin.source_connections",auditGET);
+
+export const POST=withAdminAudit("admin.source_connections",auditPOST);

@@ -6,6 +6,7 @@ const prepared={ready:false,documents:[],folders:[],publications:[],clients:[],s
 async function mockSources(page,readStatus){
   await page.route('**/api/**',async route=>{
     const url=new URL(route.request().url());
+    if(url.pathname==='/api/admin/audit-events')return route.fulfill({json:{accepted:1}});
     if(url.pathname==='/api/admin/source-connections' && route.request().method()==='GET')return readStatus(route);
     if(url.pathname==='/api/admin/source-connections')return route.fulfill({json:{rootName:'Synthetic company knowledge',files:[],checkedAt:new Date().toISOString()}});
     if(url.pathname==='/api/admin/source-connections/prepared')return route.fulfill({json:prepared});

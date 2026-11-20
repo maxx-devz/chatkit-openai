@@ -6,14 +6,14 @@ import { DriveSourceError } from "../lib/drive-source-policy.js";
 
 // Exercise the real request guards without Next's server-only import sentinel.
 const guardSource = (await readFile(new URL("../lib/request-security.js", import.meta.url), "utf8"))
-  .replace(/^import "server-only";\r?\n/m, "");
+  .replace(/^import .*;\r?\n/gm, "").replace("export function requestSecurityErrorResponse(error) {", "export function requestSecurityErrorResponse(error) { const noteAdminAuditError=()=>{};");
 const { assertTrustedOrigin, readJsonRequest, requestSecurityErrorResponse } = await import(
   `data:text/javascript;base64,${Buffer.from(guardSource).toString("base64")}`);
 process.env.BETTER_AUTH_URL = "http://127.0.0.1:3000";
 
 async function harness(authenticated = true) {
   const calls = [];
-  const mocks = {
+  const mocks = {withAdminAudit:(_operation,handler)=>handler,noteAdminAuditError:()=>{},noteAdminAuditOutcome:()=>{},
     resolveAdminContext: async () => {
       if (!authenticated) throw { publicDetails: { status: 403 } };
       return { admin: { id: "server-admin-7" } };

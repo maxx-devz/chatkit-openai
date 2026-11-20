@@ -1,3 +1,4 @@
+import {withAdminAudit} from '@/lib/admin-audited-handler';
 import { resolveAdminContext, adminErrorResponse } from "@/lib/admin-data";
 import { assertTrustedOrigin, readJsonRequest, requestSecurityErrorResponse } from "@/lib/request-security";
 import { publicProviderSettings, getRuntimeProvider, providerFromKey, saveProviderConfiguration } from "@/lib/provider-settings";
@@ -22,7 +23,7 @@ function failure(error) {
   { status: 400, headers });
 }
 
-export async function GET(request) {
+async function auditGET(request) {
   try {
     await resolveAdminContext(request.headers);
     return Response.json(await publicProviderSettings(), { headers });
@@ -58,5 +59,11 @@ async function configure(request, save) {
   } catch (error) { return failure(error); }
 }
 
-export async function POST(request) { return configure(request, false); }
-export async function PUT(request) { return configure(request, true); }
+async function auditPOST(request) { return configure(request, false); }
+async function auditPUT(request) { return configure(request, true); }
+
+export const GET=withAdminAudit("admin.provider_settings",auditGET);
+
+export const POST=withAdminAudit("admin.provider_settings",auditPOST);
+
+export const PUT=withAdminAudit("admin.provider_settings",auditPUT);

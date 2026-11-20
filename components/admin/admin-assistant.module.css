@@ -600,3 +600,5 @@
   .composer { display: grid; }
   .composer button { min-height: 40px; }
 }
+
+.card { background:var(--portal-card-background,#fff); border-color:var(--portal-card-border,#d7e5f2); box-shadow:var(--portal-card-shadow); }

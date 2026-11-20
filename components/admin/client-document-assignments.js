@@ -1,4 +1,5 @@
 "use client";
+import ActionCue from "@/components/portal-ui/action-cue";
 import {useCallback,useEffect,useRef,useState} from "react";
 import Link from "next/link";
 import {useAdminDraft} from "./admin-draft-provider";
@@ -21,7 +22,7 @@ function AssignmentForm({client,item,onSaved,onCancel}){
   const serialized=JSON.stringify(command);if(pending.current?.serialized!==serialized)pending.current={serialized,operation:crypto.randomUUID()};
   try{await api(client.id,{...command,operation:pending.current.operation});draft.clear();pending.current=null;await onSaved();}catch(e){setError(e.message);}finally{setBusy(false);}
  }
- return <section className={s.card} aria-labelledby="reference-form-title"><h2 id="reference-form-title">{item?"Edit saved reference":"Add a Drive reference"}</h2>
+ return <section data-action-card={item?"edit":"add"} className={s.card} aria-labelledby="reference-form-title"><ActionCue tone={item?"edit":"add"}>{item?"Edit reference":"Add reference"}</ActionCue><h2 id="reference-form-title">{item?"Edit saved reference":"Add a Drive reference"}</h2>
   <p className={s.muted}>Use the original file or approved client-facing folder. No second upload is needed. A tab or heading link still assigns the whole file.</p>
   <form onSubmit={save}><fieldset disabled={busy} className={s.fields}>
    <label htmlFor="document-reference-title">Display name</label><input id="document-reference-title" name="title" value={draft.value.title} onChange={change} maxLength={180} required placeholder="For example: approved audit report"/>
@@ -31,7 +32,7 @@ function AssignmentForm({client,item,onSaved,onCancel}){
    <small>A document stage label does not change journey progress.</small>
    <label htmlFor="document-reference-reason">Reason for this change</label><input id="document-reference-reason" name="reason" value={draft.value.reason} onChange={change} maxLength={400} required placeholder="A short note for the admin history"/>
    {error&&<p role="alert" className={s.error}>{error}</p>}
-   <div className={s.actions}><button type="submit" className={s.primary}>{busy?"Saving…":item?"Save changes":"Save reference"}</button>{item&&<button type="button" onClick={onCancel}>Cancel edit</button>}</div>
+   <div className={s.actions}><button data-action={item?"edit":"add"} type="submit" className={s.primary}>{busy?"Saving…":item?"Save changes":"Save reference"}</button>{item&&<button type="button" onClick={onCancel}>Cancel edit</button>}</div>
   </fieldset></form>
  </section>;
 }
@@ -41,8 +42,8 @@ function ReferenceItem({item,onEdit,onRemoved}){
  return <li className={s.reference}><div><div className={s.itemHeading}><strong>{item.title}</strong><span className={s.saved}>Saved · Not published</span></div>
   <p>{item.kind==="folder"?"Drive folder":"Drive document"}{item.stage?` · Stage ${item.stage}: ${JOURNEY_STAGE_LABELS[item.stage-1]}`:" · No journey stage assigned"}</p>
   <p className={s.url}>{item.url}</p><small>Last saved {new Date(item.updatedAt).toLocaleString()}</small></div>
-  <div className={s.actions}><a href={item.url} target="_blank" rel="noreferrer">Open in Drive</a><button type="button" disabled={busy} onClick={()=>onEdit(item)}>Edit</button><button type="button" disabled={busy} onClick={()=>setRemoving(!removing)}>Remove</button></div>
-  {removing&&<form onSubmit={remove} className={s.remove}><p>Remove this saved reference? The original Drive file will stay unchanged.</p><label htmlFor={"remove-reason-"+item.id}>Reason for removal</label><input id={"remove-reason-"+item.id} value={reason} onChange={e=>setReason(e.target.value)} maxLength={400} required disabled={busy}/><div className={s.actions}><button type="submit" disabled={busy||!reason.trim()}>Confirm removal</button><button type="button" onClick={()=>setRemoving(false)} disabled={busy}>Keep reference</button></div></form>}
+  <div className={s.actions}><a href={item.url} target="_blank" rel="noreferrer">Open in Drive</a><button data-action="edit" type="button" disabled={busy} onClick={()=>onEdit(item)}>Edit</button><button data-action="danger" type="button" disabled={busy} onClick={()=>setRemoving(!removing)}>Remove</button></div>
+  {removing&&<form data-action-card="danger" onSubmit={remove} className={s.remove}><ActionCue tone="danger">Danger · Remove this reference</ActionCue><p>Remove this saved reference? The original Drive file will stay unchanged.</p><label htmlFor={"remove-reason-"+item.id}>Reason for removal</label><input id={"remove-reason-"+item.id} value={reason} onChange={e=>setReason(e.target.value)} maxLength={400} required disabled={busy}/><div className={s.actions}><button data-action="danger" type="submit" disabled={busy||!reason.trim()}>Confirm removal</button><button data-action="neutral" type="button" onClick={()=>setRemoving(false)} disabled={busy}>Keep reference</button></div></form>}
   {error&&<p role="alert" className={s.error}>{error}</p>}
  </li>;
 }

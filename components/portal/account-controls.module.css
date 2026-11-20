@@ -85,3 +85,8 @@
     grid-template-columns: auto;
   }
 }
+
+.identity strong { font-size:12px; }.identity small { font-size:10px; line-height:1.5; }.controls > button { min-height:38px; height:auto; font-size:12px; padding:8px 12px; }.error { grid-column:1/-1; color:#a12f35; font-size:12px; line-height:1.5; }
+@media(max-width:900px) { .identity:has(select) { display:block; }.identity:has(select) small { display:none; }.controls:has(select) { grid-template-columns:minmax(0,1fr) auto; }.identity select { font-size:12px; min-height:40px; padding:6px 16px 6px 0; } }
+
+@media(max-width:720px) { .controls > button { min-height:44px; } }

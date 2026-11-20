@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '@/components/portal-ui/navigation-link';
 import { useEffect,useRef,useState } from 'react';
 
 import aocLogo from '@/aoc-logo.png';
@@ -19,7 +19,7 @@ const NAV_ITEMS = [
   ['overview', 'Overview', '/admin', 'overview'],
   ['clients', 'Clients', '/admin?view=clients', 'clients'],
   ['activity', 'AI Usage', '/admin?view=usage', 'usage'],
-  ['activity', 'AI Pricing & Credits', '/admin/credits', 'credits'],
+  ['activity', 'Plans & Credits', '/admin/credits', 'credits'],
   ['shield', 'Audit Log', '/admin/audit', 'audit'],
   ['spark', 'AI Assistant', '/admin?view=assistant', 'assistant'],
   ['spark', 'Assistant Settings', '/admin/settings', 'builder'],
@@ -68,8 +68,8 @@ export default function AdminSidebar({ admin, active = 'overview' }) {
         </Link>)}
       </nav>
       <div className={styles.sidebarStatus}>
-        <span><i /> Connected database</span>
-        <p>Local pages may use shared data. Saved changes apply to the configured database.</p>
+        <span><i /> Private admin workspace</span>
+        <p>Manage client access, approved content and AI reporting.</p>
       </div>
       <div className={styles.adminIdentity}>
         <span>{initials(admin?.name)}</span>

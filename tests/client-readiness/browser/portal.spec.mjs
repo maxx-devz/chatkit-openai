@@ -4,7 +4,7 @@ function report() {
   return {ready:true,clientId:'1',period:'2026-11',range:{start:'2026-11-01T00:00:00.000Z',end:'2026-12-01T00:00:00.000Z'},
     pricing:{id:'1',pricingType:'percentage',aocFee:'40',creditsPerUsd:'1000',effectivePeriod:'2026-11'},
     pricingExample:{apiCostUsd:'1',aocFeeUsd:'0.4',totalClientCostUsd:'1.4',creditsUsed:'1400'},
-    availableCredits:null,allocatedCredits:'1100',creditsUsed:'5.613146',incomplete:true,unpricedEvents:5,missingTurns:0,pendingUsageEvents:0,
+    availableCredits:null,allocatedCredits:'1100',creditsUsed:'5.613146',aiUsageCredits:'5.613146',fixedFeeCredits:'0',fixedFeeUsd:'0',incomplete:true,unpricedEvents:5,missingTurns:0,pendingUsageEvents:0,
     estimatedEvents:1,partialHistory:false,trackingStartedAt:'2026-10-01T00:00:00.000Z',fetchedAt:new Date().toISOString(),
     transactions:[{kind:'allocation',credits:'100',api_cost_usd:null,aoc_fee_usd:null,basis:'manual',occurred_at:'2026-11-17T00:00:00.000Z'},
       {kind:'usage',credits:null,api_cost_usd:null,aoc_fee_usd:null,basis:'unknown',status:'failed',occurred_at:'2026-11-16T00:00:00.000Z'}],
@@ -22,12 +22,77 @@ async function fixture(page,{state='incomplete'}={}) {
     }else if(url.pathname==='/api/hubstaff')body={configured:true,project:{name:'Fixture Project',url:'https://example.com'},hours:{used:20,limit:20,remaining:0,budgetSpent:20,budgetRecurrence:'monthly'},source:{monthStart:'2026-11-01',monthEnd:'2026-11-17',timeZone:'Asia/Manila',fetchedAt:new Date().toISOString()}};
     else if(url.pathname==='/api/hubstaff/workflow')body={configured:true,columns:[{id:'notes',name:'Notes',stage:'other',taskCount:2},{id:'doing',name:'Doing',stage:'in_progress',taskCount:3},{id:'review',name:'Client review',stage:'review',taskCount:5},{id:'ideas',name:'Ideas',stage:'other',taskCount:1}]};
     else if(url.pathname==='/api/client-library')body={items:[]};
+    else if(url.pathname==='/api/client-documents')body={clientId:'1',items:[],journey:null,hasMore:false};
+    else if(url.pathname==='/api/client/website-insights')body={websites:[]};
     else if(url.pathname==='/api/client/members')body={members:[],events:[]};
     else if(url.pathname==='/api/client/audit')body={events:{rows:[{id:1,kind:'document',action:'client.document.add',actor_name:'Fixture User',target_name:'Brief',occurred_at:'2026-11-17T00:00:00.000Z'}]},usage:{rows:[]},pagination:{eventPage:1,usagePage:1}};
     await route.fulfill({json:body});
   });
   return data;
 }
+
+test('all client modules fit desktop and mobile without horizontal page overflow',async({page},info)=>{
+  test.setTimeout(120000);
+  await fixture(page);
+  const failures=[];page.on('pageerror',error=>failures.push(error.message));
+  for(const view of ['dashboard','website-insights','time','projects','documents','members','audit','account']){
+    await page.goto('/?view='+view+'&role='+(view==='dashboard'?'client_viewer':'client_admin'));
+    await expect(page.getByRole('main')).toBeVisible();
+    if(view==='website-insights')await expect(page.locator('#website-insights-title')).toBeVisible();
+    if(view==='documents')await expect(page.getByRole('region',{name:'Official client documents and journey'})).toContainText('Your journey');
+    if(view==='members')await expect(page.getByRole('heading',{name:'Members & Access',exact:true,level:1})).toBeVisible();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),view+' page overflow').toBe(true);
+    const credit=await page.getByRole('button',{name:'AI Credits navigation',exact:true}).boundingBox();
+    const account=await page.getByRole('button',{name:'Sign out',exact:true}).boundingBox();
+    expect(credit && account && credit.x<account.x+account.width && credit.x+credit.width>account.x && credit.y<account.y+account.height && credit.y+credit.height>account.y,view+' header controls overlap').toBe(false);
+    await page.screenshot({path:info.outputPath('client-'+view+'.png'),fullPage:true,caret:'initial'});
+  }
+  expect(failures).toEqual([]);
+});
+
+test('AI-only navigation skips Hubstaff polling and sidebar changes do not reload the document',async({page},info)=>{
+  await fixture(page);
+  await page.route('https://cdn.platform.openai.com/**',route=>route.fulfill({contentType:'application/javascript',body:"if(!customElements.get('openai-chatkit'))customElements.define('openai-chatkit',class extends HTMLElement {setOptions(){} async setThreadId(){}});"}));
+  await page.route('**/api/ai-access',route=>route.fulfill({json:{ai:{enabled:true,uploadsEnabled:false}}}));
+  await page.route('**/api/conversations',route=>route.fulfill({json:{conversations:[]}}));
+  let hubstaff=0,documents=0;
+  page.on('request',request=>{if(new URL(request.url()).pathname.startsWith('/api/hubstaff'))hubstaff++;if(request.resourceType()==='document')documents++;});
+  await page.goto('/?view=ai');
+  await expect(page.getByRole('heading',{name:'AOC AI',exact:true,level:1})).toBeVisible();
+  if(info.project.name==='touch')await page.locator('details').filter({has:page.locator('nav[aria-label="Mobile client portal"]')}).locator('summary').click();
+  await page.getByRole('link',{name:'Account',exact:true}).click();
+  await expect(page.getByRole('main')).toContainText('This page changes your password only');
+  expect(hubstaff).toBe(0);
+  expect(documents).toBe(1);
+});
+
+test('workspace switching is available on mobile, retries failures, and resets the account controls',async({page,context})=>{
+  const data=await fixture(page);
+  await page.route('**/api/credits?**',route=>route.fulfill({json:{...data,clientId:route.request().headers()['x-aoc-client'] || '1'}}));
+  let changes=0;
+  await page.route('**/api/session/client',async route=>{
+    changes++;
+    if(changes===1)return route.fulfill({status:503,json:{error:'Synthetic temporary failure'}});
+    await context.addCookies([{name:'fixture_workspace',value:'second',url:'http://127.0.0.1:3115'}]);
+    return route.fulfill({json:{ok:true}});
+  });
+  await page.goto('/?view=account&multi=1');
+  const workspace=page.getByRole('combobox',{name:'Active client account'});
+  await expect(workspace).toBeVisible();
+  await workspace.selectOption('second');
+  await expect(page.locator('header [role="alert"]')).toContainText('This workspace could not be opened');
+  await expect(workspace).toBeEnabled();
+  await workspace.selectOption('second');
+  await expect(workspace).toHaveValue('second');
+  await expect(workspace).toBeEnabled();
+  await expect(page.getByRole('link',{name:'Members & Access',exact:true})).toHaveCount(0);
+  await expect(page.locator('header [role="alert"]')).toHaveCount(0);
+  await page.route('**/api/auth/sign-out',route=>route.fulfill({status:503,json:{message:'Synthetic sign-out failure'}}));
+  await page.getByRole('button',{name:'Sign out',exact:true}).click();
+  await expect(page.locator('header [role="alert"]')).toContainText('Sign-out could not finish');
+  await expect(page.getByRole('button',{name:'Sign out',exact:true})).toBeEnabled();
+  expect(new URL(page.url()).pathname).toBe('/');
+});
 
 test('credits remain clear, unknown costs are not zero, and details work with keyboard or touch',async({page},info)=>{
   await fixture(page);await page.goto('/credits');
@@ -88,8 +153,8 @@ test('client pages stay inside main, role navigation is preserved, search works 
   const search=page.getByRole('searchbox',{name:'Find a portal page'});await search.fill('credits');
   await expect(page.getByRole('navigation',{name:'Matching portal pages'}).getByRole('link',{name:'Credits & usage'})).toBeVisible();
   await search.press('Escape');await expect(page.getByRole('navigation',{name:'Matching portal pages'})).toHaveCount(0);
-  await page.getByLabel('Notification availability').click();await expect(page.getByText('No notification feed is connected')).toBeVisible();
-  await page.getByText('Privacy Policy',{exact:true}).click();await expect(page.getByText('A portal privacy-policy link has not been configured')).toBeVisible();
+  await page.getByLabel('Notification availability').click();await expect(page.getByText('Notifications are not connected yet.',{exact:false})).toBeVisible();
+  await page.getByText('Privacy Policy',{exact:true}).click();await expect(page.getByText('A policy link has not been added to this portal yet.',{exact:false})).toBeVisible();
   await page.goto('/?view=time&role=member');await expect(page.getByRole('main')).toContainText('Tracked time and available Hubstaff budgets are shown for this project.');
   await expect(page.getByRole('main')).toContainText('Asia/Manila');
   await page.goto('/?view=projects&role=member');await expect(page.getByRole('main')).toContainText('5 tasks are awaiting client review.');
@@ -129,4 +194,28 @@ test('an admin AI reset makes all 600 assigned credits visible in both header an
   await page.getByRole('link',{name:'Usage History',exact:true}).click();
   await expect(page.locator('#history')).toContainText('No API activity recorded for this period.');
   await page.screenshot({path:info.outputPath('credits-after-ai-reset.png'),fullPage:true});
+});
+
+test('client sees no AI consumption when only a fixed service fee is recorded',async({page})=>{
+  const data=await fixture(page);
+  Object.assign(data,{pricing:{...data.pricing,pricingType:'fixed',aocFee:'200'},allocatedCredits:null,availableCredits:null,
+    aiUsageCredits:'0',fixedFeeCredits:'200000',fixedFeeUsd:'200',creditsUsed:'200000',incomplete:false,unpricedEvents:0});
+  await page.goto('/?view=credits');
+  const cards=page.getByLabel('Credit breakdown');
+  await expect(cards.locator('article').filter({hasText:'AI usage credits'}).locator('strong')).toHaveText('0');
+  await expect(cards.locator('article').filter({hasText:'Monthly AOC fee'}).locator('strong')).toHaveText('200,000');
+  await expect(cards.getByText('Allowance not set',{exact:true})).toBeVisible();
+});
+
+test('client add, remove and security actions use purpose colors plus text cues',async({page},info)=>{
+ await fixture(page);
+ await page.route('**/api/client/members',route=>route.fulfill({json:{members:[{id:'99',name:'Example Member',username:'example.member',role:'member',active:true}],events:[]}}));
+ await page.goto('/?view=members');
+ const addForm=page.getByRole('heading',{name:'Create a client login',exact:true}).locator('..');
+ await expect(addForm.getByText('Add a client login',{exact:true})).toBeVisible();await expect(addForm).toHaveCSS('border-inline-start-color','rgb(4, 120, 87)');
+ await expect(page.getByRole('button',{name:'Deactivate',exact:true})).toHaveCSS('background-color','rgb(180, 35, 24)');
+ await page.goto('/?view=account');
+ const security=page.getByRole('heading',{name:'Password & sign-in security',exact:true}).locator('..');
+ await expect(security.getByText('Caution · Account security',{exact:true})).toBeVisible();await expect(security).toHaveCSS('border-inline-start-color','rgb(146, 64, 14)');
+ await security.screenshot({path:info.outputPath('account-security-caution.png')});
 });

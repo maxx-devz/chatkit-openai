@@ -59,7 +59,7 @@ test("Progress scheduling distinguishes queued backfill, ready indexes and activ
 
 async function endpoint({ auth = true, origin = true, result = { clientId: "1", syncedTasks: 20, syncedComments: 100 }, error } = {}) {
   const calls = [], key = `index_route_${randomUUID()}`;
-  const mocks = {
+  const mocks = {withAdminAudit:(_operation,handler)=>handler,noteAdminAuditError:()=>{},noteAdminAuditOutcome:()=>{},
     assertTrustedOrigin: () => { calls.push("origin"); if (!origin) throw { security: true }; },
     resolveAdminContext: async () => { calls.push("auth"); if (!auth) throw { publicDetails: { status: 401 } }; },
     adminErrorResponse: () => Response.json({ error: "Sign in again" }, { status: 401 }),

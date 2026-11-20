@@ -1,5 +1,6 @@
 "use client";
 
+import ActionCue from "@/components/portal-ui/action-cue";
 import { useCallback, useEffect, useState } from "react";
 import styles from "./client-access.module.css";
 
@@ -62,18 +63,18 @@ export default function ClientDocumentsPanel({ clientId, canContribute }) {
           <a href={item.type === "file" ? item.downloadUrl : item.url}
             {...(item.type === "file" ? {} : { target: "_blank", rel: "noreferrer" })}>
             {item.type === "file" ? "Download" : "Open"}</a>
-          {item.canRemove ? <button type="button" disabled={busy} onClick={() => remove(item)}>Remove</button> : null}
+          {item.canRemove ? <button data-action="danger" type="button" disabled={busy} onClick={() => remove(item)}>Remove</button> : null}
         </div>
       </li>)}
     </ul> : <p>No documents have been added yet.</p>}
-    {canContribute ? <form className={styles.form} onSubmit={addLink}>
+    {canContribute ? <form data-action-card="add" className={styles.form} onSubmit={addLink}><ActionCue tone="add">Add a shared reference</ActionCue>
       <h3>Add a reference link</h3>
       <div className={styles.fields}>
         <label>Title<input name="title" required maxLength={180} /></label>
         <label>HTTPS URL<input name="url" type="url" required maxLength={1000} /></label>
       </div>
       <label>Description<textarea name="description" maxLength={4000} rows={2} /></label>
-      <button type="submit" disabled={busy}>{busy ? "Saving..." : "Add reference"}</button>
+      <button data-action="add" type="submit" disabled={busy}>{busy ? "Saving..." : "Add reference"}</button>
     </form> : null}
   </section>;
 }

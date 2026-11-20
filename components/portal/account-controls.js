@@ -9,6 +9,7 @@ import styles from "./account-controls.module.css";
 export default function AccountControls({ client, memberships, user }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
   const initials = client.name
     .split(/\s+/)
     .filter(Boolean)
@@ -23,26 +24,33 @@ export default function AccountControls({ client, memberships, user }) {
     const slug = event.target.value;
     if (!slug || slug === client.slug) return;
     setBusy("switching");
-
-    const response = await fetch("/api/session/client", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slug }),
-    });
-
-    if (response.ok) {
+    setError("");
+    try {
+      const response = await fetch("/api/session/client", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug }),
+      });
+      if (!response.ok) throw new Error("This workspace could not be opened. Please try again.");
       router.refresh();
-      return;
+    } catch {
+      setError("This workspace could not be opened. Please try again.");
+      setBusy("");
     }
-
-    setBusy("");
   }
 
   async function signOut() {
     setBusy("signout");
-    await authClient.signOut().catch(() => null);
-    router.replace("/login");
-    router.refresh();
+    setError("");
+    try {
+      const result=await authClient.signOut();
+      if(result.error)throw new Error("Sign-out failed");
+      router.replace("/login");
+      router.refresh();
+    } catch {
+      setError("Sign-out could not finish. Please try again.");
+      setBusy("");
+    }
   }
 
   return (
@@ -77,8 +85,9 @@ export default function AccountControls({ client, memberships, user }) {
         title="Sign out"
         type="button"
       >
-        {busy === "signout" ? "..." : "Sign out"}
+        {busy === "signout" ? "Signing out…" : "Sign out"}
       </button>
+      {error && <span role="alert" className={styles.error}>{error}</span>}
     </div>
   );
 }

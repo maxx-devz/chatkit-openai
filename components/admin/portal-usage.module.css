@@ -64,3 +64,16 @@
 .historyPreview label { max-width:320px; margin:16px 0; }
 .historyControls .clearHistoryButton { background:#a6252a; border-color:#a6252a; color:#fff; }
 @media(max-width:720px) { .historyFields { grid-template-columns:1fr; } }
+
+.panel { background:var(--portal-card-background,#fff); border-color:var(--portal-card-border,#d7e5f2); box-shadow:var(--portal-card-shadow); }
+.heading { flex-wrap:wrap; align-items:center; gap:16px; }.metrics > div { background:linear-gradient(140deg,#f0f7ff,#fcfdff); }.heading button { min-height:42px; }
+
+/* Spending navigation is separate from report filters, with matching control sizes. */
+.spendingHeader{align-items:flex-start}.spendingHeader>div{flex:1;min-width:220px}
+.spending .plansLink{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:9px 13px;border:1px solid #a9cce9;border-radius:10px;background:#fff;color:#075d91;text-decoration:none;font-size:13px;font-weight:650;white-space:nowrap;box-sizing:border-box}
+.plansLink svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.spending .plansLink:hover{background:#eaf5ff;border-color:#69a3d2}.spending .plansLink:focus-visible{outline:3px solid #207fc4;outline-offset:3px}
+.spendingActions{display:flex;align-items:flex-end;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin:18px 0}
+.spendingActions label{min-width:170px}.spendingActions input{min-height:42px;box-sizing:border-box;width:100%;font:inherit}
+.spendingActions button{min-height:42px;box-sizing:border-box;padding:9px 14px;border:1px solid #b4cdea;border-radius:10px;background:#f6faff;color:#075d91;font:inherit;font-size:13px;cursor:pointer}
+@media(max-width:700px){.spendingHeader>div{min-width:0}.spendingActions{justify-content:flex-start;width:100%}.spendingActions label{width:100%;min-width:0}.spendingActions button{flex:1}.spending .plansLink{white-space:normal;max-width:100%}}

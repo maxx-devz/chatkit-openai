@@ -53,7 +53,7 @@ export default function HeaderCredits({clientId,active=false}) {
       {data?.ready && <p className={styles.summary}>{data.period} · UTC<br/>Allocated: {creditNumber(data.allocatedCredits)}<br/>
         {data.incomplete?"Known usage subtotal":"Credits used"}: {creditNumber(data.creditsUsed)}</p>}
       <nav id={id} role="menu" aria-label="AI Credits">
-      {CREDIT_LINKS.map(([label,section])=><Link key={section} role="menuitem" href={"/credits#"+section}
+      {(data?.mode==='subscription'&&data.configured?[["Plan overview","overview"],["Request more credits","pricing"],["Request history","history"],["How credits work","tokens"]]:CREDIT_LINKS).map(([label,section])=><Link key={section} role="menuitem" href={"/credits#"+section}
         prefetch={false} onClick={close}>{label}</Link>)}
       </nav>
     </div>}

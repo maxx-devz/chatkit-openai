@@ -1,3 +1,4 @@
+import {withAdminAudit} from '@/lib/admin-audited-handler';
 import { resolveAdminContext, adminErrorResponse } from "@/lib/admin-data";
 import { assertTrustedOrigin, readJsonRequest, requestSecurityErrorResponse } from "@/lib/request-security";
 import { adminHubstaffSearchStatus } from "@/lib/hubstaff-search-store";
@@ -20,7 +21,7 @@ function failure(error) {
     || Response.json({error:["42P01","42703"].includes(error?.code) ? "Run npm run hubstaff:index:migrate first."
       : "Index synchronization could not finish. Check Hubstaff access and try again; the saved cursor is retained."}, {status:503,headers});
 }
-export async function GET(request) {
+async function auditGET(request) {
   try {
     await resolveAdminContext(request.headers);
     const clientId = new URL(request.url).searchParams.get("clientId");
@@ -29,7 +30,7 @@ export async function GET(request) {
     return Response.json(await adminHubstaffSearchStatus(clientId), {headers});
   } catch (error) { return failure(error); }
 }
-export async function POST(request) {
+async function auditPOST(request) {
   try {
     assertTrustedOrigin(request.headers);
     await resolveAdminContext(request.headers);
@@ -47,3 +48,7 @@ export async function POST(request) {
     return Response.json({...result,completedAt:new Date().toISOString(),retryAfterSeconds:12},{headers});
   } catch (error) { return failure(error); }
 }
+
+export const GET=withAdminAudit("admin.hubstaff_index",auditGET);
+
+export const POST=withAdminAudit("admin.hubstaff_index",auditPOST);

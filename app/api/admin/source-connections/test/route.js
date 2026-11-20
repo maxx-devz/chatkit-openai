@@ -1,3 +1,4 @@
+import {withAdminAudit} from '@/lib/admin-audited-handler';
 import OpenAI from "openai";
 import { resolveAdminContext, adminErrorResponse } from "@/lib/admin-data";
 import { assertTrustedOrigin, readJsonRequest, requestSecurityErrorResponse } from "@/lib/request-security";
@@ -41,14 +42,14 @@ function failure(error) {
   return Response.json({ error: "The private source test could not finish. Check the source connection and AI provider settings.", code: "source_test_unavailable" }, { status: 503, headers });
 }
 
-export async function GET(request) {
+async function auditGET(request) {
   try {
     await resolveAdminContext(request.headers);
     return Response.json({ provider: sourceTestProvider(await getRuntimeProvider()), limits: SOURCE_TEST_LIMITS }, { headers });
   } catch (error) { return failure(error); }
 }
 
-export async function POST(request) {
+async function auditPOST(request) {
   try {
     assertTrustedOrigin(request.headers);
     const { admin } = await resolveAdminContext(request.headers);
@@ -57,3 +58,7 @@ export async function POST(request) {
     return Response.json(await runTest(admin.id, body, { signal }), { headers });
   } catch (error) { return failure(error); }
 }
+
+export const GET=withAdminAudit("admin.source_connections.test",auditGET);
+
+export const POST=withAdminAudit("admin.source_connections.test",auditPOST);

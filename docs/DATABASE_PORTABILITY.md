@@ -154,3 +154,23 @@ tables remain unchanged. Ordinary runtime privileges and standard PostgreSQL
 constraints/transactions are used; no provider SDK/extension or RLS claim is added.
 Original Drive files stay in Drive and are read on demand, with no file-storage
 migration or AI-source publication.
+
+## Fresh local Supabase development setup
+
+On 2026-11-20 the user chose a fresh Supabase development database for the
+`client-documents` checkout instead of importing Neon records. Neon and hosted
+Vercel configuration were left intact. See [fresh setup and verification](SUPABASE_FRESH_SETUP.md).
+
+`database/portal-runtime-grants.sql` records standard PostgreSQL access grants for
+the separately provisioned, non-owner `aoc_portal_runtime` login. Optional
+Supabase API-role grants are revoked only when those roles exist. No provider SDK,
+SQL extension, Supabase Auth/Storage switch or tenant RLS claim is introduced.
+Use the private operator URL for future DDL, then reapply the runtime grants.
+
+
+Client plans use the versioned `database/client-plans.sql` migration and a shared
+standard PostgreSQL balance view. Runtime access remains server-only through the
+existing Node/Python connectors. A separate operator connection applies reviewed
+DDL/grants; no new provider SDK, browser grant or tenant-RLS claim is introduced.
+Legacy reporting entries remain immutable history rather than subscription debits.
+See `docs/CLIENT_PLANS.md` for paid activation, per-request locking and limits.

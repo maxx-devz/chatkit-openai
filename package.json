@@ -83,7 +83,12 @@
     "test:http": "node scripts/check-builder-http.mjs",
     "test:ai-reset:database": "node --env-file=.env.local scripts/check-ai-fresh-reset-database.mjs",
     "documents:setup:migrate": "node scripts/migrate-client-document-assignments.mjs",
-    "test:documents": "node --test tests/client-document-assignment-policy.test.mjs"
+    "test:documents": "node --test tests/client-document-assignment-policy.test.mjs",
+    "client-plans:migrate": "node --env-file=.env.local scripts/migrate-client-plans.mjs",
+    "test:client-plans": "node --test tests/client-plans.test.mjs",
+    "audit:operations:migrate": "node --env-file=.env.local scripts/migrate-admin-operations.mjs",
+    "test:audit:operations": "node --test tests/admin-operations.test.mjs",
+    "test:audit:operations:database": "node scripts/check-admin-operations-database.mjs"
   },
   "engines": {
     "node": ">=22"

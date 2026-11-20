@@ -1601,3 +1601,25 @@
     gap: 8px;
   }
 }
+
+/* Shared surfaces stay CSS-only: no extra image or font requests. */
+.portalShell { background:radial-gradient(ellipse at 88% 0%,#e4f1ff 0,transparent 40%),#f4f8fc; }
+.sidebar { min-height:0; height:100dvh; }
+.portalNav { min-height:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; flex:1; }
+.sidebarAccount { flex-shrink:0; }
+.topbar { grid-template-areas:"welcome search notifications credits account"; background:linear-gradient(110deg,#fff,#f4f9ff); backdrop-filter:none; }
+.welcome { grid-area:welcome; min-width:0; }.headerSearch { grid-area:search; min-width:0; }.notificationAvailability { grid-area:notifications; }.headerCredits { grid-area:credits; min-width:0; }.headerAccount { grid-area:account; min-width:0; }
+.dashboard { width:100%; }.card,.quickQuestions,.metricCard { background:var(--portal-card-background,#fff); border-color:var(--portal-card-border,#d7e5f2); box-shadow:var(--portal-card-shadow); }
+.cardHeader { min-height:54px; }.cardHeader h2 { line-height:1.45; }
+@media(max-width:720px) {
+ .topbar { grid-template-areas:"welcome account" "search search" "credits notifications"; grid-template-columns:minmax(0,1fr) auto; gap:12px; padding:16px; }
+ .notificationAvailability { justify-self:end; }.headerAccount { justify-self:end; width:100%; }.dashboard { padding:16px 12px 24px; }
+ .headerCredits { align-self:center; }.metricCard { padding:18px; }
+}
+
+.dashboard { display:flex; flex-direction:column; gap:20px; }.dashboard > section { margin-block:0; }
+
+/* Readable reporting labels at laptop and mobile sizes. */
+.metricBody > p { font-size:12px; line-height:1.5; }.metricBody > span { font-size:11px; color:#526b83; line-height:1.6; }.metricValue b { font-size:11px; }
+.glanceStats span { font-size:11px; line-height:1.5; }.taskStageLabel strong { font-size:12px; white-space:normal; line-height:1.45; }.taskCount,.taskCard small,.taskAssistantPrompt small { font-size:11px; }.taskCard strong,.taskAssistantPrompt strong { font-size:12px; }
+.sidebarAccount strong { font-size:12px; }.sidebarAccount small { font-size:10px; }.welcome span { font-size:12px; }.footer { font-size:11px; }.policyLinks summary { font-size:12px; min-height:36px; display:flex; align-items:center; }

@@ -8,7 +8,7 @@ import { validateGenerationOptions } from "../lib/provider-generation-options.js
 
 async function endpoint({ auth = true, origin = true, accountError, modelBlocked = false } = {}) {
   const calls = [], key = `provider_route_${randomUUID()}`;
-  const mocks = {
+  const mocks = {withAdminAudit:(_operation,handler)=>handler,noteAdminAuditError:()=>{},noteAdminAuditOutcome:()=>{},
     assertTrustedOrigin: () => { calls.push("origin"); if (!origin) throw { security: true }; },
     resolveAdminContext: async () => { calls.push("auth"); if (!auth) throw { publicDetails: {} }; return { admin: { id: "admin-test" } }; },
     adminErrorResponse: () => Response.json({ error: "Sign in" }, { status: 401 }),

@@ -53,3 +53,6 @@
 .testCitations span,.testCitations small { color:#657a94; font-size:12px; }
 .page textarea:focus-visible,.page select:focus-visible { outline:3px solid #83baff; outline-offset:3px; }
 @media(max-width:640px) { .card { padding:18px; } .card dl { grid-template-columns:1fr; } .files li { align-items:flex-start; flex-direction:column; } }
+
+.card { background:var(--portal-card-background,#fff); border-color:var(--portal-card-border,#d7e5f2); box-shadow:var(--portal-card-shadow); }
+.card :is(button,input,select) { min-height:42px; }.card dd { margin-inline-start:0; overflow-wrap:anywhere; }

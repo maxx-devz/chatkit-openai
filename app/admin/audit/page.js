@@ -1,3 +1,5 @@
+import AdminHistoricalRecords from '@/components/admin/admin-historical-records';
+import AdminAuditTimeline from '@/components/admin/admin-audit-timeline';
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
@@ -56,17 +58,8 @@ export default async function AocAuditPage({ searchParams }) {
         {audit.clients.map(client => <option key={client.id} value={client.id}>{client.display_name}</option>)}
       </select></label><button type="submit">Filter</button>
     </form>
-    <section className={styles.section} id="admin-actions"><h2>Admin actions</h2>
-      <p>Client and AI configuration changes, protected access changes, and audit reads.</p>
-      <div className={styles.scroll}><table className={styles.table}><thead><tr>
-        <th>When</th><th>Client</th><th>Actor</th><th>Action</th><th>Target</th>
-      </tr></thead><tbody>{audit.events.rows.map(event => <tr key={`${event.kind}-${event.id}`}>
-        <td>{date(event.occurred_at)}</td><td>{event.client_name}</td><td>{event.actor_name}</td>
-        <td>{readable(event.action)}</td><td>{event.target_id || event.target_type}</td>
-      </tr>)}</tbody></table></div>
-      {!audit.events.rows.length && <p>No matching actions.</p>}
-      <Pagination pagination={p} kind="eventPage" hasMore={audit.events.hasMore} anchor="admin-actions" />
-    </section>
+    <AdminAuditTimeline/>
+    <AdminHistoricalRecords rows={audit.events.rows} footer={<Pagination pagination={p} kind="eventPage" hasMore={audit.events.hasMore} anchor="admin-actions"/>}/>
     <section className={styles.section} id="integration-runs"><h2>Integration runs</h2>
       <p>Actual AOC and client-portal provider requests. Internal-only runs remain in Internal Audit.</p>
       <div className={styles.scroll}><table className={styles.table}><thead><tr>

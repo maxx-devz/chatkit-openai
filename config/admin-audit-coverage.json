@@ -1,0 +1,280 @@
+[
+  {
+    "route": "/api/admin/ai-spending",
+    "methods": [
+      "GET"
+    ],
+    "operation": "admin.ai_spending",
+    "recording": "Read-only; no change-audit entries",
+    "auditedMethods": []
+  },
+  {
+    "route": "/api/admin/ai-usage",
+    "methods": [
+      "GET"
+    ],
+    "operation": "admin.ai_usage",
+    "recording": "Read-only; no change-audit entries",
+    "auditedMethods": []
+  },
+  {
+    "route": "/api/admin/assistant",
+    "methods": [
+      "GET",
+      "PUT",
+      "POST"
+    ],
+    "operation": "admin.assistant",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "PUT",
+      "POST"
+    ]
+  },
+  {
+    "route": "/api/admin/audit",
+    "methods": [
+      "GET"
+    ],
+    "operation": "admin.audit",
+    "recording": "Read-only; no change-audit entries",
+    "auditedMethods": []
+  },
+  {
+    "route": "/api/admin/client-document-assignments",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "operation": "admin.client_document_assignments",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "POST"
+    ]
+  },
+  {
+    "route": "/api/admin/client-documents",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "operation": "admin.client_documents",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "POST"
+    ]
+  },
+  {
+    "route": "/api/admin/client-operations",
+    "methods": [
+      "GET"
+    ],
+    "operation": "admin.client_operations",
+    "recording": "Read-only; no change-audit entries",
+    "auditedMethods": []
+  },
+  {
+    "route": "/api/admin/client-plan",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "operation": "admin.client_plan",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "POST"
+    ]
+  },
+  {
+    "route": "/api/admin/clients",
+    "methods": [
+      "GET",
+      "POST",
+      "PATCH"
+    ],
+    "operation": "admin.clients",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "POST",
+      "PATCH"
+    ]
+  },
+  {
+    "route": "/api/admin/credits",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "operation": "admin.credits",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "POST"
+    ],
+    "excludedActions": [
+      "preview",
+      "adjustment_preview"
+    ]
+  },
+  {
+    "route": "/api/admin/hubstaff-index",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "operation": "admin.hubstaff_index",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "POST"
+    ]
+  },
+  {
+    "route": "/api/admin/presence",
+    "methods": [
+      "GET"
+    ],
+    "operation": "admin.presence",
+    "recording": "Read-only; no change-audit entries",
+    "auditedMethods": []
+  },
+  {
+    "route": "/api/admin/provider-settings",
+    "methods": [
+      "GET",
+      "POST",
+      "PUT"
+    ],
+    "operation": "admin.provider_settings",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "PUT"
+    ]
+  },
+  {
+    "route": "/api/admin/source-connections",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "operation": "admin.source_connections",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "POST"
+    ]
+  },
+  {
+    "route": "/api/admin/usage",
+    "methods": [
+      "POST"
+    ],
+    "operation": "admin.usage",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "POST"
+    ]
+  },
+  {
+    "route": "/api/admin/source-connections/callback",
+    "methods": [
+      "GET"
+    ],
+    "operation": "admin.source_connections.callback",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "GET"
+    ]
+  },
+  {
+    "route": "/api/admin/source-connections/prepared",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "operation": "admin.source_connections.prepared",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "POST"
+    ]
+  },
+  {
+    "route": "/api/admin/source-connections/test",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "operation": "admin.source_connections.test",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "POST"
+    ]
+  },
+  {
+    "route": "/api/admin/make/test",
+    "methods": [
+      "POST"
+    ],
+    "operation": "admin.make.test",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "POST"
+    ]
+  },
+  {
+    "route": "/api/admin/client-documents/google",
+    "methods": [
+      "POST"
+    ],
+    "operation": "admin.client_documents.google",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "POST"
+    ]
+  },
+  {
+    "route": "/api/admin/client-documents/google/callback",
+    "methods": [
+      "GET"
+    ],
+    "operation": "admin.client_documents.google.callback",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "GET"
+    ]
+  },
+  {
+    "route": "/api/admin/ai-usage/history",
+    "methods": [
+      "POST"
+    ],
+    "operation": "admin.ai_usage.history",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "POST"
+    ],
+    "excludedActions": [
+      "preview"
+    ]
+  },
+  {
+    "route": "/api/builder",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "operation": "admin.builder",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "POST"
+    ]
+  },
+  {
+    "route": "/api/builder/preview",
+    "methods": [
+      "POST"
+    ],
+    "operation": "admin.builder.preview",
+    "recording": "Submitted writes; ordinary reads excluded; OAuth grant callbacks retained",
+    "auditedMethods": [
+      "POST"
+    ]
+  }
+]

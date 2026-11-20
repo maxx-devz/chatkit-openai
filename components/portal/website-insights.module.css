@@ -96,3 +96,8 @@
 @media (max-width: 1100px) { .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .heading, .siteBar { align-items: stretch; flex-direction: column; } .addForm { grid-template-columns: 1fr; } }
 @media (max-width: 700px) { .findingGrid, .previewGrid, .chartGrid { grid-template-columns: 1fr; } .googleBox, .property { align-items: stretch; flex-direction: column; } .metric { padding: 14px; } .findingTop { flex-wrap: wrap; } }
 @media print { .heading button, .siteActions, .siteBar, .googleBox, .tabs, .filters, .progress { display: none; } .finding, .preview, .chart, .performance { break-inside: avoid; } .findingGrid, .previewGrid, .chartGrid { display: block; } .finding, .preview, .chart { margin: 12px 0; } }
+
+.metric,.finding,.chart,.performance { background:var(--portal-card-background,#fff); border-color:var(--portal-card-border,#d7e5f2); box-shadow:var(--portal-card-shadow); }
+.heading { gap:18px; flex-wrap:wrap; }.heading h1 { line-height:1.25; }.tabs { scrollbar-width:thin; }.filters { align-items:end; }.filters label { min-width:0; }
+
+.heading h2 { margin:8px 0; font-size:clamp(23px,3vw,32px); line-height:1.25; }

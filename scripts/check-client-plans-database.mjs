@@ -1,0 +1,37 @@
+import pg from 'pg';import assert from 'node:assert/strict';import {randomUUID} from 'node:crypto';
+import {readClientPlan,mutateClientPlan,requestClientPlan,PlanConflict} from '../lib/client-plan-store.js';
+const url=process.env.DATABASE_URL;if(!url||!['127.0.0.1','localhost'].includes(new URL(url).hostname)||!/^aoc_documents_[a-f0-9]{10}$/.test(new URL(url).pathname.slice(1)))throw Error('Disposable loopback target required.');
+const db=new pg.Pool({connectionString:url,max:3});
+try {
+ const action=overrides=>({clientId:'1',action:'save',idempotencyKey:randomUUID(),price:'200',credits:'1000',status:'active',expectedVersion:'0',reason:'Synthetic paid plan',activate:true,paymentReference:'TEST-PAID',paymentConfirmed:true,...overrides});
+ const save=action();await mutateClientPlan(db,save,'1');assert.equal((await mutateClientPlan(db,save,'1')).duplicate,true);
+ let plan=await readClientPlan(db,'1',{admin:true});assert.equal(plan.availableCredits,'1000');assert.equal(plan.month.monthly_price,'200.00');assert.equal(plan.creditsUsed,'0');
+ await assert.rejects(mutateClientPlan(db,action({clientId:'2'}),'101'),PlanConflict);
+ await assert.rejects(mutateClientPlan(db,action({price:'201'}),'1'),PlanConflict);
+ const request={idempotencyKey:randomUUID(),kind:'credits',note:'Synthetic more credits'};
+ await requestClientPlan(db,'1','101',request);assert.equal((await requestClientPlan(db,'1','101',request)).duplicate,true);
+ await assert.rejects(requestClientPlan(db,'2','101',{...request,idempotencyKey:randomUUID()}),PlanConflict);
+ await assert.rejects(requestClientPlan(db,'1','102',{...request,idempotencyKey:randomUUID()}),PlanConflict);
+ assert.equal((await requestClientPlan(db,'1','101',{...request,idempotencyKey:randomUUID()})).duplicate,true);
+ const topup={action:'topup',clientId:'1',credits:'100',paid:'20',paymentReference:'TEST-TOPUP',paymentConfirmed:true,reason:'Synthetic paid credit addition',requestId:request.idempotencyKey,idempotencyKey:randomUUID()};
+ await mutateClientPlan(db,topup,'1');assert.equal((await mutateClientPlan(db,topup,'1')).duplicate,true);
+ plan=await readClientPlan(db,'1',{admin:true});assert.equal(plan.availableCredits,'1100');assert.equal(plan.requests[0].status,'approved');
+ const client=await readClientPlan(db,'1');assert.equal(client.audit,undefined);assert.equal(client.runs,undefined);assert.ok(!JSON.stringify(client).includes('TEST-PAID'));assert.ok(!JSON.stringify(client).includes('TEST-TOPUP'));
+ const foreign=await mutateClientPlan(db,action({clientId:'2'}),'1');assert.ok(foreign.ok);assert.equal((await readClientPlan(db,'2')).availableCredits,'1000');
+ await assert.rejects(mutateClientPlan(db,{...topup,idempotencyKey:randomUUID(),clientId:'2'},'1'),PlanConflict);
+ assert.equal((await readClientPlan(db,'2')).availableCredits,'1000','Denied action leaves no partial credit write');
+ await mutateClientPlan(db,action({expectedVersion:'1',price:'250',credits:'2000',activate:false}),'1');
+ plan=await readClientPlan(db,'1');assert.equal(plan.month.included_credits,'1000','Paid month remains immutable');assert.equal(plan.plan.monthly_credits,'2000');
+ await mutateClientPlan(db,action({expectedVersion:'2',status:'paused',activate:false}),'1');assert.equal((await readClientPlan(db,'1')).canGenerate,false);
+ assert.equal((await readClientPlan(db,'3')).configured,false,'Legacy client is not silently opted in');
+ const heldId=randomUUID(),period=new Date().toISOString().slice(0,7);
+ await db.query("INSERT INTO portal_client_plan_runs(id,client_id,period,user_id,status) VALUES($1,2,$2,201,'review')",[heldId,period]);
+ assert.equal((await readClientPlan(db,'2')).code,'plan_pending');
+ const resolution={action:'resolve',clientId:'2',runId:heldId,cost:'0.002',reason:'Synthetic verified provider reconciliation',idempotencyKey:randomUUID()};
+ await assert.rejects(mutateClientPlan(db,{...resolution,clientId:'1'},'1'),PlanConflict);
+ await mutateClientPlan(db,resolution,'1');assert.equal((await mutateClientPlan(db,resolution,'1')).duplicate,true);
+ assert.equal(Number((await readClientPlan(db,'2')).availableCredits),998,'Verified reconciliation debits once and releases only its client hold');
+ const auditAllowed=(await db.query("SELECT has_table_privilege(current_user,'portal_client_plan_audit','UPDATE') AS edit,has_table_privilege(current_user,'portal_client_plan_audit','DELETE') AS remove")).rows[0];assert.equal(auditAllowed.edit,false);assert.equal(auditAllowed.remove,false);
+ for(const role of ['anon','authenticated'])for(const table of ['portal_client_plans','portal_client_plan_balances','portal_client_plan_requests','portal_client_plan_topups'])assert.equal((await db.query("SELECT has_table_privilege($1,$2,'SELECT') AS allowed",[role,table])).rows[0].allowed,false,'Browser roles cannot read private plan data');
+ console.log('PASS: real PostgreSQL plan price/allowance separation, admin authority, paid activation/topups, same-key retries, scoped requests, no partial writes, immutable paid month, pause and append-only audit grants.');
+}finally{await db.end();}

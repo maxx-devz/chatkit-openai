@@ -26,6 +26,7 @@ from uploads import (MAX_ATTACHMENTS, MAX_FILE_BYTES, UPLOAD_ID, PrivateAttachme
                      UploadError, load_upload, upload_file, uploads_enabled)
 from ai_provider import provider_config
 from provider_settings import load_provider_settings, ProviderSettingsError
+from client_plans import reserve_plan_reply, finish_plan_reply
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(preview_router)
@@ -120,6 +121,8 @@ async def acquire_lease(context, token):
 async def cleanup(db, context, token):
     with anyio.CancelScope(shield=True):
         try:
+            if context:
+                await finish_plan_reply(context)
             if context and token:
                 await db.execute("""
                     DELETE FROM portal_chatkit_leases WHERE client_id=%s AND user_id=%s AND token=%s
@@ -171,6 +174,8 @@ async def chatkit(request: Request):
         db = await connect_database(os.environ["DATABASE_URL"])
         client = await load_client(db, envelope)
         context = Context(db, envelope.client_id, envelope.user_id, envelope.instructions, client)
+        if parsed.type in GENERATE:
+            await reserve_plan_reply(context)
         context.debug_trace = verified_debug_context(request.headers)
         context.chat_mode = envelope.chat_mode
         context.source_references = [reference.model_dump() for reference in envelope.source_references]
@@ -234,7 +239,7 @@ async def chatkit(request: Request):
     except NotFoundError:
         return JSONResponse({"error": "Conversation not found"}, status_code=404, headers=NO_STORE)
     except HTTPException as error:
-        return JSONResponse({"error": error.detail}, status_code=error.status_code, headers=NO_STORE)
+        return JSONResponse(error.detail if isinstance(error.detail, dict) else {"error": error.detail}, status_code=error.status_code, headers=NO_STORE)
     except Exception as error:
         logger.error("ChatKit request failed: %s", type(error).__name__)
         return JSONResponse({"error": "Assistant unavailable"}, status_code=503, headers=NO_STORE)

@@ -21,3 +21,11 @@
 .filter select { min-width: 220px; padding: 8px; border: 1px solid #bad0e2; border-radius: 7px; background: #fff; }
 .notice { color: #9a4d18; }
 @media (max-width: 720px) { .page { padding: 72px 16px 16px; } .section { padding: 17px; } .top { flex-direction: column; } }
+
+.section { background:var(--portal-card-background,#fff); border-color:var(--portal-card-border,#d7e5f2); box-shadow:var(--portal-card-shadow); }
+.filter { align-items:end; gap:14px; }.table th { background:#f0f6fd; }.table :is(th,td) { line-height:1.6; }
+
+/* AOC history details only: preserve existing Client/Internal audit tables. */
+.historyTable{min-width:1080px}.historyTable :is(th,td){white-space:normal;line-height:1.65}.historyTable th:nth-child(4){min-width:140px}.historyTable td:first-child{min-width:132px}.historyTable td:nth-child(5){min-width:100px}.historyTable td:nth-child(6){min-width:130px}
+.historyStatus{display:inline-block;border-radius:8px;padding:4px 8px;background:#edf2f7;color:#52657a;font-size:11px;font-weight:750;white-space:nowrap}.historyStatus[data-tone="success"]{background:#e8f7ef;color:#176647}.historyStatus[data-tone="error"]{background:#fff0f0;color:#ab2525}.historyStatus[data-tone="warning"]{background:#fff6df;color:#87550c}
+.historyOutcome{display:block;margin-top:5px;color:#5b6e80;font-size:11px}.historyTable .historyMessage{min-width:280px;max-width:420px}.historyMessage p{margin:0 0 7px}.historyExplanation{color:#566f88}.historyDiagnostics{font-size:11px}.historyDiagnostics summary{cursor:pointer;color:#075d95;font-weight:650}.historyDiagnostics dl{display:grid;grid-template-columns:80px minmax(0,1fr);gap:5px 10px;margin:10px 0 0}.historyDiagnostics dt{font-weight:700}.historyDiagnostics dd{margin:0;overflow-wrap:anywhere}

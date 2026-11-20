@@ -1,5 +1,6 @@
 "use client";
 
+import ActionCue from "@/components/portal-ui/action-cue";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { costStatus, spendingCsv, usd, unpricedReason } from "../../lib/ai-spending-format.js";
@@ -22,7 +23,8 @@ export default function AiSpending() {
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Spending could not be loaded.");
-        if (active) setSnapshot({ data, error: "" });
+        if (active) setSnapshot({ data, error: "", auditWarning: response.headers.get('X-AOC-Audit-Status')==='incomplete'
+          ? 'Spending is available, but this refresh could not be added to the audit log.' : '' });
       } catch {
         if (active) setSnapshot({ data: null, error: "Spending could not be refreshed. No costs are assumed to be zero." });
       } finally { inFlight = false; }
@@ -45,17 +47,22 @@ export default function AiSpending() {
     link.href = url; link.download = `client-api-spending-${month}.csv`; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  return <section className={styles.spending} aria-labelledby="client-spending-title">
-    <div className={styles.heading}>
+  return <section data-action-card="info" className={styles.spending} aria-labelledby="client-spending-title"><ActionCue tone="info">View costs · Read-only report</ActionCue>
+    <div className={`${styles.heading} ${styles.spendingHeader}`}>
       <div><h3 id="client-spending-title">Client API spending · USD</h3>
-        <p>Visible provider cost history for pricing and usage review. Chat has no portal request cap.</p></div>
-      <div className={styles.spendingActions}>
-        <Link href="/admin/credits" prefetch={false}>AI credit pricing & allowances</Link>
-        <label>UTC month <input type="month" value={month} onChange={event => setMonth(event.target.value)} /></label>
-        <button type="button" onClick={() => setRefresh(value => value + 1)}>Refresh costs</button>
-        <button type="button" disabled={!data?.ready} onClick={download}>Export CSV</button>
-      </div>
+        <p>Recorded provider costs for review. Active client plans enforce separate AI credit limits.</p></div>
+      <Link className={styles.plansLink} href="/admin/credits" prefetch={false}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3zM3 9h18M7 14h3M15 14h2"/></svg>
+        Client plans & credits
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
+      </Link>
     </div>
+    <div className={styles.spendingActions} role="group" aria-label="Spending report controls">
+      <label>UTC month <input type="month" value={month} onChange={event => setMonth(event.target.value)} /></label>
+      <button type="button" onClick={() => setRefresh(value => value + 1)}>Refresh costs</button>
+      <button type="button" disabled={!data?.ready} onClick={download}>Export CSV</button>
+    </div>
+    {snapshot.auditWarning && <p className={styles.notice} role="status">{snapshot.auditWarning}</p>}
     {snapshot.error && <p className={styles.error} role="alert">{snapshot.error}</p>}
     {!data && !snapshot.error && <p role="status">Loading client spending…</p>}
     {data && !data.ready && <p className={styles.notice} role="status">{data.setupMessage}</p>}

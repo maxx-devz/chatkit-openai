@@ -8,3 +8,6 @@
 @media(max-width:600px){.panel{padding:18px}.panel header,.files li,.documentHeading{align-items:flex-start;flex-direction:column}.stages,.filters{grid-template-columns:1fr}.actions{flex-wrap:wrap}.next{padding:16px}.next>p:first-of-type{font-size:16px}}
 
 .summary{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px}.summary>header,.summary>p,.summary>div[role=alert],.summary>section[id]{grid-column:1/-1}.summary .next,.summary .journey{min-width:0}.summary>header>div>p{margin-bottom:6px}@media(max-width:800px){.summary{grid-template-columns:1fr}}
+
+.panel { background:var(--portal-card-background,#fff); border-color:var(--portal-card-border,#d7e5f2); box-shadow:var(--portal-card-shadow); }
+.journey { background:linear-gradient(135deg,#edf5ff,#f8fbff); }.files li { background:#ffffffbf; }.panel header { flex-wrap:wrap; }.filters { align-items:end; }

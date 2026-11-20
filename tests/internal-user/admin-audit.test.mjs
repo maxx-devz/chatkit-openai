@@ -60,7 +60,7 @@ test('AOC audit requires administrator access and filters all result sets by cli
   adminAuthorized = true;
   const result = await loadAocAdminAudit(new Headers(), { clientId: '10' });
   assert.equal(result.pagination.clientId, '10');
-  assert.equal(queries.length, 5);
+  assert.equal(queries.length, 4);
   for (const query of queries.slice(1, 4)) {
     assert.equal(query.values[1], '10');
     assert.match(query.sql, /\$2::bigint IS NULL/);

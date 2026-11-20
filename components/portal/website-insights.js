@@ -1,4 +1,5 @@
 "use client";
+import ActionCue from "@/components/portal-ui/action-cue";
 import { useCallback, useEffect, useState } from "react";
 import { compareReports, safePageLink, googleConnectionView } from "../../lib/website-insights/presentation.js";
 import styles from "./website-insights.module.css";
@@ -62,7 +63,8 @@ function SearchResults({ search }) {
       <tbody>{search.pages.map(row => <tr key={row.page}><td><PageLink url={row.page} /></td><td>{fmt(row.clicks)}</td><td>{fmt(row.impressions)}</td><td>{row.ctr == null ? "Unavailable" : `${fmt(row.ctr * 100, 1)}%`}</td><td>{fmt(row.position, 1)}</td></tr>)}</tbody></table></div>
   </>;
 }
-export default function WebsiteInsights({ clientId, canWrite, canManage, initialWebsite, connectionResult }) {
+export default function WebsiteInsights({ clientId, canWrite, canManage, initialWebsite, connectionResult, embedded=false }) {
+  const Heading=embedded?"h2":"h1";
   const [websites, setWebsites] = useState([]), [siteId, setSiteId] = useState(initialWebsite || "");
   const [history, setHistory] = useState([]), [report, setReport] = useState(null), [google, setGoogle] = useState(null);
   const [properties, setProperties] = useState([]), [property, setProperty] = useState("");
@@ -77,16 +79,18 @@ export default function WebsiteInsights({ clientId, canWrite, canManage, initial
   const reloadDetail = useCallback(async (id, signal) => { const data = await api(`?site=${encodeURIComponent(id)}`, null, signal); setHistory(data.history); setGoogle(data.google); setProperties(data.google.properties || []); setProperty(data.google.property || ""); return data; }, []);
   useEffect(() => {
     const controller = new AbortController();
-    reloadSites(controller.signal).then(sites => setSiteId(current => sites.some(site => site.id === current) ? current : sites[0]?.id || ""))
+    Promise.resolve().then(()=>{if(!controller.signal.aborted)return reloadSites(controller.signal);}).then(sites => {if(sites && !controller.signal.aborted)setSiteId(current => sites.some(site => site.id === current) ? current : sites[0]?.id || "");})
       .catch(failure => { if (!controller.signal.aborted) setError(failure.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [clientId, reloadSites]);
   useEffect(() => {
     if (!siteId) return;
     const controller = new AbortController();
-    setDetailLoading(true);
-    setReport(null); setPrevious(null); setProperties([]); setGoogle(null); setError("");
-    reloadDetail(siteId, controller.signal).then(async data => {
+    Promise.resolve().then(async () => {
+      if(controller.signal.aborted)return;
+      setDetailLoading(true);
+      setReport(null); setPrevious(null); setProperties([]); setGoogle(null); setError("");
+      const data=await reloadDetail(siteId, controller.signal);
       if (data.history[0]) {
         const value = await api(`?report=${data.history[0].id}`, null, controller.signal);
         if (!controller.signal.aborted) setReport(value.report);
@@ -186,30 +190,30 @@ export default function WebsiteInsights({ clientId, canWrite, canManage, initial
     position: item.search_summary?.position, mobile: item.performance?.mobile?.scores?.performance, desktop: item.performance?.desktop?.scores?.performance }));
 
   return <section className={styles.insights} aria-labelledby="website-insights-title">
-    <header className={styles.heading}><div><p className={styles.eyebrow}>YOUR DIGITAL STOREFRONT, IN FOCUS</p><h1 id="website-insights-title">Website Insights</h1><p>Understand your website. Find the next useful improvement.</p></div>
+    <header className={styles.heading}><div><p className={styles.eyebrow}>YOUR DIGITAL STOREFRONT, IN FOCUS</p><Heading id="website-insights-title">Website Insights</Heading><p>Understand your website. Find the next useful improvement.</p></div>
       {canWrite && <button className={styles.primary} onClick={() => setAdding(!adding)} disabled={busy || running}>＋ Add website</button>}</header>
     {error && <p role="alert" className={styles.error}>{error}</p>}
     {oauthResult && <p role="status" className={styles.notice}>{["connected", "authorization_saved"].includes(oauthResult)
       ? "Google returned an authorization. Search Console access and a matching property still need verification below."
       : "The latest Google sign-in was cancelled or did not finish. No new account was connected; any earlier saved authorization was preserved."}</p>}
-    {adding && <form onSubmit={add} className={styles.addForm}><label>Website name<input name="name" placeholder="My store" maxLength={120} required /></label><label>Website URL<input name="url" type="url" placeholder="https://your-store.com" maxLength={1000} required /></label><button className={styles.primary} disabled={busy}>Save website</button></form>}
+    {adding && <form data-action-card="add" onSubmit={add} className={styles.addForm}><ActionCue tone="add">Add a monitored website</ActionCue><label>Website name<input name="name" placeholder="My store" maxLength={120} required /></label><label>Website URL<input name="url" type="url" placeholder="https://your-store.com" maxLength={1000} required /></label><button data-action="add" className={styles.primary} disabled={busy}>Save website</button></form>}
     {loading ? <p role="status">Loading your websites…</p> : !websites.length ? <div className={styles.empty}><span className={styles.emptyIcon}>◎</span><h2>A clearer view starts with your website</h2><p>Add a public HTTPS website, then run a read-only analysis. No Google connection is required to get started.</p>{!canWrite && <p>Your role can read reports. Ask a client member or administrator to add a website.</p>}</div> : <>
       <div className={styles.siteBar}><label>Website<select value={siteId} onChange={event => setSiteId(event.target.value)} disabled={busy}>{websites.map(site => <option key={site.id} value={site.id}>{site.name} · {new URL(site.url).hostname}</option>)}</select></label>
-        <div className={styles.siteActions}>{canWrite && <button className={styles.secondary} disabled={busy || running || !selected} onClick={async () => {
+        <div className={styles.siteActions}>{canWrite && <button data-action="edit" className={styles.secondary} disabled={busy || running || !selected} onClick={async () => {
           const name = window.prompt("Website display name", selected.name); if (!name) return;
           if (await action({ action: "rename", site: siteId, name })) await reloadSites();
         }}>Rename</button>}
-        {canManage && <button className={styles.textButton} disabled={busy || running || !selected} onClick={async () => {
+        {canManage && <button data-action="danger" className={styles.textButton} disabled={busy || running || !selected} onClick={async () => {
           if (!window.confirm("Archive this website and disconnect its Google access? Reports are retained in storage, not permanently deleted.")) return;
           if (await action({ action: "archive", site: siteId })) { const sites = await reloadSites(); setSiteId(sites[0]?.id || ""); setReport(null); }
         }}>Archive</button>}
         {canWrite && <button className={styles.primary} disabled={busy || running || !selected} onClick={analyze}>Analyze Website ↗</button>}</div></div>
       {selected && <p className={styles.domain}><PageLink url={selected.url} /> <span>Public, read-only checks · No changes to your website</span></p>}
-      <aside className={styles.googleBox}><div><strong>Google Search Console</strong><p role="status" aria-label="Google connection status">{connection.label}</p><p>{connection.message}</p></div>
+      <aside data-action-card="warning" className={styles.googleBox}><div><ActionCue tone="warning">Caution · Google account permissions</ActionCue><strong>Google Search Console</strong><p role="status" aria-label="Google connection status">{connection.label}</p><p>{connection.message}</p></div>
         {canManage && <div className={styles.siteActions}>
           {connection.canCheck && <button className={styles.secondary} disabled={busy || running} onClick={checkGoogleAccess}>Check access again</button>}
           <button className={styles.secondary} disabled={busy || running || !google?.configured || google?.state === "checking"} onClick={connect}>{google?.state === "sign_in_incomplete" ? "Retry Google sign-in" : connection.hasAuthorization ? "Reconnect Google · read only" : "Connect Google · read only"}</button>
-          {connection.hasAuthorization && <button className={styles.textButton} disabled={busy || running} onClick={async () => { if (await action({ action: "disconnect", site: siteId })) { setProperties([]); setOauthResult(""); await reloadDetail(siteId); } }}>{connection.ready ? "Disconnect" : "Remove saved authorization"}</button>}
+          {connection.hasAuthorization && <button data-action="danger" className={styles.textButton} disabled={busy || running} onClick={async () => { if (await action({ action: "disconnect", site: siteId })) { setProperties([]); setOauthResult(""); await reloadDetail(siteId); } }}>{connection.ready ? "Disconnect" : "Remove saved authorization"}</button>}
         </div>}
         {canManage && connection.canSelectProperty && properties.length > 0 && <div className={styles.property}><label>Search Console property<select value={property} onChange={event => setProperty(event.target.value)}><option value="">Choose property</option>{properties.map(item => <option key={item.siteUrl}>{item.siteUrl}</option>)}</select></label><button className={styles.secondary} disabled={!property || busy || running} onClick={async () => { if (await action({ action: "select-property", site: siteId, property })) { setOauthResult(""); await reloadDetail(siteId); } }}>Use this property</button></div>}
         {connection.hasAuthorization && <small>Authorization saved: {date(google.connectedAt)}. A new sign-in replaces it only after authorization succeeds. Removing it here does not delete saved reports or revoke other Google integrations.</small>}

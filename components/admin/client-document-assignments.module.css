@@ -3,3 +3,6 @@
 .manager textarea{box-sizing:border-box;width:100%;padding:11px;border:1px solid #819db7;border-radius:8px;font:inherit;color:#17283f}.manager label.checkbox{display:flex;align-items:flex-start;gap:10px;line-height:1.7}.manager .checkbox input{width:20px;min-height:20px;margin-top:3px;flex-shrink:0}
 
 .mapping{width:100%;border-collapse:collapse;margin:18px 0;font-size:13px;table-layout:fixed}.mapping caption{text-align:left;font-weight:700;margin-bottom:10px}.mapping th,.mapping td{border-bottom:1px solid #cbdbe9;padding:10px;text-align:left;vertical-align:top;overflow-wrap:anywhere}.mapping th{background:#eef5fc}
+
+.card,.picker { background:var(--portal-card-background,#fff); border-color:var(--portal-card-border,#d7e5f2); box-shadow:var(--portal-card-shadow); }
+.picker { align-items:end; }.picker label { line-height:1.6; }.card h2 { line-height:1.35; }.card button { min-height:42px; }

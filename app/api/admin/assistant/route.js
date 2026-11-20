@@ -1,3 +1,4 @@
+import {withAdminAudit} from '@/lib/admin-audited-handler';
 import OpenAI from "openai";
 import { randomUUID } from 'node:crypto';
 import { resolveAiProvider } from "@/lib/ai-provider";
@@ -146,7 +147,7 @@ async function catalogForRequest(provider) {
   }
 }
 
-export async function GET(request) {
+async function auditGET(request) {
   try {
     await resolveAdminContext(request.headers);
     const provider = await getRuntimeProvider();
@@ -181,7 +182,7 @@ export async function GET(request) {
   }
 }
 
-export async function PUT(request) {
+async function auditPUT(request) {
   try {
     assertTrustedOrigin(request.headers);
     const { admin } = await resolveAdminContext(request.headers);
@@ -205,7 +206,7 @@ export async function PUT(request) {
   }
 }
 
-export async function POST(request) {
+async function auditPOST(request) {
   let body;
   let messages;
   let provider;
@@ -365,3 +366,9 @@ export async function POST(request) {
     );
   }
 }
+
+export const GET=withAdminAudit("admin.assistant",auditGET);
+
+export const PUT=withAdminAudit("admin.assistant",auditPUT);
+
+export const POST=withAdminAudit("admin.assistant",auditPOST);
