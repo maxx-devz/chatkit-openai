@@ -111,21 +111,57 @@ publication rule. Existing email delivery is unchanged; this feature sends no em
   refresh; provider revocation is detected on attempted delivery. There is no
   claim of instantaneous recall of an in-flight response or a downloaded copy.
 
-### Journey progress
+### Journey progress and document filters
 
-Use **Update verified journey progress** separately. Confirm all seven stage names
-against the approved journey, select the current stage and record the verified
-project milestone, approval or Billing evidence. The next required client action
-and client-safe evidence summary appear in the client's view. An admin-only change
-reason is retained in audit history. Earlier stages are represented as completed;
-confirm that interpretation before setting the current stage. Completion of the
-whole journey requires stage 7 and explicit confirmation.
+Admin keeps the **seven internal stages** in Update verified journey progress.
+The editor shows the exact mapping to the client's five steps:
 
-The field is an authorized human record, not an automatic validation of external
-Billing/project systems. Document-stage metadata must match the approved original;
-the portal does not edit existing PDFs/Docs to insert stage labels. No file upload
-or document approval changes journey progress. No new billing obligations, fees,
-payment status or sales metrics are inferred.
+| Internal stage | Client-facing step |
+| --- | --- |
+| 1 Inquiry / fit and 2 Paid audit | 1 Get Started |
+| 3 Discovery | 2 Share Your Process |
+| 4 Audit / build decision | 3 Review Your Plan |
+| 5 Implementation readiness and 6 Build / test | 4 Build & Test |
+| 7 Release / handover | 5 Launch & Handover |
+
+This mapping follows the Client Journey & Document Map's 19 November display
+crosswalk. Existing seven-stage records, IDs, evidence and labels remain unchanged.
+The client sees a completed step only after the saved internal stage has moved
+beyond that group. Stage 5 alone does not complete Build & Test; stage 7 stays
+current until the recorded whole-journey completion. No saved journey means
+Unconfirmed, never assumed completion.
+
+Use **Update verified journey progress** separately from document publication.
+Confirm all seven internal names, select the current internal stage and record
+verified milestone, approval or Billing evidence. The existing next-action field
+now appears prominently as **Your next action** on the dashboard and Documents
+page. Record a specific real client request; leave it blank if none is recorded.
+The blank state does not claim that no work or approvals are outstanding.
+
+The admin reason stays private. The client-safe summary and next action are
+visible only to the authorized client workspace. The dashboard links to the
+existing document library; it does not add a signing or approval action.
+
+On the client's Documents page:
+
+1. Search by the approved document title and press **Search documents** or Enter.
+2. Choose **Document type** and/or **Journey step**; changing either applies the
+   current search and resets to page 1.
+3. Use **Clear filters** to restore all approved documents.
+4. Use Previous/Next to browse the matching pages. Filters search the full eligible
+   client library on the server, not just the loaded page. Titles are matched
+   case-insensitively, and `%`, `_` and backslash are literal search characters.
+
+Document entries display their mapped client step, independently of the client's
+actual current progress. Admin release controls show both internal stage and client
+step. Existing document authorization, exact-version checks and withdrawal behavior
+are preserved. This update changes no database schema and requires no extra
+environment variables or migration.
+
+These are authorized human milestone records, not automated verification by
+external Billing/project systems. Actual client signatures/acceptance, UAT, live
+release decisions, payment events and email triggers remain separate work. Reading
+or downloading a document does not record a decision.
 
 ### Reconnection and rotation
 

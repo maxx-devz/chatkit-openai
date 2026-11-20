@@ -2,7 +2,7 @@
 
 Branch: client-documents, created from master916bbf5 in AI\portal.
 
-**Current checkpoint: Step 3 functional document delivery and saved journey state.**
+**Current checkpoint: Step 4 five-step client journey, document filters and next-action card.**
 Steps 1–2 below are historical. Live routes no longer render the prototype.
 The approved Neon document migrations were applied on 2026-11-20 (see activation
 record below). Google configuration/consent and live file verification remain
@@ -414,3 +414,97 @@ view/download and withdrawal check. The four reference-tab re-read remains
 pending the approved Jaymark connector session; those reference links are not
 client deliverable approval. No provider consent, live file read, client mutation,
 message or payment was performed by this migration action. No push.
+
+## Step 4: clear client journey and document discovery (2026-11-20)
+
+User authorized the recommended next increment: five-step client presentation,
+seven-stage admin mapping, document search/type/step filters and a dashboard
+next-action card. Built on `26b0f96` in `AI\portal`, branch `client-documents`.
+This step does not implement the later signature/approval or payment/email work.
+
+### Reference review completed
+
+Jaymark's connector session was verified and the supplied `ai commerce drafts`
+folder was read without edits. Its 11 accessible documents were reviewed, including
+all four tabs of the main journey guide. The prior pending fresh reference review
+is therefore resolved; Google consent **inside the portal** remains independent.
+The guide's 19 November crosswalk supplies the five-step presentation while
+retaining seven internal stages and twelve checkpoints. References:
+
+- Folder: https://drive.google.com/drive/folders/1isPW3TbqyVmII_hfa3iyVVDj57DqX-eQ
+- Main crosswalk: https://docs.google.com/document/d/18w4a3t3PE-fvxyi-IVX5__LkooUMj_0xGwmuKEwd1_A/edit?tab=t.0
+
+The source documents remain working/internal-review drafts. Their display mapping
+is used here; their draft prices, commercial terms, messages and system access
+are not automatically adopted. Nothing from that folder was published for a client.
+
+### Changes
+
+- Shared pure crosswalk maps internal 1/2→client 1 Get Started, 3→2 Share Your
+  Process, 4→3 Review Your Plan, 5/6→4 Build & Test and 7→5 Launch & Handover.
+  Saved internal state/evidence is unchanged. Unknown progress stays unconfirmed.
+  A grouped step stays current until the internal stages in that group are passed.
+- Client Documents and dashboard use the five-step wording; document entries show
+  their applicable client step independently of current progress. Admin retains
+  seven stages, sees a mapping table and sees both labels on release controls.
+- Your next action is prominent on dashboard/Documents, using only the existing
+  admin-recorded nextAction and date. An empty field says no action was recorded,
+  not that nothing needs attention. Dashboard link opens the protected Documents
+  view; no nonfunctional signature or payment buttons are added.
+- Search approved document titles and filter by type/client step. Validation and
+  parameterized SQL run after the existing client permission check. Filtering
+  covers the full eligible client library before pagination; type/step/search
+  combinations are supported, and SQL wildcard characters are escaped literally.
+  Filter changes reset paging. Client/account switches unmount/clear prior data.
+- Responsive layout and accessible labels/states retained. Dashboard summary is
+  compact on desktop; mobile uses a single column. No browser storage, new
+  credential, external provider call or dependency is introduced.
+
+### Actual verification
+
+| Check | Result and limits |
+| --- | --- |
+| General Node suite | 367 passed, zero failures/skips, including four crosswalk/filter-policy tests. |
+| Setup database/API | 7 reported passes (parent plus six scenario groups), real temporary auth/PostgreSQL. |
+| Delivery database/API | 11 reported passes (parent plus ten scenario groups). Added 53 synthetic release metadata records to verify >50 paging, older-document search, grouped step filters, literal wildcards/injection-like strings, type combinations and foreign-client denial. Fixture records cleaned up. Google transport mocked. |
+| OAuth/Google adapter | 5 reported passes (parent plus four scenario groups); provider OAuth/HTTP mocked, SQL/state/authorization real. |
+| Authenticated Chrome | 11 passed against the actual built Next app and disposable PostgreSQL: existing regressions plus five-step display/admin crosswalk, mobile filter requests/clear state, saved dashboard action/link and unrelated client fallback. |
+| Internal Portal regressions | 115 passed, zero failures/skips in existing controlled Node harness. |
+| Offline Drive/Hubstaff regressions | 40 passed, zero failures/skips; no live provider checks. |
+| Changed-file lint | Passed. |
+| Full repository lint | Existing two set-state-in-effect errors in unchanged Website Insights component (lines 80/87); no new reported errors. |
+| Production build | Passed with all private .env values shadowed and unreachable loopback DB/provider defaults. |
+
+Database tests report 23 passes including three parent tests (20 scenario groups),
+not 23 live-provider checks. Browser checks exercise real auth/API/SQL and no
+fake connected Google UI. Positive multi-page search results use synthetic
+metadata in the database suite; a live Google-connected browser download remains
+pending. Client desktop/mobile and dashboard screenshots were inspected.
+
+### Preservation and remaining checks
+
+No schema changes/migration are needed. Neon was not read or written in this
+step; the previously approved Step 3 activation remains recorded separately.
+No .env/credential change, real client publication, actual milestone update,
+email/message, payment action or source-file edit occurred. Disposable local
+databases/accounts and isolated verification servers were destroyed/stopped after
+checks. IDs, seven-stage records, client permissions, existing download/revocation
+checks, Hubstaff mappings, credits, resources, conversations, AI knowledge and
+indexing paths were preserved. No Internal Portal behavior was changed.
+
+Files: `lib/client-journey.js`, `lib/client-document-filters.js`,
+`lib/document-delivery.js`, `app/api/client-documents/route.js`, the existing
+admin delivery manager/CSS and client official-documents component/CSS,
+`tests/client-journey.test.mjs`, extended document database/browser tests and
+setup/progress documentation. Intended files live in real project paths, not
+only the ignored task scratch directory.
+
+Review after restarting the local portal: existing AOC admin at
+`/admin/client-documents`, existing authorized client at `/?view=documents` and
+its dashboard `/`. No new login was created for retained review. No extra
+configuration is needed for this increment. The prior document Google settings,
+portal sign-in/consent, approved client-facing pilot file and live provider checks
+remain pending as documented; being connected as Jaymark in this assistant does
+not authenticate the portal's separate OAuth grant. Do not publish this drafts
+folder. Keep signature/acceptance capture, payment automation and email sending
+outside this completed slice. Local commit only; no push.

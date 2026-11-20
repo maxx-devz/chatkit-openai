@@ -61,7 +61,7 @@ using the isolated runtime environment, then run:
 node node_modules/@playwright/test/cli.js test --config tests/client-document-assignments/playwright.config.mjs
 ```
 
-Nine browser checks run in order on one worker as a save/edit/revoke workflow.
+Eleven browser checks run in order on one worker as a save/edit/revoke workflow.
 They use real username sign-in and database persistence, and block external
 browser requests. Drive-looking IDs are metadata validation inputs only; no fake
 Google API or consent is substituted. Stop the test server and destroy the
@@ -92,3 +92,15 @@ not evidence of live provider consent or downloads. They clean local connections
 before the browser run. The browser run uses real portal auth/SQL, verifies admin
 journey changes and client isolation, and never simulates a connected Google UI.
 Live Google review/publication/download remains a separately authorized pilot.
+
+## Five-step presentation and filtering
+
+`node --test tests/client-journey.test.mjs` checks all seven→five mappings, grouped
+step completion, unknown status, filter validation and literal wildcard handling.
+The delivery database suite adds 53 temporary release metadata rows to verify
+search/type/client-step combinations beyond the first page and foreign-client
+isolation. Those are metadata fixtures, not approved real Google files. The
+browser suite also checks the five-step client view, seven-stage admin table,
+mobile filtering/reset, dashboard next-action card and unrelated-client fallback.
+Search filters apply on the server before paging; no data/schema migration or
+new private setup variable is needed for this update.
