@@ -11,10 +11,13 @@ client dashboard. Existing AOC admin and client sign-in/permissions remain in us
 ## Before using the save form with an existing admin
 
 The existing admin login is unchanged. No retained review account was created.
-The new additive schema must first be approved and applied to the intended
-environment; it was applied only to a disposable local PostgreSQL database during
-this step. Configured Neon was not contacted or migrated. Until storage is ready,
-the page explains that setup is needed; existing library features keep working.
+On 2026-11-20, with the user’s explicit approval, both document migrations were
+applied and verified on the configured Neon database. Existing client rows and
+all 52 preexisting table counts were unchanged. This checkout no longer needs
+that database migration repeated; continue with private Google setup below.
+
+The following migration instructions are for another approved environment or a
+fresh installation. They do not authorize changes to a different database.
 
 1. Identify the approved database and its ordinary application login role.
    Back up the approved target before a persistent migration. This documentation

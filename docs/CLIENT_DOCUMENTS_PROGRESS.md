@@ -4,8 +4,9 @@ Branch: client-documents, created from master916bbf5 in AI\portal.
 
 **Current checkpoint: Step 3 functional document delivery and saved journey state.**
 Steps 1–2 below are historical. Live routes no longer render the prototype.
-Google consent/live file verification and an approved persistent migration remain
-pending; a local implementation pass is not a completed live rollout.
+The approved Neon document migrations were applied on 2026-11-20 (see activation
+record below). Google configuration/consent and live file verification remain
+pending; migration success alone is not a completed live-provider rollout.
 
 ## Step 1 - layout prototype only
 
@@ -355,3 +356,61 @@ existing AOC admin at `/admin/client-documents`, complete Google consent and rev
 approve one real client file. Verify client `/?view=documents` view/download,
 withdrawal and isolation using authorized test identities. Do not publish this
 internal reference document or enable broad automatic publication.
+
+## Approved Neon document activation (2026-11-20)
+
+The user explicitly approved applying the document tables to the configured Neon
+database after being asked about that target. This authorization supersedes the
+earlier leave-Neon-untouched restriction **for this additive document migration
+only**. No other feature, test fixture, client mutation or publication was authorized
+or performed. Application source remains implementation commit `6107fae`.
+
+### Completed and verified
+
+- Verified the configured runtime/migration endpoint, actual database identity,
+  role context, parent schema and schema/REFERENCES privileges privately. No
+  connection string, credential, database name or account identifier was printed.
+- Created an access-restricted, Windows-user DPAPI-encrypted backup of the full
+  database schema plus any preexisting document-feature rows, and verified local
+  decryption/readback before DDL. This is an affected-schema backup, **not** a
+  full application-data backup or a provider restore rehearsal. Private artifacts:
+  `.tmp/client-documents-neon-20261120-bd6f07eb07/`; excluded from Git.
+- Applied the existing reviewed migration script with its confirmed database and
+  runtime role plus the approved remote-target option. Both version records,
+  `001_assignments` and `002_delivery`, match the committed SQL checksums.
+- Verified all **nine document-feature tables** exist and are accessible through
+  the actual runtime login. The eight feature-data tables are empty; only the
+  two migration ledger rows were created. No client document was published.
+- Compared all **52 preexisting table row counts** before/after: no changes.
+  Compared the existing client-row content fingerprint: unchanged. No tests or
+  synthetic identities were inserted into Neon. Existing conversations, files,
+  memberships, credits, resources, knowledge and indexing records were not
+  rewritten by this additive migration.
+- The actual runtime retains its existing owner/elevated privileges, including
+  audit UPDATE/DELETE capability through ownership. The migration did not promote
+  any role, and append-only grants do not override owner bypass. Do not claim RLS
+  or database-enforced immutable audit with this runtime login.
+
+The first backup attempts stopped before DDL because the pooled Neon connection
+rejects a startup `statement_timeout` option. Removing that backup-only startup
+option allowed the read-only schema dump to succeed. TLS certificate validation
+remained enabled. No application connection/env setting was changed.
+
+### Pending activation steps
+
+The private configuration check still reports these names missing/blank in
+`AI\portal\.env.local`:
+
+- `CLIENT_DOCUMENTS_GOOGLE_CLIENT_ID`
+- `CLIENT_DOCUMENTS_GOOGLE_CLIENT_SECRET`
+- `CLIENT_DOCUMENTS_ENCRYPTION_KEY`
+- `CLIENT_DOCUMENTS_ALLOWED_EMAIL`
+
+Configure them privately as described in `CLIENT_DOCUMENTS_SETUP.md`, register the
+exact callback, and restart the portal. The existing authorized AOC admin can
+then open `/admin/client-documents`, select a client and complete Google consent.
+An approved client-facing file/client is still required for a live publication,
+view/download and withdrawal check. The four reference-tab re-read remains
+pending the approved Jaymark connector session; those reference links are not
+client deliverable approval. No provider consent, live file read, client mutation,
+message or payment was performed by this migration action. No push.
