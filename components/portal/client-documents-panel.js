@@ -52,7 +52,7 @@ export default function ClientDocumentsPanel({ clientId, canContribute }) {
   }
 
   return <section className={styles.panel} id="client-documents">
-    <h2>Documents</h2><p>References approved for this client workspace.</p>
+    <h2>Additional references</h2><p>Project links and resources shared in this client workspace. Official engagement releases appear above.</p>
     <p>Use reference links for project briefs, guides and other approved resources. Each external resource keeps its own access permissions; adding a link does not change its sharing settings.</p>
     {error ? <p className={styles.error} role="alert">{error}</p> : null}
     {loading ? <p>Loading documents...</p> : items.length ? <ul className={styles.documents}>

@@ -3,6 +3,7 @@ import {useCallback,useEffect,useRef,useState} from "react";
 import Link from "next/link";
 import {useAdminDraft} from "./admin-draft-provider";
 import {JOURNEY_STAGE_LABELS} from "@/lib/client-document-assignment-policy";
+import DocumentDeliveryManager from "./document-delivery-manager";
 import s from "./client-document-assignments.module.css";
 async function api(client,body,signal){
  const response=await fetch("/api/admin/client-document-assignments"+(body?"":client?"?clientId="+encodeURIComponent(client):""),{cache:"no-store",signal,headers:{...(client?{"x-aoc-document-client":client}:{}),...(body?{"Content-Type":"application/json"}:{})},...(body?{method:"POST",body:JSON.stringify(body)}:{})});
@@ -21,11 +22,11 @@ function AssignmentForm({client,item,onSaved,onCancel}){
   try{await api(client.id,{...command,operation:pending.current.operation});draft.clear();pending.current=null;await onSaved();}catch(e){setError(e.message);}finally{setBusy(false);}
  }
  return <section className={s.card} aria-labelledby="reference-form-title"><h2 id="reference-form-title">{item?"Edit saved reference":"Add a Drive reference"}</h2>
-  <p className={s.muted}>Use the original file or approved client-facing folder. No second upload is needed.</p>
+  <p className={s.muted}>Use the original file or approved client-facing folder. No second upload is needed. A tab or heading link still assigns the whole file.</p>
   <form onSubmit={save}><fieldset disabled={busy} className={s.fields}>
    <label htmlFor="document-reference-title">Display name</label><input id="document-reference-title" name="title" value={draft.value.title} onChange={change} maxLength={180} required placeholder="For example: approved audit report"/>
    <label htmlFor="document-reference-url">Google Drive file or folder link</label><input id="document-reference-url" name="url" type="url" value={draft.value.url} onChange={change} maxLength={500} required placeholder="Paste the existing Google link" aria-describedby="reference-link-help"/>
-   <small id="reference-link-help">Google access is not verified by saving this link. No files become visible to the client yet.</small>
+   <small id="reference-link-help">Google access is not verified by saving this link. Approve individual files below before they become visible to the client.</small>
    <label htmlFor="document-reference-stage">Related journey stage (optional)</label><select id="document-reference-stage" name="stage" value={draft.value.stage} onChange={change}><option value="">Not assigned</option>{JOURNEY_STAGE_LABELS.map((name,i)=><option key={name} value={String(i+1)}>{i+1}. {name}</option>)}</select>
    <small>A document stage label does not change journey progress.</small>
    <label htmlFor="document-reference-reason">Reason for this change</label><input id="document-reference-reason" name="reason" value={draft.value.reason} onChange={change} maxLength={400} required placeholder="A short note for the admin history"/>
@@ -57,8 +58,8 @@ function SelectedClient({id}){
  return <><section className={s.clientBar}><div><span>Selected client</span><h2>{data.client.name}</h2></div><span className={s.saved}>Admin setup only</span></section>
  {notice&&<p role="status" className={s.success}>{notice}</p>}
  <div className={s.grid}><AssignmentForm key={editing?.id||"new"} client={data.client} item={editing} onSaved={saved} onCancel={()=>setEditing(null)}/>
- <section className={s.card} aria-labelledby="saved-references-title"><h2 id="saved-references-title">Saved references</h2><p className={s.muted}>These are setup records, not approved client releases.</p>{data.assignments.length?<ul className={s.references}>{data.assignments.map(item=><ReferenceItem key={item.id+":"+item.revision} item={item} onEdit={setEditing} onRemoved={removed}/>)}</ul>:<div className={s.empty}><strong>No reference assigned yet</strong><p>Save an existing Drive link using the form. Nothing will be uploaded or published.</p></div>}</section></div>
- <section className={s.next}><h2>What happens next?</h2><p>Google access and the exact released version will be verified before client publication and automated retrieval are enabled. Saving a link does not confirm payment, advance the journey or add the file to AI knowledge.</p></section>
+ <section className={s.card} aria-labelledby="saved-references-title"><h2 id="saved-references-title">Saved references</h2><p className={s.muted}>Saved locations are not client releases. Review and approve individual files below.</p>{data.assignments.length?<ul className={s.references}>{data.assignments.map(item=><ReferenceItem key={item.id+":"+item.revision} item={item} onEdit={setEditing} onRemoved={removed}/>)}</ul>:<div className={s.empty}><strong>No reference assigned yet</strong><p>Save an existing Drive link using the form. Nothing will be uploaded or published.</p></div>}</section></div>
+ <DocumentDeliveryManager clientId={id} references={data.assignments}/>
  {!!data.history.length&&<details className={s.card}><summary>Recent admin changes</summary><ul className={s.history}>{data.history.map((entry,i)=><li key={i}><strong>{entry.action==="create"?"Reference added":entry.action==="update"?"Reference updated":"Reference removed"}</strong><p>{entry.reason}</p><small>{entry.actorName||"Authorized administrator"} · {new Date(entry.occurredAt).toLocaleString()}</small></li>)}</ul></details>}
  </>;
 }
@@ -67,6 +68,6 @@ export default function ClientDocumentAssignments(){
  useEffect(()=>{const controller=new AbortController();Promise.resolve().then(()=>api("",null,controller.signal)).then(data=>{if(!controller.signal.aborted)setClients(data.clients);}).catch(e=>{if(!controller.signal.aborted)setError(e.message);});return()=>controller.abort();},[]);
  return <div className={s.manager}><section className={s.intro}><span className={s.step}>STEP 1 · CLIENT DOCUMENT SETUP</span><h2>Choose the client. Save the original link.</h2><p>Keep approved documents in Google Drive. Set up their client assignment here without uploading another copy.</p></section>
  {error?<p role="alert" className={s.error}>{error}</p>:!clients?<p role="status">Loading clients…</p>:!clients.length?<section className={s.card}><h2>No clients available</h2><Link href="/admin?view=clients">Create a client first</Link></section>:<section className={s.picker}><div><label htmlFor="reference-client-search">Find a client</label><input id="reference-client-search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search by client name"/></div><div><label htmlFor="reference-client-select">Client account</label><select id="reference-client-select" value={selected} onChange={e=>setSelected(e.target.value)}><option value="">Choose a client</option>{clients.filter(c=>c.id===selected||c.name.toLowerCase().includes(query.toLowerCase())||c.slug.toLowerCase().includes(query.toLowerCase())).map(c=><option key={c.id} value={c.id}>{c.name}{c.enabled?"":" (portal paused)"}</option>)}</select></div></section>}
- {selected?<SelectedClient key={selected} id={selected}/>:clients?.length?<section className={s.empty}><h2>Start by choosing a client</h2><p>Their saved references will appear here. Client documents remain private until the release checks are connected.</p></section>:null}
+ {selected?<SelectedClient key={selected} id={selected}/>:clients?.length?<section className={s.empty}><h2>Start by choosing a client</h2><p>Their saved references will appear here. Only explicitly approved versions appear in the client library.</p></section>:null}
  </div>;
 }

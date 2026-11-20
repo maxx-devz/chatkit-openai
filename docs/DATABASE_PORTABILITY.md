@@ -145,3 +145,12 @@ is the access boundary. Original Drive files are neither uploaded nor published
 by saving metadata. Existing clients/history/credit/index tables are not backfilled
 or rewritten. See `CLIENT_DOCUMENTS_SETUP.md` for explicit migration approval and
 private setup requirements.
+
+Document delivery adds migration `002_delivery` in
+`database/client-document-delivery.sql`: separate encrypted OAuth connections and
+one-time states, version-bound releases, client journey state, and append-only
+publication/milestone/connection audit. The original `001_assignments` checksum and
+tables remain unchanged. Ordinary runtime privileges and standard PostgreSQL
+constraints/transactions are used; no provider SDK/extension or RLS claim is added.
+Original Drive files stay in Drive and are read on demand, with no file-storage
+migration or AI-source publication.

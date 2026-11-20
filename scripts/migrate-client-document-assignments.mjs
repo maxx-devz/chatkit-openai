@@ -15,6 +15,15 @@ async function main(){
  const old=(await db.query("SELECT checksum FROM portal_client_document_schema WHERE version='001_assignments'")).rows[0];
  if(old&&old.checksum!==checksum)throw Error("Applied migration checksum mismatch");
  if(!old){await db.query(sql);await db.query("INSERT INTO portal_client_document_schema(version,checksum) VALUES('001_assignments',$1)",[checksum]);}
+ const delivery=await readFile(new URL("../database/client-document-delivery.sql",import.meta.url),"utf8");
+ const deliveryHash=createHash("sha256").update(delivery.replace(/\r\n/g,"\n")).digest("hex");
+ const applied=(await db.query("SELECT checksum FROM portal_client_document_schema WHERE version='002_delivery'")).rows[0];
+ if(applied&&applied.checksum!==deliveryHash)throw Error("Delivery migration checksum mismatch");
+ if(!applied){await db.query(delivery);await db.query("INSERT INTO portal_client_document_schema(version,checksum) VALUES('002_delivery',$1)",[deliveryHash]);}
+ await db.query(`GRANT SELECT,INSERT,UPDATE,DELETE ON portal_document_connections,portal_document_oauth_states TO "${role}"`);
+ await db.query(`GRANT SELECT,INSERT,UPDATE ON portal_document_releases,portal_client_journey TO "${role}"`);
+ await db.query(`GRANT SELECT,INSERT ON portal_document_delivery_audit,portal_document_connection_audit TO "${role}"`);
+ await db.query(`GRANT USAGE,SELECT ON SEQUENCE portal_document_delivery_audit_id_seq,portal_document_connection_audit_id_seq TO "${role}"`);
  await db.query(`GRANT SELECT,INSERT,UPDATE ON portal_client_document_assignments TO "${role}"`);
  await db.query(`GRANT SELECT,INSERT ON portal_client_document_assignment_audit TO "${role}"`);
  await db.query(`GRANT USAGE,SELECT ON SEQUENCE portal_client_document_assignment_audit_id_seq TO "${role}"`);

@@ -6,7 +6,7 @@ import { clientNavigation, clientView } from "@/lib/client-navigation";
 import AiAssistantPanel from "@/components/ai-assistant/ai-assistant-panel";
 import AccountControls from "@/components/portal/account-controls";
 import ClientDocumentsPanel from "@/components/portal/client-documents-panel";
-import ClientDocumentsPrototype, { ClientDocumentsDashboardPrototype } from "@/components/portal/client-documents-prototype";
+import ClientOfficialDocuments from "@/components/portal/client-official-documents";
 import ClientAuditPanel from '@/components/portal/client-audit-panel';
 import ClientMembersPanel from "@/components/portal/client-members-panel";
 import ClientPasswordSettings from "@/components/portal/client-password-settings";
@@ -149,7 +149,7 @@ function MobileNavigation({ portal }) {
   </details>;
 }
 
-export default function ClientPortal({ portalContext, requestedView, initialWebsite, connectionResult, standalonePage, children, journeyPreview = false }) {
+export default function ClientPortal({ portalContext, requestedView, initialWebsite, connectionResult, standalonePage, children }) {
   const portal = {
     ...PORTAL_CONFIG,
     clientName: portalContext.client.name,
@@ -183,7 +183,7 @@ export default function ClientPortal({ portalContext, requestedView, initialWebs
               <p>{portal.clientName} · your client workspace</p>
             </header>}
             {children}
-            {portal.view === "dashboard" && journeyPreview && portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_READ) && <ClientDocumentsDashboardPrototype/>}
+            {portal.view === "dashboard" && portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_READ) && <ClientOfficialDocuments key={`official-summary:${portalContext.client.id}`} clientId={portalContext.client.id} summary/>}
             {portal.view === "dashboard" && <section className={styles.metrics} aria-label="Account overview">
               <HubstaffMetrics />
             </section>}
@@ -218,7 +218,7 @@ export default function ClientPortal({ portalContext, requestedView, initialWebs
               initialWebsite={initialWebsite} connectionResult={connectionResult}
               canWrite={portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_CONTRIBUTE)}
               canManage={portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_MANAGE)} />}
-        {portal.view === "documents" && journeyPreview && <ClientDocumentsPrototype/>}
+        {portal.view === "documents" && <ClientOfficialDocuments key={`official:${portalContext.client.id}`} clientId={portalContext.client.id}/>}
         {portal.view === "documents" && <ClientDocumentsPanel key={`documents:${portalContext.client.id}`} clientId={portalContext.client.id}
           canContribute={portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_CONTRIBUTE)} />}
         {portal.view === "members" && portal.permissions.includes(CLIENT_PERMISSIONS.MEMBERS_MANAGE)

@@ -2,6 +2,11 @@
 
 Branch: client-documents, created from master916bbf5 in AI\portal.
 
+**Current checkpoint: Step 3 functional document delivery and saved journey state.**
+Steps 1–2 below are historical. Live routes no longer render the prototype.
+Google consent/live file verification and an approved persistent migration remain
+pending; a local implementation pass is not a completed live rollout.
+
 ## Step 1 - layout prototype only
 
 The user requested gradual implementation ("konti-konti"), real Google sign-in
@@ -199,3 +204,154 @@ layout-only if running; it is not this authenticated functional app. Next: verif
 one approved real file/folder and account through Google sign-in when available,
 then add explicit release and protected client retrieval in a separate increment.
 Keep automatic publication and milestone advancement disabled meanwhile. No push.
+
+## Step 3: functional releases and client journey (2026-11-20)
+
+Built on `02e10f3` in the actual `AI\portal` checkout on `client-documents`.
+The former opt-in journey preview is replaced on the client dashboard/Documents
+view by a database-backed Documents & Journey component. Historical presentation
+components/standalone tests remain in source, but no live portal route renders
+them. The old `journeyPreview=1` flag is no longer needed.
+
+### Implemented behavior
+
+- AOC Admin retains the existing client picker/reference setup and now has a
+  separate client-document Google connection, file review, explicit per-version
+  approval/withdrawal, release/milestone audit history and verified journey editor.
+- Google consent is real OAuth with read-only Drive plus openid/email, PKCE, an
+  HttpOnly SameSite callback cookie, encrypted refresh token, account/session/config
+  binding, one-time expiry and disconnect/reconnect event checks. There is no
+  shared company-knowledge or Website Insights grant inheritance.
+- A saved original file or direct client-facing folder is reviewed through Drive.
+  Discovery does not publish files. Human approval records the exact source
+  version, client-facing title/type and relevant journey stage for the client.
+- Clients see their approved documents and saved journey on Documents, with a
+  dashboard summary. Working view/download handlers retrieve original content;
+  Docs/Sheets/Slides export to PDF, supported stored files retain their format.
+  No duplicate editable document or persistent content cache is created.
+- Client lists are paged, no-store and scoped to the resolved active membership.
+  URLs contain no bearer grant/Google token/Drive ID. Copied links require current
+  authentication and the same selected client. Viewer can read; client roles cannot
+  publish. Internal users remain independently excluded.
+- Delivery checks source ancestry, canDownload, approved version/name/type/date,
+  assignment revision, connection generation/config and active publisher. Membership
+  and release/connection checks run again after reading content, before bytes leave
+  the server. Edits, reference changes, revocation, suspension, disconnect or
+  reconnect prevent new deliveries. Files already downloaded cannot be recalled.
+- Verified milestones are separate human records with seven confirmed names,
+  current stage/completion, client-safe evidence and next action. A release or
+  upload cannot advance the journey or confirm payment. Billing remains authoritative.
+  Admin-only reasons are excluded from client output. Existing reference-library
+  features remain available below, now labeled Additional references.
+
+### Actual results
+
+| Check | Result |
+| --- | --- |
+| Production build | Passed using isolated child environment; real `.env*` provider/database values shadowed and no live data dependency. |
+| General Node regressions | 363 passed, zero failures/skips (seven additional delivery-policy tests). |
+| Internal Portal suite | 115 passed, zero failures/skips in the existing controlled Node harness. |
+| Offline Drive/Hubstaff suite | 40 passed, zero failures/skips; not live provider checks. |
+| Setup database/API suite | 7 reported passing tests, including parent and six scenario groups. Real PostgreSQL/auth, no mocked portal authorization. |
+| Release/milestone database/API suite | 10 reported passing tests, including parent and nine scenario groups. Real PostgreSQL/auth/API; Google transport explicitly mocked. |
+| OAuth/Drive adapter suite | 5 reported passing tests, including parent and four scenario groups. Actual state/encryption/adapter code and SQL; OAuth identity/token and Google HTTP mocked. |
+| Authenticated Chrome | 9 passed against the actual built project with disposable accounts/database. Includes admin journey save and assigned/foreign client views. Google connection is visibly disconnected; no fake connected provider UI. |
+| Migration | Applied twice to fresh disposable WSL PostgreSQL 18, with a separate ordinary runtime role. Prerequisite table contents reconciled unchanged. Original 001 checksum/schema unchanged; new checksummed 002 additive migration. |
+| Changed-file lint | Passed. |
+| Full repository lint | Still the same two preexisting errors in unchanged `components/portal/website-insights.js`, lines 80 and 87. |
+
+Browser screenshots of client journey and desktop/mobile admin forms were inspected.
+The new approval and withdrawal/delivery paths have real API/SQL evidence with
+mocked Google transport; a live connected-provider browser download is **not**
+claimed. An ambiguous admin release-list SQL query and form accessible-label
+issue were found by the browser checks and fixed. A disconnect race during first
+OAuth connection was addressed with a durable connection-event binding, tested
+alongside reconnect races. No authorization requirement was removed for tests.
+
+The 22 reported database-test passes include three parent tests; there are 19
+scenario groups. Do not describe these numbers as 22 live Google checks.
+
+### Security and practical limits
+
+- Dedicated server-side credential storage; deployment Google scope is read-only
+  but broader than one folder. The server restricts retrieval to explicit client
+  assignments/releases. Prefer a dedicated OAuth client so provider-side grant
+  revocation is independent from company knowledge. Disconnect here removes local
+  authority and does not globally revoke another OAuth use.
+- One review checks at most 100 immediate folder entries, with an incomplete-result
+  notice. Nested folders, shortcuts, internal/draft/restricted/archived-looking names
+  and unsupported formats are excluded. Human review remains mandatory.
+- **Whole-file release only.** A Google tab/heading URL is a selector within a
+  document, not a separate permission boundary. Review the entire original and all
+  tabs; the UI/confirmation explains this. No internal reference Doc is published
+  just because its tab was linked. The portal does not edit original documents to
+  add stage labels: approved source content and portal metadata must be aligned.
+- Delivery is capped at 4 MiB to stay within Vercel's documented non-streaming
+  response limit, with a bounded provider timeout. Larger-file handling is pending
+  a separately verified delivery design. Native exports can fail if Google limits
+  are exceeded. HTML/SVG/executable types are not exposed inline.
+- Google revocation/moves/version changes are detected on file access. Previously
+  approved titles may remain in a loaded list until refresh; there is no polling
+  guarantee or instant recall of an in-flight/already downloaded response.
+- Application authorization is the baseline boundary. The migration grants
+  append-only audit access to an ordinary runtime but does not introduce RLS or
+  protect against an already privileged database owner/login.
+- No automatic Drive publication rule or external billing/milestone integration
+  was invented. Approved originals are retrieved on demand. Existing emails are
+  unchanged; the portal does not send messages in this step.
+
+### Files and reproducibility
+
+New runtime: `lib/document-{delivery,delivery-access,delivery-policy,drive}.js`,
+`lib/client-document-categories.js`, admin `/api/admin/client-documents` and Google
+callback routes, client `/api/client-documents` list/content routes, admin delivery
+manager and client official-documents component/CSS. New document endpoints are excluded
+from the debugger body-capture allowlist as private file surfaces. The new portable schema is
+`database/client-document-delivery.sql`, applied through the existing explicit
+`scripts/migrate-client-document-assignments.mjs`.
+
+Existing admin/client page composition, reference form/CSS, library heading,
+`.env.example`, setup/portability docs and scoped tests were extended. No new SDK
+or dependency was installed. See `tests/client-document-assignments/README.md`
+for guarded test commands and `CLIENT_DOCUMENTS_SETUP.md` for private configuration,
+callback, migration, connection/rotation and review instructions. Scratch helpers,
+private fixture accounts, generated content and logs are not shipped code.
+
+### Preservation, setup and handoff
+
+All database writes were to fresh `aoc_documents_<random>` loopback WSL databases
+with generated temporary identities. Those databases/accounts and test servers
+were destroyed/stopped. No retained review login was created. Existing AOC client
+IDs, files, conversations, approved knowledge, resources, credits, indexing code
+and Hubstaff mappings were not migrated or changed on real data. Local migration
+checks and offline regressions support preservation; live workflows remain unrun.
+Configured Neon, real messages/payments, Google sharing and private environment
+files were untouched. No branch switch or push.
+
+Private setup still required at the last format check:
+`CLIENT_DOCUMENTS_GOOGLE_CLIENT_ID`, `CLIENT_DOCUMENTS_GOOGLE_CLIENT_SECRET`,
+`CLIENT_DOCUMENTS_ENCRYPTION_KEY`, `CLIENT_DOCUMENTS_ALLOWED_EMAIL` in
+`AI\portal\.env.local` (and the matching Vercel environment when approved).
+Only names/status were checked; no values were printed. Set an approved operator
+`CLIENT_DOCUMENTS_MIGRATION_DATABASE_URL` privately in an ignored setup file and
+confirm the database/runtime-role target before persistent DDL. No persistent
+migration is authorized by this checkpoint. Existing runtime auth/DB values stay
+private and unchanged.
+
+The user supplied four reference tabs in Doc
+`18w4a3t3PE-fvxyi-IVX5__LkooUMj_0xGwmuKEwd1_A`:
+`t.po0mnw2awazg`, `t.0`, `t.ebr8nbyuihrx`, `t.r5uejtgwwgod`. These are requirements,
+not an approved client-facing pilot file. A fresh explicit re-read was requested.
+The connector currently reports a different account from the approved Jaymark
+account; the user chose to reconnect `jaymark@alwaysopencommerce.co`. No document
+read was performed through the other account. Fresh four-tab coverage remains
+pending reconnection; prior research is recorded in Steps 1–2, not relabeled as
+this fresh check. No real test client/file was assigned.
+
+Resume: confirm the approved Google connector/account for reference review; finish
+private document-provider setup; obtain the approved persistent migration target
+and client-facing pilot file/client. After migration approval, sign in with the
+existing AOC admin at `/admin/client-documents`, complete Google consent and review/
+approve one real client file. Verify client `/?view=documents` view/download,
+withdrawal and isolation using authorized test identities. Do not publish this
+internal reference document or enable broad automatic publication.

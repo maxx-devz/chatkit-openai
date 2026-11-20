@@ -28,6 +28,10 @@ Set these names privately in an ignored test configuration:
 - `DATABASE_URL`: ordinary runtime login, same disposable database/host/port.
 - `BETTER_AUTH_URL`: `http://127.0.0.1:YOUR_TEST_PORT`.
 - `BETTER_AUTH_SECRET`: freshly generated test secret.
+- `CLIENT_DOCUMENTS_GOOGLE_CLIENT_ID`, `CLIENT_DOCUMENTS_GOOGLE_CLIENT_SECRET`,
+  `CLIENT_DOCUMENTS_ENCRYPTION_KEY`, `CLIENT_DOCUMENTS_ALLOWED_EMAIL`: generated
+  fictional test-only configuration for deterministic Google transport tests.
+  No real Google token/account is required or contacted by those tests.
 - `CLIENT_DOCUMENTS_FIXTURE`: absolute path below the ignored `.tmp` directory.
 
 Before starting Next, isolate the child environment and shadow every variable
@@ -57,7 +61,7 @@ using the isolated runtime environment, then run:
 node node_modules/@playwright/test/cli.js test --config tests/client-document-assignments/playwright.config.mjs
 ```
 
-Seven browser checks run in order on one worker as a save/edit/revoke workflow.
+Nine browser checks run in order on one worker as a save/edit/revoke workflow.
 They use real username sign-in and database persistence, and block external
 browser requests. Drive-looking IDs are metadata validation inputs only; no fake
 Google API or consent is substituted. Stop the test server and destroy the
@@ -66,3 +70,25 @@ disposable database/accounts and private fixture file afterward.
 General regression commands remain `npm test` and `npm run test:internal-user`.
 The completed rehearsal also ran the offline source/Hubstaff suites, changed-file
 lint and production build. Actual results are in `docs/CLIENT_DOCUMENTS_PROGRESS.md`.
+
+## Delivery and Google adapter checks
+
+After the initial database suite writes its private fixture, run these in separate
+Node processes with the same isolated configuration:
+
+```powershell
+node --test tests/document-delivery-policy.test.mjs
+node --conditions=react-server --experimental-test-module-mocks --import ./tests/internal-user/aliases.mjs --test tests/client-document-assignments/delivery.database.test.mjs
+node --conditions=react-server --experimental-test-module-mocks --import ./tests/internal-user/aliases.mjs --test tests/client-document-assignments/google.database.test.mjs
+```
+
+The delivery suite mocks the Google adapter only, using real SQL/auth/API checks.
+The Google suite exercises the actual adapter and OAuth state SQL while mocking
+Google OAuth token/identity and HTTP methods. It checks wrong-account/scope/config,
+state replay/expiry/session substitution, disconnect/reconnect races (including an
+initial grant with no prior connection), admin revocation during exchange, encrypted
+credential copying, foreign file ancestry and bounded content. These are fixtures,
+not evidence of live provider consent or downloads. They clean local connections
+before the browser run. The browser run uses real portal auth/SQL, verifies admin
+journey changes and client isolation, and never simulates a connected Google UI.
+Live Google review/publication/download remains a separately authorized pilot.

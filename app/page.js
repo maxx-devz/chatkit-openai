@@ -65,5 +65,5 @@ export default async function HomePage({ searchParams }) {
     );
   }
 
-  return <ClientPortal portalContext={portalContext} requestedView={params?.view} initialWebsite={params?.site} connectionResult={params?.connection} journeyPreview={params?.journeyPreview === "1"} />;
+  return <ClientPortal portalContext={portalContext} requestedView={params?.view} initialWebsite={params?.site} connectionResult={params?.connection} />;
 }
