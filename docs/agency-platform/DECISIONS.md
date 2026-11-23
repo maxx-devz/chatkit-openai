@@ -923,3 +923,32 @@ can change tool/agency/client authority. Existing mapped budgets/tasks stay on t
 working path. Stage15 local branding and Stage14 security remain independent.
 Non-AOC client rollout stays gated. No Stage16A/Stage17 feature, fake connection,
 provider credential, source publication or real account promotion is introduced.
+
+
+## S16A-D01 — approved guidance is distinct from delivery authority
+
+Agency-owned role profiles are editable draft guidance. Explicit agency-admin
+approval snapshots an immutable revision, and onboarding pins that exact revision.
+Changes never expand roles/actions, attach a source or turn on AI/tools. New
+agencies inherit no AOC profile. Retirement stops future retrieval; new revision
+selection/reassignment and prior checklist revocation are explicit independent
+actions. Existing memberships and approved Stage13A assignments remain the sole
+customer-data authority. Internal/HR records are excluded from the projection.
+
+Own staff can use existing customer tools without Hubstaff or specialist staffing.
+Combined-package specialists additionally require an active approved assignment
+with matching agency/client/person and sufficient expiry/action. Profile selection
+does not imply cross-discipline qualifications. The agency retains priority and
+review ownership; fictional starters imply no training credential or deadline.
+
+## S16A-D02 — onboarding is not a task, approval or publication workflow
+
+The four-step checklist records participant progress and business blockers only.
+It grants no access and completion never approves a deliverable. Permission-aware
+read-only controls match server checks. Free-text reminders prohibit private
+personnel content; no claim of automatic semantic detection is made. No HR table
+or profile data is added to AI retrieval. Existing-tool URLs are links, not
+integrations. Stage17 requests/approvals and20A published workflow templates remain
+later work. Account security, branding, runtime-role guards and external gates are
+unchanged. Already displayed guidance revalidates on focus/15-second checks; all
+mutations reauthorize in SQL without pooled tenant settings.

@@ -2392,3 +2392,114 @@ checkpoint commit and clean-status confirmation, a normal manual branch switch
 is safe as a Git operation. Ignored environment/build files stay local across
 branches; review their target before starting an application on another branch.
 This stage stops here; no Stage16A or Stage17 implementation is authorized now.
+
+
+## Stage16A — role profiles and guided delivery onboarding (2026-11-23)
+
+**Local engineering PASS; external agency activation HOLD. Stop before17.**
+The owner requested switching from the historical isolation branch to the latest
+agency work and continuing the next stage in order. Switched to feat/agency-platform
+at9bb7d49, with the untracked tests/client-documents-preview/ preserved. Read the
+Stage16 checkpoint, context/decisions/isolation/runbook, AGENTS and installed
+Next16.3.3 route/CSS guidance. Read playbook16A as reference; no17/20A work began.
+
+### Implemented behavior
+
+- Agency-owned editable development/SEO/design/reporting examples, bounded plain
+  delivery fields, explicit exact-revision approval and immutable snapshots.
+- Agency-admin assignment of approved guidance to existing permitted staff or
+  matching approved specialists. Guidance, hiring or engagement never grants
+  client, source, file, Internal, AI or platform authority. Read-only actions match
+  the approved scope in both UI and SQL. Existing tools/Hubstaff stay optional.
+- Explicit personal onboarding scopes; four persisted checklist states/blocker
+  notes, review context and a small first task. Reload resumes saved progress.
+  Completion is self-reported, not a client/deliverable approval or automated
+  access request. Later requests/approvals remain17; workflow publication is20A.
+- Fresh session/MFA, agency/client/member/reviewer/assignment/status/expiry checks,
+  metadata audit, idempotent operation receipts, stale revision denial, explicit
+  revocation/retirement, private no-store responses and no pooled scope settings.
+- No HR/private personnel join or ingestion into AI retrieval. Plain-text field
+  guidance excludes personnel data; no semantic DLP/automatic qualification claim.
+
+### Final source files
+
+014_delivery_onboarding.sql under database/agency-platform; lib/delivery-profile-policy.js
+and lib/delivery-onboarding.js; guarded admin/personal onboarding API routes and
+pages; components/agency onboarding console, participant component and CSS; two
+navigation updates in agency-console/specialist-delivery. Migration, synthetic
+fixture and guarded review seed scripts; package commands; pure policy, real
+database/API and Chrome browser tests. CONTEXT, DECISIONS, this PROGRESS,
+ISOLATION-EVIDENCE and STAGE16A_DELIVERY_ONBOARDING.md carry the handoff.
+All final implementation lives in actual AI\portal project paths, not only.tmp.
+
+### Actual verification
+
+| Check | Final actual result |
+| --- | --- |
+| Stage16A schema |014 applied twice on fresh disposable loopback PostgreSQL18.3; ordinary runtime entry grants. Four ENABLE/FORCE-RLS tables. A further repeat preserved the complete logical database snapshot, including public history, rows and sequences. |
+| Stage16A real database/API |10 TAP checks including parent: explicit approval, retry dedupe, no-Hubstaff progress/resume, stale writes, agency/client/identity denial, immutable pinned revisions, live specialist scope/read-only, revocation/suspension/expiry, profile retirement/replacement/downgrade, raw-table denial/ownership mismatch and unchanged memberships. |
+| Stage16A Chrome |8 passed: owner draft/approval/assignment, resumed blocker, denied foreign/client/engagement access, specialist guidance, revoked open page, authorized multi-agency switching, mobile/no-store/CSRF/gate and read-only controls. Real sessions/routes/database; synthetic cookie injection for these UI cases. External traffic blocked. Mobile screenshot inspected. |
+| Password/MFA review check |Fresh Better Auth username/password login for synthetic staff and password+TOTP for the synthetic owner reached their authorized API. No secrets printed. |
+| Earlier real DB regressions |Stage03 9 scenarios; Stage04 9 TAP;05 5;06/07 11;08 1;09 6;10 9;11 matrix9;12 11;13 11;13A11;14 16;15 8;16 8. Providers/model behavior are fixtures. Restored legacy dry-run/backfill idempotence and public record/sequence preservation assertions passed. |
+| Earlier Chrome regressions |Stage14 account security8, Stage15 branding7, Stage16 business5 passed again on the fresh target. |
+| Offline regressions |381 general Node,115 Internal and40 prepared-source/index tests passed. Python188 reported,10 opt-in skips (178 passed); its opt-in real DB cases also ran within the relevant database regression suites. |
+| Lint/build |Repository and focused/test ESLint passed. Full production build passed in the isolated review snapshot. Two pre-existing dynamic-filesystem tracing warnings in auth-mail.js remain; review artifacts are private and are not deployment artifacts. |
+| Source verification |391 application/component/library/migration files in the tested production snapshot match actual project source byte-for-byte. No application changes exist solely under.tmp. |
+
+Initial lint found a plain internal anchor in the new screen; replaced with Link.
+An initial broad Python run blanked CHATKIT_UPLOADS_ENABLED while clearing inherited
+configuration, disabling a mocked uploads test. Setting the expected true value
+only in that offline child environment restored188/10-skip success; no backend or
+live setting was changed. Read-only UI was tightened to match the existing action
+check; final SQL/API/browser runs passed afterward. No failing acceptance case is
+left hidden. Standalone seed CLI is linted; the same underlying fixture creation
+ran in database acceptance, but that separate CLI first-run path was not executed
+against an additional target merely to generate duplicate review accounts.
+
+### Private local review and configuration
+
+Retained review: http://127.0.0.1:3006/login, /onboarding and
+/admin/agency/onboarding?agency=<authorized-slug>. Exact agency links and private
+account setup are in STAGE16A_DELIVERY_ONBOARDING.md. Ignored account location:
+.tmp/delivery-onboarding-review/accounts.json. Use accounts.staffA.username/password
+for the participant, ownerA for agency approval and specialist for scoped delivery.
+Owner MFA remains enforced; factors/backup codes stay in the private account file.
+Use a separate browser profile because127.0.0.1 cookies are shared across ports.
+
+Ignored .env.delivery-onboarding-review contains only generated local runtime,
+test-operator, auth/capture and fixture settings. Account/environment ACLs are
+restricted to the local owner and SYSTEM. No.env.local value was copied or changed.
+No new production variable or.env.example placeholder is introduced. Existing
+names/purposes/private setup are listed in the runbook; no configuration is missing
+for this local slice. No provider consent is required for these deterministic tests.
+
+The retained task-only WSL supervisor uses a fresh disposable cluster and keeps
+the review running. Its session metadata is private under the review directory.
+The ignored local orchestration/evidence is at
+C:\Users\MY PC\Desktop\AOC\chatkit\.tmp\stage16a, including a stop-file shutdown;
+the runtime production snapshot is AI\portal\.tmp\stage16a-build. Final source is
+the committed project paths above. Earlier disposable attempts were stopped and
+removed. The pre-existing WSL main cluster and unrelated review listeners were
+not targeted. Do not assume these credentials survive a stopped/disposed target.
+
+### Preservation, pending boundaries and resume
+
+No real client, Hubstaff mapping, legacy ID/conversation/file/credit/resource/source/
+indexing history or customer DB was edited. No Neon/Supabase remote connection,
+provider upload, real email/payment, DNS, deployment or push occurred. Existing
+runtime-role guards and the local/external gates remain intact. Only synthetic
+fixtures received assignments/progress. Unrelated untracked preview files remain.
+
+External release stays HOLD for critical hosted-AI privacy and deployed private
+CDN/cache evidence. Carry forward live providers/consent/resources/revocation,
+hosted runtime/pooler-role mapping, scheduler delivery, rotation/restore, real mail/
+legacy enrollment/lost-factor handling, custom DNS/TLS/hosts and supported-browser/
+BFCache coverage. Google revocation remains next-check/15-minute freshness.20B
+approved-source publication is still a later dependency. Existing tracing warnings
+need deployment/package review; no live hosting behavior is inferred from build.
+
+Resume on feat/agency-platform from this Stage16A local commit. Read AGENTS,
+CONTEXT/DECISIONS/PROGRESS, ISOLATION-EVIDENCE and the16A runbook, verify the target
+and preserve unrelated edits. **Stage17 — Requests, approvals and action center —
+is next, and has not started.** Require a separately authorized task; never enable
+external agencies merely because local16A checks pass. Do not skip into20A.

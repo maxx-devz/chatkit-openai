@@ -796,3 +796,13 @@ Python188 reported/10 opt-in skips, lint and build. Model/provider responses are
 fixtures, not live verification. Review3005 uses private .env.business-review and
 .tmp/business-review/accounts.json. See PROGRESS and STAGE16_WITHOUT_HUBSTAFF.md.
 Next permitted work is separately authorized Stage16A, not started here.
+
+
+## Stage16A implementation scope (2026-11-23)
+
+Continued from Stage16 checkpoint9bb7d49 on feat/agency-platform. Agency-owned
+role guidance, immutable approval snapshots, scoped staff/specialist onboarding
+and resumable progress are additive014. Guidance never grants customer/AI access.
+External agency mode stays closed; no Hubstaff is required. See
+STAGE16A_DELIVERY_ONBOARDING.md for behavior/private setup and PROGRESS.md for
+actual verification/closeout. Stage17 has not started.

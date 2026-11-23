@@ -1,0 +1,5 @@
+import {test} from "node:test";
+import assert from "node:assert/strict";
+import {validateProfile,STARTER_PROFILES,PROFILE_FIELDS} from "../lib/delivery-profile-policy.js";
+test("fictional role starters remain editable guidance with no authorization fields",()=>{assert.equal(STARTER_PROFILES.length,4);for(const p of STARTER_PROFILES){assert.deepEqual(validateProfile(p.fields),p.fields);assert.ok(p.fields.firstTask);assert.ok(p.fields.excludedResponsibilities);assert.equal(Object.keys(p.fields).length,Object.keys(PROFILE_FIELDS).length);}});
+test("profiles reject role escalation, personnel fields, executable links and markup",()=>{for(const value of [{role:"agency_admin"},{payroll:"private"},{specialty:"<script>bad</script>"},{externalToolUrl:"javascript:alert(1)"},{externalToolUrl:"https://secret@example.com/"},{externalToolUrl:"https://127.0.0.1/"}])assert.throws(()=>validateProfile(value));assert.equal(validateProfile({tools:"First\r\nSecond"}).tools,"First\nSecond");assert.equal(validateProfile({externalToolUrl:"https://tasks.example/approved"}).externalToolUrl,"https://tasks.example/approved");});

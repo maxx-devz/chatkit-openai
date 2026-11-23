@@ -613,3 +613,29 @@ resource/revocation, schedulers, runtime/pooler deployment, rotation/restore, li
 mail/recovery and custom-host checks retain earlier status. Google's detection
 window remains next-check/15-minute freshness. Non-AOC client entry stays gated;
 new business evidence is not permission to inherit AOC knowledge. No Stage16A.
+
+
+## Stage16A — approved delivery guidance and onboarding (2026-11-23)
+
+**Local PASS; external activation HOLD.** Stage16 checkpoint9bb7d49 on
+feat/agency-platform. Existing permissions and runtime-role guards are reused.
+No agency/client/person selector or profile text grants customer/AI authority.
+
+| Boundary | Status / actual evidence |
+| --- | --- |
+| Agency/profile ownership and approval |passed — real SQL/API; draft cannot be assigned, approval pins an immutable revision; cross-agency/client/person attempts deny without partial writes; profile edit preserves membership and assigned guidance. |
+| Staff/specialist scope |passed — own staff require existing customer access; specialist needs approved matching unexpired assignment; engagement/client/Internal identity alone fails. Read-only UI and API agree. |
+| Current access |passed — revoke, suspension, expiry, role downgrade, specialist replacement and profile retirement deny subsequent reads/updates. Open-page focus recheck clears denied content. Visibility recheck bound is15 seconds; no instant remote-erase claim. |
+| Database/runtime/pooling |passed — four ENABLE/FORCE-RLS tables, direct runtime SELECT denied, composite mismatch rejected, ordinary session identity retained. Four narrow caller functions; no per-tenant session GUC. Legacy service-role exception remains explicit. |
+| Progress/replay/history |passed — persisted blocker resumes after reload, repeated operation creates no duplicate, stale revision conflicts. Repeat014 left full logical snapshot identical. Four-step completion is self-report, not a deliverable approval or task write. |
+| HR and AI boundary |passed with synthetic canary — private fixture HR text absent from permitted views; no HR table join or new AI ingestion/provider call. Live model behavior remains not run; no semantic DLP guarantee for voluntary text. |
+| Browser/UI |passed —8 Chrome scenarios using real session cookies, actual server/database and blocked external network, including390px viewport. Separate password/TOTP health check plus repeated Stage14 interactive auth browser8. |
+| Regression/build |passed —10 Stage16A DB/API TAP checks incl parent; prior DB matrices; branding Chrome7, business Chrome5;381 general,115 Internal,40 sources/index; Python188 reported/10 skips; repository/focused lint, production build. Prior auth-mail dynamic tracing warnings remain. |
+| Hosted/providers/CDN/real mail/DNS |not run — critical hosted-AI privacy/private-cache gates remain HOLD. Provider consent/revocation, deployed runtime/pooler roles, scheduler, rotation/restore and real mail/custom-host checks retain prior status. |
+
+Commands: package agency:onboarding; test:delivery-onboarding:database / :browser
+with matching private DELIVERY_ONBOARDING_FIXTURE, DATABASE_URL,
+AGENCY_WORKSPACE_TEST_DATABASE_URL and current local Better Auth/capture settings.
+Operator migration uses AGENCY_MIGRATION_DATABASE_URL and exact target/role flags.
+No real data, Neon/Supabase connection, message, payment, provider request or push.
+Stage17 is not implemented. See PROGRESS and STAGE16A_DELIVERY_ONBOARDING.md.

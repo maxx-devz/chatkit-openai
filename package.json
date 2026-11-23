@@ -123,7 +123,11 @@
     "test:agency:branding:database": "node --conditions=react-server --experimental-test-module-mocks --import ./tests/internal-user/aliases.mjs --test tests/agency-backfill/branding.database.test.mjs",
     "test:agency:branding:browser": "playwright test --config tests/agency-branding/playwright.config.mjs",
     "seed:branding:review": "node --env-file=.env.branding-review scripts/seed-branding-review.mjs",
-    "dev:branding:review": "node --env-file=.env.branding-review scripts/dev-platform-review.mjs --branding"
+    "dev:branding:review": "node --env-file=.env.branding-review scripts/dev-platform-review.mjs --branding",
+    "agency:onboarding": "node scripts/migrate-delivery-onboarding.mjs",
+    "test:delivery-onboarding:database": "node --conditions=react-server --experimental-test-module-mocks --import ./tests/internal-user/aliases.mjs --test tests/agency-backfill/delivery-onboarding.database.test.mjs",
+    "test:delivery-onboarding:browser": "playwright test --config tests/delivery-onboarding/playwright.config.mjs",
+    "onboarding:review:seed": "node scripts/seed-delivery-onboarding-review.mjs"
   },
   "engines": {
     "node": ">=22"
