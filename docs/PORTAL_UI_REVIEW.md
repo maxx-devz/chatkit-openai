@@ -391,3 +391,402 @@ Stopped browser navigation/click/checkbox logging and ordinary GET/read auditing
 Expanded rows distinguish approved submitted values from values confirmed by a committed database operation/server result. Safe client/plan fields are readable with units; passwords, tokens, payment references and private/free-text content are excluded. Commit failures, duplicates and partial post-commit request failures are labelled accurately. Existing authorization and table expand/collapse behavior are preserved.
 
 Passed: 515 offline regressions, 58 admin browser checks, disposable PostgreSQL checks, full lint and isolated build. Actual local navigation/filtering produced zero browser POST telemetry and no additional read/browser audit records. No shared schema/private environment or real client plan/balance changes. No live provider/financial mutations tested; Neon untouched. Review `/admin/audit`.
+
+## Documents focus reload fix - 2026-11-23
+
+Cause reproduced in the real ClientDocumentAssignments component using an isolated
+Chrome fixture: dispatching five browser-focus events caused five extra reference
+GETs (six total). The focus listener set loading=true and replaced the entire
+SelectedClient subtree, removing its reference/delivery/journey forms. Native
+select popups and switching tabs can trigger that focus event.
+
+Removed that focus subscription. Reference data now refreshes on client selection,
+completed save/removal, or an explicit Refresh references button. Subsequent reads
+keep forms mounted, retain unsaved edits on transient failure, and display a stale
+reference warning with retry. Request sequencing rejects late pre-save responses.
+401/403/404 responses still remove previously displayed client content. Server
+permissions, no-store requests, publication approval and client scope are unchanged.
+
+Application: components/admin/client-document-assignments.js.
+Verification fixture: tests/client-readiness/ui/app/admin/client-documents/page.js.
+Browser cases: tests/admin-readiness/browser/documents.spec.mjs.
+
+Actual results:
+- Reproduction before fix: one desktop case failed with six GETs instead of one.
+- Final Chrome desktop/touch: 14 passed (focus/native-select event simulation,
+  unsaved reference and journey drafts, delayed refresh, transient failure/retry,
+  saving without form replacement or duplicate write, client switching, stale
+  response ordering and authorization denial).
+- Existing document assignment/delivery policy tests: 11 passed.
+- Changed-file lint, full project lint, and git diff --check: passed.
+- Isolated production build: passed, including /admin/client-documents. The first
+  isolated build attempt rejected its node_modules junction outside Turbopack's
+  root; only the temporary snapshot root was adjusted to include dependencies.
+  The application next.config.mjs and running server build output were untouched.
+
+Commands: node node_modules/@playwright/test/cli.js test --config
+ tests/admin-readiness/playwright.config.mjs documents.spec.mjs;
+ node --test tests/client-document-assignment-policy.test.mjs
+ tests/document-delivery-policy.test.mjs; npm run lint; next build in the isolated
+ .tmp/document-refresh-build-20261123 snapshot with database/provider access off.
+
+Browser API responses were fixtures; no live Google document delivery or real
+client save was tested. No database query/migration, production deployment,
+environment change, commit or push was performed for this fix. Existing live
+provider/deployment checks remain pending. Review /admin/client-documents.
+
+## Approved Drive link library - 2026-11-23
+
+Implemented the user-approved simpler default: admin saves an original individual
+Drive link, explicitly confirms publication for the selected client, and that
+client opens it in Google Drive. Saved references now show Private draft or
+Published to [client], with Publish link and Unpublish link actions. Publication
+requires a document type, journey stage, business reason and whole-file/sharing
+confirmation. Folder references stay private. Save/edit/removal does not publish
+or advance journey progress. Editing or withdrawing a published link requires
+another explicit publication before it becomes visible again.
+
+No Google OAuth/environment configuration or new migration is needed for links.
+Existing optional version-approved protected downloads remain available. Their
+Google configuration and empty release panel are hidden from the default setup
+when that optional connection is not configured. The previous focus-reload fix
+is preserved.
+
+Publication uses an existing append-only assignment-audit JSONB receipt, committed
+atomically with a new assignment revision. Queries require matching assignment,
+client and revision, active publisher and no Internal Portal identity. Active
+membership and workspace selection are checked on list and again on open. Portal
+open URLs bind the publication revision, remain private/no-store, and redirect only
+to a normalized HTTPS Google file URL with no portal referrer. Copied portal links
+cannot grant another client access. Legacy protected downloads and link metadata
+share server-side filtering/pagination; neither leaks admin reasons or credentials.
+
+Limits: Google controls actual file access/downloads and later file changes. The
+portal does not verify source content/sharing/version through Google's API in link
+mode. Unpublishing cannot recall a direct Google URL, downloaded copy or existing
+Google permission. An anyone-with-link file remains accessible outside the portal.
+No automatic publication, Drive sharing change, email, payment or AI upload occurs.
+
+Actual checks:
+- 22 desktop/mobile Chrome component checks passed, with mocked APIs: default flow
+  without Google settings, confirmation, draft/folder hiding, correct-client view,
+  unpublication/edit withdrawal, retries and all focus/draft/client-switch cases.
+- 30 actual disposable PostgreSQL 18 checks passed through ordinary runtime roles:
+  7 original assignment checks, 7 simple-link checks, 11 existing protected-delivery
+  checks and 5 Google-adapter checks. Auth, SQL, transactions, replay, same-client
+  and foreign-client denial, copied links, stale revisions, revoked membership,
+  Viewer access, publisher revocation, pagination and history were exercised.
+  Simple-link checks used absent Google settings. Google transport in legacy
+  delivery/adapter checks was mocked; no live Google access is claimed.
+- Existing document migrations applied twice on the disposable database only.
+- Full lint and all 398 top-level offline regressions passed.
+- Production build passed from an isolated source snapshot without private env
+  files or database/provider access. The dependency root adjustment was confined
+  to that ignored build snapshot, preserving the running review server output.
+
+The current WSL distro initially lacked PostgreSQL, so PostgreSQL 18 was installed
+for fresh disposable tests. The first bootstrap needed its integration-audit
+prerequisite. A new test's temporary memberships initially conflicted with an older
+suite's fixture; cleanup was corrected and all four suites passed on a fresh database.
+These were local test setup issues; no shared database repair was needed.
+
+No Supabase/Neon data, real client link publication, Google permissions, private
+configuration, live provider, deployment, commit or push was changed. The user can
+review their existing saved reference at /admin/client-documents and explicitly
+publish it, then sign in as that client at /?view=documents. Live Google sharing and
+download availability remain the account owner's check.
+
+Cleanup confirmed: both synthetic test databases and the dedicated WSL aoc_links
+cluster were removed after verifying their names. The existing port-3000 review
+server remains running. Final built application files match the project files.
+
+
+## Simple title/description library - 2026-11-23
+
+User-requested scope change supersedes the journey presentation requirement in
+previous checkpoints. Renamed the admin navigation, overview card, page and client
+panel to Document Library. Removed both client journey/next-action panels, workflow
+filters and the admin milestone/stage controls. Main editing fields are Document
+title, optional Description and Google Drive file link. Publish/unpublish retains
+its confirmation and audit trail, with action-generated reasons. Client entries
+show only the shared title, description, date and appropriate open/download action.
+
+No stored journey or prior document history was deleted. Description metadata uses
+existing append-only assignment-audit result JSONB, matching the current assignment,
+client and revision. Save, publish and unpublish preserve descriptions; old API
+requests omitting fields retain their existing metadata. Current-client permission,
+URL validation, publication revision, active-publisher checks and no-store headers
+are unchanged. Existing protected-download APIs and historical journey APIs remain
+compatible, while journey controls are removed from the document UI.
+
+Actual checks: 24 desktop/mobile document component checks passed with mocked APIs;
+2 existing client portal layout checks passed. Mobile screenshot was visually
+reviewed. Real auth/SQL on a fresh disposable WSL PostgreSQL database: 31 passed
+(7 assignment, 8 link/description, 11 protected delivery, 5 Google adapter). The
+link suite ran without Google configuration; legacy Google transport was mocked.
+All 399 offline regressions, full lint and isolated production build passed.
+The retained real-auth browser suite was aligned to the new UI but was not rerun.
+
+No Supabase/Neon writes, real publications, live Google calls, environment changes,
+production deployment, commit or push. No schema migration is needed. Review with
+the existing admin at /admin/client-documents and client at /?view=documents.
+
+Cleanup for this increment: the single synthetic database and dedicated aoc_links
+cluster were removed. Final changed application files match the built snapshot.
+
+
+## Bounded client document loading - 2026-11-23
+
+Reproduced an indefinite loading state in Chrome by stalling the document API
+response: the previous component had no deadline and remained loading after 21
+virtual seconds. Added a 20-second deadline covering fetch and response-body
+parsing. It aborts the active request and directly shows an actionable error even
+if the response never settles. Try again starts a fresh controller. Late requests,
+unmount and hidden-tab cancellation cannot overwrite the current result. Returning
+to a visible tab rechecks authorization; hidden content is cleared. Invalid HTML
+or malformed response shapes now show a safe retry message instead of raw parser
+errors. The approved-link data/access model is unchanged.
+
+Read-only diagnostic on the explicitly approved Supabase project found gogrit and
+one currently published link; that query completed in 2,323 ms. The anonymous local
+API returned 401. No client content, token or password was printed; no records were
+modified. This does not identify the original browser request's network-stall cause
+or claim an authenticated inspection of the user's current Chrome session.
+
+Actual results: 16 desktop/mobile browser checks passed using fixture APIs, including
+stalled-response timeout/recovery, malformed body recovery, visibility/revocation and
+the simple publication/library workflow. Changed-file/test lint and isolated
+production build passed. No database writes, schema/environment changes, provider
+calls, deployment, commit or push. Existing published files remain preserved.
+
+
+## Initial document list rendered on the server - 2026-11-23
+
+The timeout increment alone did not resolve the user's observed loading screen.
+First verified the complete existing sign-in/save/publish/client-list/reload flow
+in a clean Chrome context against the isolated full app and disposable PostgreSQL:
+both initial and reload document API responses were 200, with no page errors.
+This does not reproduce or identify the cause in the user's existing Chrome.
+
+Implemented a request-scoped initial list in app/page.js for the authorized
+Documents view, calling the existing clientDocumentList authorization path.
+ClientPortal passes a client-bound initial result to ClientOfficialDocuments.
+The library renders that list in server HTML and does not immediately replace it
+with an initial browser fetch. Error results show a generic actionable retry;
+foreign-client initial results are ignored. Search/paging/retry/visibility still
+use existing authorized no-store API reads and the 20-second full-response bound.
+No shared server/browser cache, credentials, provider permissions or CSP changes.
+
+Actual final checks:
+- 24 desktop/mobile component-browser checks passed: publication, edited
+  descriptions, draft visibility, unpublish, retries, stalled/malformed requests,
+  scoped initial results, safe errors and tab-return revocation. APIs mocked.
+- 4 full Next app Chrome checks passed using real Better Auth and disposable
+  PostgreSQL, including blocked initial browser document API, JavaScript disabled,
+  unrelated-client HTML/list denial and active-session membership revocation.
+  These call the real application source and existing API; Google is not contacted.
+- 31 database-suite reported passes on disposable PostgreSQL during this
+  investigation (including parent tests); legacy Google transport mocked.
+- 399 offline tests passed; changed-source/test lint and isolated production
+  build passed. No new skipped tests in these runs.
+
+Early verification found two test-harness mistakes: a nonexistent membership id
+instead of the existing composite key, and an ambiguous alert selector matching
+Next's route announcer. Corrected both. The visibility test now explicitly waits
+for hydration before dispatching its event; all affected checks passed afterward.
+
+No live Google file/permission check, authenticated inspection of the user's
+Chrome profile or deployment is claimed. No real account/file changes, schema
+migration, environment edit, remote database write, commit or push. Main review
+server on port 3000 remains running; isolated test server was stopped.
+
+Final cleanup: dedicated synthetic PostgreSQL cluster removed after verifying its
+only non-template databases were postgres and the generated test database. Main
+review server on port 3000 was preserved. Shared dates use an explicit locale and
+UTC to keep server/client markup consistent across browser timezone settings.
+
+
+## Admin credit-request review flow - 2026-11-23
+
+User reported confusing admin UI after requesting 200 through gogrit. Reviewed
+the existing /admin/credits components: pending requests were below the monthly
+plan and top-up forms, with only an immediate decline action. Approval required
+manually choosing the related request in a separate paid-credit form. The client
+request is a free-text note; its number does not identify a verified price or an
+approved quantity. Did not impersonate the user's current Chrome session or
+approve/decline the actual gogrit request.
+
+Changes in real project paths:
+- components/credits/admin-plan-requests.js: request-first table above forms,
+  pending count, original message/date, explicit review action and resolved
+  history. Decline requires a reason and confirmation; failed retries retain
+  the same operation key. Mobile rows show all fields/actions without swiping.
+- components/credits/admin-client-plan.js: review opens the matching credit form
+  with its request preselected. Agreed credits and actual payment remain separate
+  blank inputs; no amount is guessed from the client's note. Monthly activation
+  is required when no paid month exists. Paid additions precede monthly settings,
+  while upgrade review focuses monthly settings. Success explicitly says when
+  the linked request was approved. The existing server transaction/idempotency,
+  authorization, confirmed-payment requirements and balances are unchanged.
+- components/credits/admin-plans.js and credits.module.css: clearer client picker,
+  selected-client identity, payment guidance and responsive request presentation.
+- Retained tests: tests/admin-readiness/browser/credit-requests.spec.mjs; existing
+  plans.spec.mjs regressions unchanged. The isolated plans fixture uses its own
+  route for client switching; the real application defaults to /admin/credits.
+
+Actual results: 26 desktop/mobile Playwright checks passed (12 new request-flow
+checks and 14 existing plan/client regressions), 399 offline Node tests passed,
+changed-source/test lint passed and isolated production build passed. Browser
+APIs were intercepted fixtures: no actual payment, provider call or real request
+mutation. Checks cover unpaid-month routing, linked credit approval, no write on
+review, decline/cancel/reason, retry keys, workspace switch and unchanged paid
+monthly settings. Inspected desktop/mobile screenshots; mobile table no longer
+needs horizontal scrolling. Initial failures were exact getByLabel selectors
+that included nested option text; corrected to role/name combobox selectors.
+
+No schema/backend/auth/environment change, remote database write, live payment,
+email, commit or push. No new configuration. Real request approval and actual
+account review remain for the user. Upgrade approval continues to use the existing
+manual monthly-settings/linked-credit process; no automated charging or dedicated
+new upgrade decision API was introduced. Main server on port 3000 kept running;
+isolated browser server is stopped by Playwright after verification.
+
+Review: /admin/credits as the existing authorized AOC admin, choose gogrit, then
+use Review & add credits (or Activate monthly plan for an unpaid month). Confirm
+the agreed credit quantity, actual payment and reference before final submission.
+
+
+## Original request versus actual credit grant - 2026-11-23
+
+Follow-up screenshot showed a request message of 200 credits, a confirmed grant
+of 150, and history labeled only Approved. The request note is free text and
+must stay unchanged. No numeric request amount is guessed or invented from it.
+
+readClientPlan now includes granted_credits and granted_period from the existing
+portal_client_plan_topups rows linked by BOTH request_id and client_id. This is
+a parameterized, provider-neutral, read-only extension of the existing query;
+no schema migration, data rewrite or credentials/configuration change. Existing
+correctly linked top-ups become visible on the next read. Payment amounts,
+references and admin audit details are not added to client-facing request data.
+
+Admin history separates Original client message, Credits actually added and
+Decision. Stored approved status is presented as Closed, with the exact recorded
+grant/month beside it. Client history shows the same original message and actual
+grant. Older closed requests without a linked grant say Amount not recorded;
+they never infer the quantity from the note or unrelated balance additions.
+The review and save feedback explain the actual grant and that the request
+closes at that quantity. No remaining portion is queued automatically; no new
+partial-request/remainder workflow or automatic payment was introduced.
+
+Changed source: lib/client-plan-store.js, components/credits/request-grant.js,
+admin-plan-requests.js, admin-client-plan.js, client-plan-view.js and shared CSS.
+Extended scripts/check-client-plans-database.mjs and credit-requests.spec.mjs.
+
+Actual verification:
+- Real disposable WSL PostgreSQL 18, ordinary non-owner runtime role: existing
+  plan activation/authorization/idempotency/immutability/audit grants checks pass,
+  plus requests of 200 with grants of 150/200/300, exact linked month, retry
+  totals, foreign-client denial, payment-reference privacy, pending/declined
+  null grants and exclusion of unlinked top-ups. Checks used synthetic records.
+- 36 desktop/mobile browser checks pass with fixture APIs, including admin and
+  client history, lower/equal/higher grants and missing transaction history.
+  Inspected both desktop/mobile requested-200/granted-150 screenshots. Initial
+  three mobile failures were exact cell-name assertions including CSS column
+  labels; corrected selectors, then all 36 passed.
+- 399 offline tests, changed-source/test lint and isolated production build pass.
+
+The local aoc_credit_review cluster was removed after confirming its only
+non-template databases were postgres and the generated aoc_documents test DB.
+Fixture browser server stopped automatically; main port 3000 kept running.
+No real client request/balance/payment edit, Supabase/Neon access, deployment,
+commit or push. Current account/provider verification remains user review.
+Refresh /admin/credits or the client plan history; no setup or migration needed.
+
+
+## Saved monthly plan: summary, explicit editing and cancel - 2026-11-23
+
+Saved plans now default to a compact read-only summary of saved portal price,
+included monthly credits and status. Edit monthly plan opens the existing form
+and focuses its first field. Cancel editing unmounts the draft and reopens from
+saved data; it does not submit. New clients keep the initial setup form open.
+An unpaid saved month has an explicit Activate this month entry point; opening
+it never confirms payment. Existing credit-request review can open the editor
+for activation/upgrades. Saving returns to the summary once refreshed saved
+version/month data arrives, with success feedback retained. Failed saves keep
+the form and retry key; failed refresh keeps the confirmed-change warning.
+
+Changed real paths: components/credits/admin-client-plan.js, credits.module.css,
+tests/admin-readiness/browser/plans.spec.mjs and credit-requests.spec.mjs.
+Actual checks: 42 desktop/mobile fixture-browser cases passed, including cancel
+after review, reset drafts/payment fields, client switching, unpaid activation,
+failed-save retry, failed-refresh recovery and earlier credit-grant regressions.
+Changed-source/test lint and isolated production build passed. Inspected saved
+summary screenshot; browser APIs mocked. No database/provider writes, backend,
+schema, environment or Internal Portal changes. Existing user edits preserved;
+no commit/push. Main review server on 3000 remains running. Review /admin/credits.
+
+
+## Screenshot-tool document flicker - 2026-11-23
+
+The client document component explicitly aborted/cleared its current list on
+hidden visibility transitions. Screenshot overlays can cause those transitions,
+which replaced Shared documents with Loading your documents on return.
+Removed hidden-state clearing and cancellation. Existing rendered client data
+and initial in-flight reads now survive capture. Returning visible still performs
+an authorized no-store recheck while retaining the list; in-flight coalescing
+prevents repeated visibility/focus signals from starting duplicate reads.
+
+Search/paging still clear their old results intentionally. The 20-second response
+deadline, retry/error behavior, unmount cancellation and scope keys remain.
+A denied recheck clears previously displayed content; client switching cannot
+restore an old response. Previously rendered metadata may remain visible until
+that recheck completes; this does not grant file access. Download/open handlers
+continue to authorize each request. No shared cache or new revocation guarantee.
+This supersedes the earlier immediate hidden-tab clearing described above.
+
+Actual results: 44 desktop/mobile fixture-browser checks passed, including
+screenshot-like hidden/visible/blur/focus transitions, retained list/search draft,
+one document navigation only, coalesced requests, initial in-flight reads,
+revoked access, client switching and existing admin document regressions.
+Changed-source/test lint and isolated production build passed. Inspected the
+capture screenshot. Native Lightshot was not driven; browser events and API
+responses were controlled fixtures. No real documents, database, provider,
+credentials or environment changes, no commit/push. Main review server on 3000
+remains running; the fixture server was stopped automatically after tests.
+Changed real files: components/portal/client-official-documents.js and
+tests/admin-readiness/browser/document-loading.spec.mjs, plus these notes.
+
+
+## File-aware document open buttons - 2026-11-23
+
+Replaced the blanket Open in Google Drive button with labels based on available
+file evidence: Google Docs/Sheets/Slides links identify the relevant application;
+PDF, Office, spreadsheet/CSV, presentation, image and text MIME/extensions identify
+the action. Unknown/opaque links show Open file. No Google fetch/metadata lookup
+is added. For opaque Drive IDs without MIME data, the approved display-title
+extension is only a presentation hint, not verified file content. Protected native
+Google documents are exported by the existing route as PDF, so their label is
+View PDF rather than a misleading Google editor action.
+
+lib/document-open-label.js is pure presentation policy. lib/document-delivery.js
+uses already-authorized assignment source_url internally and returns only the
+computed viewLabel; original Drive URLs/IDs are not added to client JSON. Existing
+client-approved title/description, revision binding, visibility behavior, private
+download URLs and file validation are unchanged. No migration/new environment
+variables. The client component uses the server label, with an extension-based
+fallback for older payloads. Download behavior is unchanged.
+
+Actual results: 46 desktop/mobile fixture-browser checks passed, including action
+labels and existing publication, visibility, revocation and scope regressions;
+402 offline Node tests passed (including three new label-policy groups), lint and
+isolated production build passed. All four real disposable WSL PostgreSQL suites
+passed: 7 assignments, 8 simple-links, 11 protected-delivery and 5 Google-adapter
+reported tests (31 including parent tests); provider transport mocked. The link
+suite checks the actual Docs label and preserves the raw-source non-disclosure
+assertion. Retained real-auth browser label assertion updated, not rerun here.
+
+No actual client record, provider file, remote Supabase/Neon database, credentials
+or environment changed. The generated test database and dedicated aoc_links
+cluster were verified and removed. Main review server on 3000 kept running;
+fixture browser server stops automatically. No commit/push. Refresh the client
+Documents view to see labels for existing files; no re-upload required.

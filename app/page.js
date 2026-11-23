@@ -9,6 +9,8 @@ import ClientPortal from "@/components/portal/client-portal";
 import { resolveAdminContext } from "@/lib/admin-data";
 import { isPortalAuthConfigured } from "@/lib/auth";
 import { resolvePortalContext } from "@/lib/portal-data";
+import { CLIENT_PERMISSIONS } from "@/lib/client-permissions";
+import { clientDocumentList } from "@/lib/document-delivery";
 import { notFound } from "next/navigation";
 import { debuggerAccess, debuggerEnabled } from "@/lib/debugger/access";
 import { DEBUGGER_PORTAL_HEADER, debuggerPortalPath } from "@/lib/debugger/routing";
@@ -65,5 +67,18 @@ export default async function HomePage({ searchParams }) {
     );
   }
 
-  return <ClientPortal portalContext={portalContext} requestedView={params?.view} initialWebsite={params?.site} connectionResult={params?.connection} />;
+  // Load the library during this authenticated request. The initial document
+  // list must not depend on a second browser request or JavaScript hydration.
+  // This is request-scoped data; never put it in a shared cache.
+  let initialDocumentResult;
+  if (params?.view === "documents" && portalContext.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_READ)) {
+    const clientId = String(portalContext.client.id);
+    try {
+      initialDocumentResult = { clientId, data: await clientDocumentList(requestHeaders, clientId) };
+    } catch {
+      initialDocumentResult = { clientId, error: "Documents could not be loaded. Please try again." };
+    }
+  }
+
+  return <ClientPortal portalContext={portalContext} requestedView={params?.view} initialWebsite={params?.site} connectionResult={params?.connection} initialDocumentResult={initialDocumentResult} />;
 }

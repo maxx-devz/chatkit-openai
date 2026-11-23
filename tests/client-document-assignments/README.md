@@ -104,3 +104,40 @@ browser suite also checks the five-step client view, seven-stage admin table,
 mobile filtering/reset, dashboard next-action card and unrelated-client fallback.
 Search filters apply on the server before paging; no data/schema migration or
 new private setup variable is needed for this update.
+
+
+## Approved link-library verification (no Google configuration)
+
+Run `links.database.test.mjs` after `database.test.mjs` on the same guarded fresh
+loopback fixture, in a separate Node process with the existing aliases/conditions.
+Leave all four CLIENT_DOCUMENTS_GOOGLE_* / CLIENT_DOCUMENTS_ENCRYPTION_KEY /
+CLIENT_DOCUMENTS_ALLOWED_EMAIL settings empty for this suite. It uses real Better
+Auth, ordinary runtime SQL and API handlers; Google is not contacted. It verifies
+private saves, explicit approval, copied links, client switching, revocation,
+publisher status, Viewer reads, filters/pagination and publication history. Its
+workspace membership changes are cleaned before the older provider fixture suites.
+Advanced Google suites still use their separately generated fictional configuration.
+
+`tests/admin-readiness/browser/document-links.spec.mjs` checks the real admin and
+client components with mocked APIs; `documents.spec.mjs` retains focus/draft/race
+regressions. Run both using the existing admin-readiness Playwright configuration.
+These browser component fixtures do not claim real Google sharing verification.
+
+
+## Server-rendered library regression
+
+Run server-rendered-library.spec.mjs with this directory's existing Playwright
+configuration and fresh guarded loopback fixture. It requires matching
+CLIENT_DOCUMENTS_FIXTURE, CLIENT_DOCUMENTS_TEST_DATABASE_URL, DATABASE_URL and
+BETTER_AUTH_URL (use a private ignored test config, never the live .env.local).
+Start the full app with the fixture's ordinary runtime role on its fixture origin.
+The test validates the local target, creates one fictional approved link through
+the real API, and archives it afterward. No Google/file/provider request is sent.
+It covers actual server HTML with JavaScript disabled, blocked browser list API,
+reload, unrelated-client denial and membership revocation for an existing session.
+Do not run this suite on a remote database or real accounts.
+
+document-loading.spec.mjs in admin-readiness separately uses mocked component
+API responses for deadlines, retry, foreign initial props and visibility checks.
+Server-rendered markup can appear before hydration; simulated visibility events
+must wait until an interactive handler has demonstrably run.

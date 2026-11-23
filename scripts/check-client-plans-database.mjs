@@ -33,5 +33,24 @@ try {
  assert.equal(Number((await readClientPlan(db,'2')).availableCredits),998,'Verified reconciliation debits once and releases only its client hold');
  const auditAllowed=(await db.query("SELECT has_table_privilege(current_user,'portal_client_plan_audit','UPDATE') AS edit,has_table_privilege(current_user,'portal_client_plan_audit','DELETE') AS remove")).rows[0];assert.equal(auditAllowed.edit,false);assert.equal(auditAllowed.remove,false);
  for(const role of ['anon','authenticated'])for(const table of ['portal_client_plans','portal_client_plan_balances','portal_client_plan_requests','portal_client_plan_topups'])assert.equal((await db.query("SELECT has_table_privilege($1,$2,'SELECT') AS allowed",[role,table])).rows[0].allowed,false,'Browser roles cannot read private plan data');
+ // Request text is not an allocation: show only its linked persisted grants.
+ for(const amount of ['150','200','300']) {
+  const id=randomUUID();await requestClientPlan(db,'1','101',{idempotencyKey:id,kind:'credits',note:'200 credits'});
+  const grant={...topup,requestId:id,credits:amount,idempotencyKey:randomUUID()};
+  await mutateClientPlan(db,grant,'1');await mutateClientPlan(db,grant,'1');
+  for(const admin of [true,false]) {
+   const state=await readClientPlan(db,'1',{admin}),record=state.requests.find(row=>row.id===id);
+   assert.equal(record.note,'200 credits');assert.equal(record.granted_credits,amount);assert.equal(record.granted_period,period);assert.equal(record.status,'approved');
+   assert.ok(!JSON.stringify(record).includes('TEST-TOPUP'),'Grant summary never includes private payment references');
+  }
+  assert.ok(!(await readClientPlan(db,'2')).requests.some(row=>row.id===id),'Foreign client cannot see request or grant');
+ }
+ const noGrant=randomUUID();await requestClientPlan(db,'1','101',{idempotencyKey:noGrant,kind:'credits',note:'200 credits'});
+ let history=(await readClientPlan(db,'1')).requests.find(row=>row.id===noGrant);assert.equal(history.granted_credits,null);
+ await mutateClientPlan(db,{action:'decline',clientId:'1',requestId:noGrant,reason:'Synthetic request withdrawn',idempotencyKey:randomUUID()},'1');
+ history=(await readClientPlan(db,'1')).requests.find(row=>row.id===noGrant);assert.equal(history.granted_credits,null);assert.equal(history.status,'declined');
+ await mutateClientPlan(db,{...topup,requestId:'',credits:'77',idempotencyKey:randomUUID()},'1');
+ history=(await readClientPlan(db,'1')).requests.find(row=>row.id===noGrant);assert.equal(history.granted_credits,null,'Unlinked top-ups are never attributed to a request');
+ console.log('PASS: requested 200, granted 150/200/300, recorded month, retry totals, pending/declined unknown amounts, payment privacy and foreign-client denial.');
  console.log('PASS: real PostgreSQL plan price/allowance separation, admin authority, paid activation/topups, same-key retries, scoped requests, no partial writes, immutable paid month, pause and append-only audit grants.');
 }finally{await db.end();}

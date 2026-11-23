@@ -174,3 +174,19 @@ existing Node/Python connectors. A separate operator connection applies reviewed
 DDL/grants; no new provider SDK, browser grant or tenant-RLS claim is introduced.
 Legacy reporting entries remain immutable history rather than subscription debits.
 See `docs/CLIENT_PLANS.md` for paid activation, per-request locking and limits.
+
+
+Approved document links (2026-11-23) reuse the existing assignment revision and
+append-only assignment audit result JSONB. Publication and its new revision commit
+atomically; current-client/revision checks withdraw older receipts after an edit,
+removal or unpublish. No new schema, provider SDK, applied migration modification,
+Google connection or DDL-on-read is introduced. PostgreSQL transactions, joins and
+parameterized JSONB predicates work with the existing portable database helper.
+
+
+Client-facing document descriptions reuse revision-scoped result JSONB in the
+existing assignment audit table. Server validation limits plain text to 1,000
+characters. Description reads match the current client/assignment revision; saves
+and publication/unpublication receipts preserve them atomically. Omitted metadata
+in legacy requests retains existing values. This adds no DDL and removes no stored
+journey data; only the document UI's journey presentation is retired by user request.
