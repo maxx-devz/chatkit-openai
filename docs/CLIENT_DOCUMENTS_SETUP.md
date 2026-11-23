@@ -1,4 +1,80 @@
-# Client Documents: setup, approval and protected delivery
+# Document Library: titles, descriptions and approved file links
+
+
+## Current scope: a simple Document Library
+
+The user explicitly removed journey/next-action presentation from both admin and
+client document screens on 2026-11-23. Main fields are Document title, Description
+(optional, 1,000 plain-text characters) and Google Drive file link. The client sees
+shared titles/descriptions and open/download actions, plus simple title search.
+There are no stage/type selectors, milestone editor, next-action card or journey
+progress panels in this interface. Existing stored journey records and older
+metadata/API behavior are preserved; this UI simplification deletes no history.
+
+Description is client-facing metadata. It is saved in the existing append-only
+assignment audit result for the exact client/assignment revision and is copied
+forward into publication/unpublication receipts. Old records default to an empty
+description. Legacy requests that omit description or stage preserve existing
+values when editing. No new schema migration or environment setting is required.
+
+## Default: publish an approved Google Drive link
+
+This is the default flow as of 2026-11-23. It needs the existing portal database
+and sign-in only; no CLIENT_DOCUMENTS_GOOGLE_* configuration, Google OAuth consent,
+new schema migration, duplicate upload or provider call is required.
+
+1. Sign in as an authorized AOC admin and open /admin/client-documents.
+2. Select the client, add the original individual Google Drive/Docs/Sheets/Slides
+   file link with a Document title and optional Description, then Save document.
+3. In Saved references choose Publish link. Review the original file and its
+   sharing, confirm it is appropriate for this client and Confirm publication.
+   The portal records an audit reason for the submitted action automatically.
+4. The badge changes from Private draft to Published to [client]. The authorized
+   client sees it in /?view=documents and the dashboard document summary, with an
+   Open in Google Drive action. Use Google's download option where permitted.
+5. Unpublish link withdraws new portal opens. Editing or removing a reference
+   invalidates its publication; edits need another explicit publication.
+
+Existing saved links are never automatically published. Folder references remain
+admin-only; publish individual approved files so a folder cannot expose unreviewed
+contents. Publishing does not advance the independent verified journey, confirm a
+payment, send email, or add document contents to AI knowledge.
+
+### Access and limitations
+
+The portal checks the current session, active membership/selected client, current
+reference revision and the approving administrator's active status before listing
+or redirecting. A copied portal URL does not grant client access. List/redirect
+responses remain private/no-store and redirects suppress the portal referrer.
+Only normalized HTTPS Google Drive/Docs file URLs are accepted. Title search applies before pagination across both delivery modes. Legacy API
+metadata filters remain compatible but are no longer shown in the document UI.
+
+Google controls the file itself. Share it with the intended recipient through
+Google; publication does not change Google sharing. Anyone-with-link sharing allows
+access outside this portal. Unpublishing cannot recall a copied Google URL, remove
+Google sharing permissions, close an already-open Google page or remove downloaded
+copies. The original is live: later edits within Google do not trigger reapproval.
+This flow does not verify file content, file version, Google identity or download
+availability through a provider API. Resource-key-dependent links are not supported
+by the existing URL normalizer; use explicit recipient sharing. Exact-version,
+server-delivered downloads remain an optional advanced integration below.
+
+### Existing storage and audit contract
+
+Link publication reuses portal_client_document_assignments and its append-only
+portal_client_document_assignment_audit. An explicit publish command advances the
+reference revision and writes its publication receipt in result JSONB in the same
+transaction. Only a published_link receipt matching the current assignment ID,
+client and revision is eligible. Category and approval time come from that receipt.
+Save/edit/archive/revoke advance the revision, so old receipts and revision-bound
+portal URLs immediately cease to authorize new opens. Historical receipts are
+preserved. Exact retry operation IDs are idempotent. No new columns, tables, grants
+or changes to applied migration checksums are introduced by this feature.
+
+## Optional: protected downloads with a separate Google connection
+
+The following historical setup applies only to the optional server-delivered,
+version-approved download feature. It is not a prerequisite for the link library.
 
 The current implementation provides actual admin reference setup, separate read-only
 Google consent, per-file version approval/withdrawal, protected client viewing and
@@ -214,3 +290,21 @@ Google calls, real emails, real client changes or live billing were involved. Te
 The separate layout-only server on port 3116, if still running, remains Step 1's
 unauthenticated presentation preview. It does not demonstrate persistence or
 Google access; review the functional route through the actual protected portal.
+
+## Stable editing and refreshing - 2026-11-23
+
+The admin reference setup loads when a client is selected, after saving/removing a
+reference, or when the administrator chooses **Refresh references**. Returning to
+the browser tab or closing a native select popup no longer triggers a reload.
+Refreshes keep the existing reference and journey forms mounted. Transient refresh
+failures disclose that references may be out of date and preserve unsaved inputs;
+401/403/404 responses clear the previously displayed client content. Only the
+latest request for the selected client may update the screen. Client switching
+still uses separate keyed state and never reuses another client's reference list.
+
+## Vercel deployment checkpoint — 2026-11-23
+
+See [VERCEL_ENV_SETUP.md](VERCEL_ENV_SETUP.md) for the saved Production and
+client-documents Preview configuration, public certificate packaging, pending
+Preview backend authorization and deployment sequence. The approved-link library
+does not require the optional Client Documents Google OAuth variables.

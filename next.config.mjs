@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  // Include the public PostgreSQL CA in serverless function bundles.
+  outputFileTracingIncludes: { '/*': ['./config/database/*.crt'] },
   // Keep same-origin debugger rewrites on the original host. Normalization
   // otherwise changes 127.0.0.1 to localhost, which can become an IPv6 proxy.
   skipProxyUrlNormalize: true,

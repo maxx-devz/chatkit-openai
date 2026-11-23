@@ -146,7 +146,7 @@ function MobileNavigation({ portal }) {
   </details>;
 }
 
-export default function ClientPortal({ portalContext, requestedView, initialWebsite, connectionResult, standalonePage, children }) {
+export default function ClientPortal({ portalContext, requestedView, initialWebsite, connectionResult, initialDocumentResult, standalonePage, children }) {
   const portal = {
     ...PORTAL_CONFIG,
     clientName: portalContext.client.name,
@@ -215,7 +215,7 @@ export default function ClientPortal({ portalContext, requestedView, initialWebs
               initialWebsite={initialWebsite} connectionResult={connectionResult}
               canWrite={portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_CONTRIBUTE)}
               canManage={portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_MANAGE)} />}
-        {portal.view === "documents" && <ClientOfficialDocuments key={`official:${portalContext.client.id}`} clientId={portalContext.client.id}/>}
+        {portal.view === "documents" && <ClientOfficialDocuments key={`official:${portalContext.client.id}`} clientId={portalContext.client.id} initialResult={initialDocumentResult}/>}
         {portal.view === "documents" && <ClientDocumentsPanel key={`documents:${portalContext.client.id}`} clientId={portalContext.client.id}
           canContribute={portal.permissions.includes(CLIENT_PERMISSIONS.DOCUMENTS_CONTRIBUTE)} />}
         {portal.view === "members" && portal.permissions.includes(CLIENT_PERMISSIONS.MEMBERS_MANAGE)

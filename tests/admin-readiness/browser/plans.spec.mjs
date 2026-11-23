@@ -59,19 +59,20 @@ test('plan creation and pausing communicate different risks before saving',async
 });
 
 async function reviewUpdate(page,{price='175',credits='1500',paid=false}={}){
+ await page.getByRole('button',{name:'Edit monthly plan',exact:true}).click();
  await page.getByLabel('Monthly portal price (USD)').fill(price);await page.getByLabel('Included AI credits per month').fill(credits);
  if(!paid)await page.getByLabel('Activate '+period+' after payment confirmation').uncheck();
  await page.getByLabel('Reason for this plan change').fill('Approved synthetic plan change');await page.getByRole('button',{name:'Review client plan',exact:true}).click();
 }
 test('Plan update shows saving and persistent confirmation, explains unpaid activation, and clears feedback on edits',async({page},info)=>{
- const f=await fixture(page,{configured:true,delaySave:900});await page.goto('/admin/plans?client=1');await expect(page.getByRole('heading',{name:'Edit monthly plan',exact:true})).toBeVisible();await reviewUpdate(page);
+ const f=await fixture(page,{configured:true,delaySave:900});await page.goto('/admin/plans?client=1');await expect(page.getByRole('region',{name:'Saved monthly plan',exact:true})).toBeVisible();await reviewUpdate(page);
  await expect(page.getByRole('status').filter({hasText:'Client plan updated'})).toHaveCount(0);await page.getByRole('button',{name:'Confirm client plan',exact:true}).click();await expect(page.getByRole('button',{name:'Saving…',exact:true})).toBeDisabled();
- const success=page.getByRole('status').filter({hasText:'Client plan updated'});await expect(success).toBeVisible();await expect(success).toContainText('still waiting for admin payment confirmation');await expect(page.getByLabel('Reason for this plan change')).toHaveValue('');await expect(success).toBeVisible();await expect(success).toBeInViewport();expect(f.writes).toHaveLength(1);
- await success.screenshot({path:info.outputPath('plan-saved-confirmation.png')});await page.getByLabel('Monthly portal price (USD)').fill('180');await expect(success).toHaveCount(0);
+ const success=page.getByRole('status').filter({hasText:'Client plan updated'});await expect(success).toBeVisible();await expect(success).toContainText('still waiting for admin payment confirmation');await expect(page.getByLabel('Reason for this plan change')).toHaveCount(0);await expect(success).toBeVisible();await expect(success).toBeInViewport();expect(f.writes).toHaveLength(1);
+ await success.screenshot({path:info.outputPath('plan-saved-confirmation.png')});await page.getByRole('button',{name:'Edit monthly plan',exact:true}).click();await page.getByLabel('Monthly portal price (USD)').fill('180');await expect(success).toHaveCount(0);
 });
 test('Paid-month update confirms future settings while preserving this month’s credits; switching clients clears feedback',async({page})=>{
  const f=await fixture(page,{configured:true,paid:true});await page.goto('/admin/plans?client=1');await reviewUpdate(page,{price:'200',credits:'2000',paid:true});await page.getByRole('button',{name:'Confirm client plan',exact:true}).click();
- const success=page.getByRole('status').filter({hasText:'Client plan updated'});await expect(success).toContainText('This month’s paid credits are unchanged.');await expect(success).toContainText('future month');await expect(page.getByLabel('Included AI credits per month')).toHaveValue('2000');expect(f.data['1'].month.included_credits).toBe('1000');
+ const success=page.getByRole('status').filter({hasText:'Client plan updated'});await expect(success).toContainText('This month’s paid credits are unchanged.');await expect(success).toContainText('future month');await expect(page.getByRole('region',{name:'Saved monthly plan'})).toContainText('2,000');await expect(page.getByLabel('Included AI credits per month')).toHaveCount(0);expect(f.data['1'].month.included_credits).toBe('1000');
  await page.goto('/admin/plans?client=2');await expect(page.getByRole('heading',{name:'Set up this client’s plan',exact:true})).toBeVisible();await expect(success).toHaveCount(0);
 });
 test('A failed save keeps input and retry identity and never displays a false success',async({page})=>{
@@ -82,5 +83,27 @@ test('A failed save keeps input and retry identity and never displays a false su
 test('Confirmed save survives a failed refresh and recovers without another payment or save',async({page})=>{
  const f=await fixture(page,{configured:true,failRefresh:true});await page.goto('/admin/plans?client=1');await reviewUpdate(page);await page.getByRole('button',{name:'Confirm client plan',exact:true}).click();
  await expect(page.getByRole('main').getByRole('alert')).toContainText('Your confirmed change is saved.');await expect(page.getByRole('status').filter({hasText:'Client plan updated'})).toBeVisible();expect(f.writes).toHaveLength(1);
- f.recoverRefresh();await page.getByRole('button',{name:'Refresh plan',exact:true}).click();await expect(page.getByLabel('Monthly portal price (USD)')).toHaveValue('175');await expect(page.getByRole('status').filter({hasText:'Client plan updated'})).toBeVisible();expect(f.writes).toHaveLength(1);
+ f.recoverRefresh();await page.getByRole('button',{name:'Refresh plan',exact:true}).click();await expect(page.getByRole('region',{name:'Saved monthly plan'})).toContainText('$175.00');await expect(page.getByRole('status').filter({hasText:'Client plan updated'})).toBeVisible();expect(f.writes).toHaveLength(1);
+});
+
+
+test('saved paid plan is read-only until Edit and Cancel discards all unsaved changes',async({page},info)=>{
+ const f=await fixture(page,{configured:true,paid:true});await page.goto('/admin/plans?client=1');const summary=page.getByRole('region',{name:'Saved monthly plan',exact:true});
+ await expect(summary).toContainText('$150.00');await expect(summary).toContainText('1,000');await expect(page.getByLabel('Monthly portal price (USD)',{exact:true})).toHaveCount(0);await expect(page.getByLabel('Extra AI credits',{exact:true})).toBeVisible();
+ await summary.screenshot({path:info.outputPath('saved-monthly-plan.png')});await summary.getByRole('button',{name:'Edit monthly plan',exact:true}).click();await expect(page.getByLabel('Monthly portal price (USD)',{exact:true})).toBeFocused();
+ await page.getByLabel('Monthly portal price (USD)',{exact:true}).fill('999');await page.getByLabel('Included AI credits per month',{exact:true}).fill('2500');await page.getByLabel('Reason for this plan change',{exact:true}).fill('Unsaved draft');await page.getByRole('button',{name:'Review client plan',exact:true}).click();
+ await page.getByRole('button',{name:'Cancel editing',exact:true}).click();await expect(summary).toContainText('$150.00');await expect(summary).toContainText('1,000');expect(f.writes).toHaveLength(0);
+ await summary.getByRole('button',{name:'Edit monthly plan',exact:true}).click();await expect(page.getByLabel('Monthly portal price (USD)',{exact:true})).toHaveValue('150.00');await expect(page.getByLabel('Included AI credits per month',{exact:true})).toHaveValue('1000');await expect(page.getByLabel('Reason for this plan change',{exact:true})).toHaveValue('');await expect(page.getByRole('button',{name:'Review client plan',exact:true})).toBeVisible();expect(f.writes).toHaveLength(0);
+});
+
+test('unpaid saved plan has a clear activation action; opening or canceling never confirms payment',async({page})=>{
+ const f=await fixture(page,{configured:true});await page.goto('/admin/plans?client=1');const summary=page.getByRole('region',{name:'Saved monthly plan',exact:true});await expect(summary.getByRole('button',{name:'Activate this month',exact:true})).toBeVisible();await expect(page.getByLabel('Monthly portal price (USD)',{exact:true})).toHaveCount(0);
+ await summary.getByRole('button',{name:'Activate this month',exact:true}).click();await expect(page.getByLabel('Activate '+period+' after payment confirmation',{exact:true})).toBeChecked();await expect(page.getByLabel('I verified the payment outside the portal.',{exact:true})).not.toBeChecked();expect(f.writes).toHaveLength(0);
+ await page.getByLabel('Payment reference',{exact:true}).fill('UNSAVED-PAYMENT-REFERENCE');await page.getByRole('button',{name:'Cancel editing',exact:true}).click();await expect(summary).toBeVisible();await summary.getByRole('button',{name:'Activate this month',exact:true}).click();await expect(page.getByLabel('Payment reference',{exact:true})).toHaveValue('');expect(f.writes).toHaveLength(0);expect(f.data['1'].month).toBeNull();
+});
+
+test('switching clients cannot carry an open monthly editor or its draft into the next workspace',async({page})=>{
+ const f=await fixture(page,{configured:true,paid:true});await page.goto('/admin/plans?client=1');await page.getByRole('button',{name:'Edit monthly plan',exact:true}).click();await page.getByLabel('Monthly portal price (USD)',{exact:true}).fill('999');await page.getByLabel('Reason for this plan change',{exact:true}).fill('Private unsaved draft');
+ await page.getByRole('combobox',{name:'Client plan',exact:true}).selectOption('2');await expect(page.getByRole('heading',{name:'Set up this client’s plan',exact:true})).toBeVisible();await expect(page.getByLabel('Monthly portal price (USD)',{exact:true})).toHaveValue('');await expect(page.getByLabel('Reason for this plan change',{exact:true})).toHaveValue('');
+ await page.getByRole('combobox',{name:'Client plan',exact:true}).selectOption('1');await expect(page.getByRole('region',{name:'Saved monthly plan',exact:true})).toBeVisible();await expect(page.getByLabel('Monthly portal price (USD)',{exact:true})).toHaveCount(0);expect(f.writes).toHaveLength(0);
 });

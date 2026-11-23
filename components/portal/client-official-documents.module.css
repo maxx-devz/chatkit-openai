@@ -11,3 +11,5 @@
 
 .panel { background:var(--portal-card-background,#fff); border-color:var(--portal-card-border,#d7e5f2); box-shadow:var(--portal-card-shadow); }
 .journey { background:linear-gradient(135deg,#edf5ff,#f8fbff); }.files li { background:#ffffffbf; }.panel header { flex-wrap:wrap; }.filters { align-items:end; }
+
+.filters{grid-template-columns:minmax(0,1fr) auto}.filterActions{grid-column:auto;align-items:center}.summary{grid-template-columns:minmax(0,1fr)}.fileDetails{min-width:0}.description{white-space:pre-line;overflow-wrap:anywhere;color:#526779;margin:8px 0;font-size:14px}.files li{align-items:flex-start}@media(max-width:600px){.filters{grid-template-columns:1fr}.filterActions{grid-column:1/-1}}

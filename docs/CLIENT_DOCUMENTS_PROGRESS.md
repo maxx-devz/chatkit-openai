@@ -1,12 +1,72 @@
-# Client Documents and AI Commerce Journey
+# Client Document Library
 
 Branch: client-documents, created from master916bbf5 in AI\portal.
 
-**Current checkpoint: Step 4 five-step client journey, document filters and next-action card.**
-Steps 1–2 below are historical. Live routes no longer render the prototype.
-The approved Neon document migrations were applied on 2026-11-20 (see activation
-record below). Google configuration/consent and live file verification remain
-pending; migration success alone is not a completed live-provider rollout.
+**Current checkpoint: simple title/description Document Library, 2026-11-23.**
+
+File-action follow-up: open buttons now use available MIME type, Google editor
+link or filename extension (PDF, Docs, Sheets, Slides, Office, image/text), with
+Open file for unknown types. Protected Google exports correctly say View PDF.
+No Google metadata request, raw-source URL disclosure or migration. 46 fixture
+browser checks, 402 offline tests, 31 disposable database reported checks, lint
+and isolated build passed. Existing files need no re-upload; refresh the library.
+
+
+Screenshot follow-up: hidden/visible transitions no longer clear the rendered
+document list or abort its initial read. Access is revalidated silently on return;
+denial clears content and client switches discard prior scope. Previously rendered
+metadata can remain until the recheck completes; file access is always server
+authorized. 44 desktop/mobile fixture checks, lint and isolated build passed.
+Native Lightshot itself was not automated. No real data or configuration changes.
+
+
+Latest follow-up: the authenticated Documents page now loads its authorized
+initial list on the server, so it is readable before hydration and without a
+second browser API request. The existing 20-second timeout/retry still protects
+search, paging and tab-return reads. Initial results are bound to the current
+client; tab return reauthorizes, and no shared document cache was introduced.
+
+Actual results for this follow-up: 24 desktop/mobile component-browser checks,
+4 full-app real-auth/SQL Chrome checks, 399 offline tests, changed-file/test lint
+and isolated production build passed. Full-app checks prove initial rendering
+with the document API blocked, with JavaScript disabled, foreign-client denial
+and membership revocation on reload. Google transport is not live-verified.
+The four database suites were also rerun on disposable WSL PostgreSQL: 31
+reported passes (including parent tests), with legacy Google transport mocked.
+No Supabase/Neon write, real-client publication or environment change occurred.
+A previous read-only Supabase diagnostic confirmed one published gogrit link.
+The user's existing Chrome profile/network failure was not directly inspected;
+the console extension/preload/source-map warnings do not establish its cause.
+
+Changed real project paths for server loading: app/page.js,
+components/portal/client-portal.js and client-official-documents.js. Retained
+coverage: tests/admin-readiness/browser/document-loading.spec.mjs and
+tests/client-document-assignments/browser/server-rendered-library.spec.mjs,
+plus the scoped fixture route. The app snapshot under .tmp was used only for
+isolated builds/browser verification; intended changes also exist in real paths.
+No new setup variables or migration. Refresh /?view=documents on the running
+port 3000 to review using the existing authorized client login. No commit/push.
+
+At the user's explicit request, removed journey progress, next actions and stage/
+type selectors from both admin and client document screens. The main admin fields
+are Document title, optional Description and Google Drive file link. Publication
+still requires the administrator's client-facing/sharing confirmation. Clients see
+shared titles/descriptions and their open action, with simple title search.
+
+Descriptions reuse existing revision-scoped audit JSONB metadata. No migration,
+Google OAuth configuration or private environment changes are required. Existing
+journey records, older metadata, optional protected downloads, access controls,
+publication history and the focus-reload fix are preserved. No real link or client
+record was changed during verification.
+
+Passed: 24 desktop/mobile document interaction cases plus 2 client-portal layout
+cases, 31 disposable PostgreSQL checks, 399 offline regressions, lint and an isolated
+production build. Browser APIs/legacy Google transport are fixtures; database checks
+use real auth/SQL. Live Google permissions/downloads remain unverified. The retained
+real-auth document browser suite was updated for the new scope but was not rerun.
+
+Steps below are historical checkpoints, including earlier Google rollout blockers
+that apply only to the optional protected-download integration.
 
 ## Step 1 - layout prototype only
 
@@ -508,3 +568,28 @@ remain pending as documented; being connected as Jaymark in this assistant does
 not authenticate the portal's separate OAuth grant. Do not publish this drafts
 folder. Keep signature/acceptance capture, payment automation and email sending
 outside this completed slice. Local commit only; no push.
+
+Final cleanup: dedicated synthetic PostgreSQL cluster removed after verifying its
+only non-template databases were postgres and the generated test database. Main
+review server on port 3000 was preserved. Shared dates use an explicit locale and
+UTC to keep server/client markup consistent across browser timezone settings.
+
+## Vercel configuration handoff — 2026-11-23
+
+Production and branch-scoped client-documents Preview environment imports were
+completed for both the confirmed portal and Python projects. Config/Secret types
+and targets were verified remotely. Node and Python passed read-only Supabase
+TLS checks; an isolated production build passed and traced the public CA.
+No migration, real-client test write, Neon access, local dotenv change, commit,
+push or deployment occurred. Source changes: public CA files in both deployment
+roots, Next tracing, deployment ignore protection and deployment documentation.
+Preview backend automation access was subsequently explicitly approved and
+configured. The portal Secret is scoped to client-documents Preview. Live checks:
+unauthenticated Preview health redirects (302), the server credential reaches
+health (200), and an unsigned ChatKit probe returns 503, Backend is not configured,
+from the old deployment (private/no-store). Application authorization and working
+chat must be checked after deploying the imported settings and public certificate
+files. Vercel sign-in protection is preserved. No valid chat, database test write,
+provider call or message was sent.
+Current deployments still use their previous settings. See
+[VERCEL_ENV_SETUP.md](VERCEL_ENV_SETUP.md) for exact pending checks and resume steps.

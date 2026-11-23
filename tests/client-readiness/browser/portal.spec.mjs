@@ -39,7 +39,7 @@ test('all client modules fit desktop and mobile without horizontal page overflow
     await page.goto('/?view='+view+'&role='+(view==='dashboard'?'client_viewer':'client_admin'));
     await expect(page.getByRole('main')).toBeVisible();
     if(view==='website-insights')await expect(page.locator('#website-insights-title')).toBeVisible();
-    if(view==='documents')await expect(page.getByRole('region',{name:'Official client documents and journey'})).toContainText('Your journey');
+    if(view==='documents')await expect(page.getByRole('region',{name:'Client document library'})).toContainText('Document Library');
     if(view==='members')await expect(page.getByRole('heading',{name:'Members & Access',exact:true,level:1})).toBeVisible();
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),view+' page overflow').toBe(true);
     const credit=await page.getByRole('button',{name:'AI Credits navigation',exact:true}).boundingBox();
