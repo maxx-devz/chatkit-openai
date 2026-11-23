@@ -190,3 +190,17 @@ characters. Description reads match the current client/assignment revision; save
 and publication/unpublication receipts preserve them atomically. Omitted metadata
 in legacy requests retains existing values. This adds no DDL and removes no stored
 journey data; only the document UI's journey presentation is retired by user request.
+
+
+Admin client-document uploads (2026-11-23) use the established PostgreSQL BYTEA
+pattern in new portal_client_document_files/file_audit tables. The versioned
+003_private_uploads migration uses only UUID, BIGINT, BYTEA, TEXT, timestamps,
+JSONB, ordinary constraints/indexes and explicit role grants. No Supabase Auth,
+Storage, browser database SDK or Vercel Blob API is introduced. Conditional
+standard SQL revokes anon/authenticated grants if those roles exist; providers
+without those role names remain supported. App authorization still scopes each
+request; these service-role tables do not claim tenant RLS. Private download
+checks, bounded bodies and audit retain their normal application paths. Direct
+uploads have no AI indexing/knowledge inheritance. The migration was rehearsed
+locally twice and applied only to the already approved Supabase target; no Neon
+or existing client data changes were made. See CLIENT_DOCUMENTS_SETUP.md.

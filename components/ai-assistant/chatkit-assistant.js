@@ -59,7 +59,7 @@ function ConversationSidebar({ activeId, mode, onDelete, onNew, onRename, onSele
           </div>
         ) : null}
         {!state.loading && !state.error && !state.items.length ? (
-          <p className={styles.conversationState}>No saved conversations yet.</p>
+          <p  A className={styles.conversationState}>No saved conversations yet.</p>
         ) : null}
         {state.items.map((conversation) => (
           <div className={`${styles.conversationRow} ${conversation.id === activeId ? styles.activeConversation : ""}`} key={conversation.id}>
@@ -261,7 +261,7 @@ function ChatSurface({
     theme: {
       colorScheme: "light", radius: "soft", density: "normal",
       color: { accent: { primary: appearance?.accent || "#1765ca", level: 2 } },
-      typography: { baseSize: 14 },
+      typography: { baseSize: 14, fontFamily: 'Consolas, "Liberation Mono", Menlo, monospace', fontFamilyMono: 'Consolas, "Liberation Mono", Menlo, monospace' },
     },
     frameTitle: `${clientName} AI assistant`,
     initialThread: activeThreadId,

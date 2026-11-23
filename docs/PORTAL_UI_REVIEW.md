@@ -790,3 +790,202 @@ or environment changed. The generated test database and dedicated aoc_links
 cluster were verified and removed. Main review server on 3000 kept running;
 fixture browser server stops automatically. No commit/push. Refresh the client
 Documents view to see labels for existing files; no re-upload required.
+
+## Compact document cards and global Consolas — 2026-11-23
+
+Applied the requested Consolas stack globally through app/globals.css, including
+inherited form controls and code text. Devices without Consolas use a local
+monospace fallback; no font downloads or new dependencies were added. ChatKit's
+installed typography API receives the same normal/code font stack because its
+frame does not inherit page CSS. Live ChatKit font rendering remains unverified.
+
+The admin Document Library now gives more width to saved documents and places
+cards side by side where space permits. Each card has one shared action group
+for Open in Drive, Edit, Publish/Unpublish and Remove. Controls fill the available
+width and wrap into balanced rows on smaller cards. Confirmation forms remain
+inline with their existing review/reason requirements; disclosure buttons expose
+expanded state. Labels, spacing and metadata are tighter; full source links remain
+available through Open and the URL tooltip. The Save button aligns to the form end.
+Only presentation/composition changed; API commands, client scoping, confirmation,
+retry keys and publication/removal persistence remain on their existing paths.
+
+Verification: 46 existing desktop/mobile document browser checks passed using
+mocked API responses and database access disabled. Five additional temporary
+visual checks passed at widths 1680, 1280, 1024, 768 and 390: computed Consolas
+inheritance, action containment, no horizontal page overflow, and inline
+publication open/cancel behavior. Desktop/mobile screenshots were inspected.
+Changed-component lint, git diff --check and an isolated production build passed.
+No database/provider writes, environment changes, deployment, commit or push in
+this presentation step. The review server was preserved; temporary browser
+servers stopped automatically. Review /admin/client-documents in the local portal.
+
+Changed source: app/globals.css,
+components/ai-assistant/chatkit-assistant.js,
+components/admin/client-document-assignments.js,
+components/admin/client-document-assignments.module.css and
+components/admin/document-link-publication.js. Existing local edits preserved.
+
+## Client-grouped document tables — 2026-11-23
+
+Replaced the large client picker/empty landing block and document cards with
+client-grouped tables. Client rows show name/account, portal access and a library
+disclosure. Clicking anywhere on a summary row or its keyboard-accessible button
+expands/collapses the client. Only the selected client's existing authorized API
+data is loaded; switching/closing a group unmounts the previous client panel.
+
+Within a group, rows show document title, publication visibility and updated date
+(UTC). A row expands into description, original Google link, available file size
+and Open attached file / Edit / Publish or Unpublish / Delete actions. The
+existing review, reason, revision and idempotency checks remain in place. Delete
+uses the existing archive command, retaining history and the original Drive file.
+The add/edit form opens on demand and closes after a successful save. Existing
+per-client draft preservation, quiet refresh and authorization-denial behavior
+remain covered. The existing optional protected-delivery path is retained below.
+
+Added client-name/account search; per-client document title/description search;
+newest/oldest/title sorting; and published/private-draft filters. File-size sorts
+work only for rows with supplied numeric byte metadata; unknown sizes sort last.
+The current saved-link API supplies no verified sizes: those display Not provided
+in expanded details and size sorting is disabled with an explanation. No Google
+metadata fetch or guessed byte count was introduced. Tests supplying synthetic
+size metadata demonstrate conditional UI behavior, not live provider support.
+Search/sorting cover the existing latest-100 list; an explicit note appears when
+100 records are returned. This step adds no global cross-client document search,
+pagination, schema migration, environment setting or provider connection.
+
+Actual results: 52 focused desktop/mobile fixture-browser checks passed, covering
+the new disclosure/search/date/title/metadata-size/visibility behavior, delete
+confirmation and existing publication, retry, revocation, saved drafts, screenshot
+focus, stale-response and client-switching regressions. Changed source/tests lint
+and git diff --check passed; isolated production build passed. Inspected desktop
+and mobile screenshots of expanded tables and actions. Real-auth database browser
+selectors were updated for the new navigation, but that disposable database suite
+was not rerun in this presentation step. No live provider verification was run.
+
+Changed source: components/admin/client-document-assignments.js and its CSS
+module. Updated tests/admin-readiness/browser/{document-links,documents}.spec.mjs
+and tests/client-document-assignments/browser/assignments.spec.mjs. Existing
+Consolas configuration, server authorization, persistence, original client IDs,
+document links and unrelated local changes were preserved. No database/provider
+writes, real file deletion, dotenv changes, deployment, commit or push. Fixture
+servers stopped automatically and the primary review server was left running.
+Review the local /admin/client-documents route with an authorized AOC admin.
+
+## Simpler sharing and real private uploads — 2026-11-23
+
+Supersedes the nested-table interaction above. One client selector, an always
+visible drag/drop or Drive-link form and direct row actions replace the multiple
+expansion/add/publish steps. File names fill titles; descriptions are optional.
+Save & share explicitly saves/publicizes a reviewed file or link in one action;
+Save draft retains privacy. Existing link save operations remain private and
+separate publish callers still require confirmation. One-step link sharing uses
+the same locked transaction/audit receipt and retains legacy category/stage
+metadata. Edit, Share/Unshare and Delete are visible without expanding rows.
+Delete/Unshare confirmations remain, with automatic business audit reasons.
+
+Added durable, bounded PostgreSQL file bytes and append-only upload audit, reusing
+the application's portable storage/authorization pattern, not a provider SDK or
+Vercel disk. New server-only routes create/update and preview admin files; the
+existing authenticated client document list/download paths include shared uploads.
+IDs, revisions, client scope, active membership and publisher state are rechecked;
+bytes are not released on denial. Files are not sent to AI or external storage.
+Size sorting now uses real uploaded-byte sizes; opaque Drive links stay unknown.
+2 MiB per file; 100 MiB retained bytes per client and 30 uploads/client/creator/day.
+Archive retains private bytes/audit, and future retention cleanup is not included.
+
+Actual final verification:
+
+- 407 offline Node tests passed; zero failures/skips.
+- 58 desktop/mobile fixture-browser checks passed, including actual file-input
+  and drag/drop UI, filename defaults, private drafts, missing setup, retries,
+  direct actions, search/sort, client switching, screenshot focus and revoked
+  access. API/provider responses in these browser checks were mocked.
+- 39 reported real-auth/disposable PostgreSQL tests passed across assignments
+  (7), links (9), uploaded files (7), protected Google delivery (11), Google
+  adapter (5); these include five parent tests. Google transport was mocked.
+  Both migrations ran twice on each fresh fixture database. The upload suite
+  verifies exact byte persistence, concurrent replay, scope/revocation, old URL
+  denial, inline/download headers, forbidden actors and browser-role SQL grants.
+  A deliberately permissive browser-role default grant was revoked by migration.
+- Changed-source/test lint, git diff --check and isolated production build passed.
+- Desktop/mobile upload screens inspected. No live AI/Google/email/payment or
+  real customer-file verification performed. Real-auth browser selectors were
+  aligned, but that separate retained DB-browser suite was not rerun.
+
+Additive upload migration applied to the approved Supabase target after rehearsal;
+new tables/role grants and browser denial verified. Existing client/reference
+counts unchanged and zero real uploads created. No Neon access, environment file
+change, Git commit, push or deployment. New runtime configuration is not needed.
+The primary review server remains available at /admin/client-documents. Existing
+approved Google links, conversations, credits, resources, knowledge, indexing and
+Internal Portal functionality remain on their existing paths.
+
+Files: database/client-document-files.sql; scripts/migrate-client-document-files.mjs;
+lib/client-document-file-policy.js; lib/client-document-files.js; existing link
+policy/store and document-delivery.js; new admin file POST/GET routes; admin
+document component/CSS; admin audit manifest; package script; pure, database and
+browser tests; setup/portability/progress/UI documentation. All intended source
+lives under actual project paths; ignored .tmp holds only scratch/private fixtures.
+
+Remaining deployment work: publish/review the source and deploy Next.js with the
+existing Supabase certificate packaging. Larger-file direct object storage,
+antivirus scanning, retention purge, real customer-file/provider checks and the
+previous Vercel AI/deployment checks remain outside this completed local slice.
+
+Final follow-through: private/share checkbox choices are included in the
+client-scoped draft, so switching clients cannot turn a private unfinished draft
+into an automatically shared one. This case passed in the final 58-check browser
+run. The final changed-source lint/build passed after that fix. All five generated
+databases and the dedicated aoc_uploads cluster were verified and removed; the
+existing WSL main cluster and primary portal review server were preserved.
+No real customer files were added or downloaded during verification.
+
+
+## 2026-11-23 — Shared interactive dropdown styling
+
+Applied one shared single-value dropdown treatment in app/globals.css. The current
+inventory contains 54 select controls across 23 application/component files:
+Admin, client, Internal Portal, builder and debugger. This is a visual enhancement;
+existing values, permissions, onChange handlers, server forms and database paths
+are preserved. The current locally edited font setting is retained.
+
+Current Chrome uses customizable select pickers (appearance: base-select), with
+rounded blue borders, an animated chevron, a selected checkmark, distinct hover
+and keyboard focus states, disabled states, a bounded scrollable option list,
+and top-layer menus that escape clipped cards. Reduced-motion preferences disable
+the picker/arrow animations. Typing jumps to matching options through the browser's
+typeahead; this does not introduce a separate search field. No JavaScript library
+or client bundle code is added.
+
+Browser limitation: unsupported browsers retain a styled closed control and their
+operating-system option menu. Firefox/Safari were not exercised. Embedded ChatKit
+iframe UI is owned by its SDK and is outside the application's global stylesheet.
+Reference: https://developer.chrome.com/docs/modern-web-guidance/guides/forms/branded-select-styling
+
+Files: app/globals.css; tests/client-readiness/ui/app/dropdowns/page.js;
+tests/admin-readiness/browser/dropdowns.spec.mjs; this review record.
+The dropdown page exists only in the isolated test app, not as a portal route.
+
+Actual verification, with real database/provider settings cleared in the child
+process environment:
+
+- Passed: combined desktop/mobile Chrome fixture run, 68 checks (10 initial
+  dropdown checks plus 58 document-library regressions). Mocked API responses;
+  no provider or database verification is implied.
+- Passed: final dropdown run, 12 checks, including reduced-motion handling.
+  Verified pointer and keyboard selection, typeahead, Escape/outside dismissal,
+  disabled controls/fieldset, required validation, GET submission, reset,
+  60-option list boundaries, clipped containers, and no horizontal overflow.
+  Inspected desktop/mobile screenshots of the open menu.
+- Passed: ESLint on the new fixture and browser spec; git diff --check.
+- Passed: production build in the isolated .tmp/document-library-build-20261123
+  snapshot with the final shared stylesheet copied from the real project.
+- Earlier test fixture label selectors failed; explicit label associations fixed
+  those fixture errors, and all affected checks passed on rerun.
+
+No database/environment changes, migration, commit, push or deployment were made
+for this dropdown work. Existing local changes were preserved. The primary review
+server remains on http://127.0.0.1:3000. Live authenticated inspection of every
+portal screen and non-Chrome browser verification remain unrun.
+
+Visual follow-through: removed the popup opacity fade after inspecting a mobile screenshot; the menu now stays opaque from the first frame. The final 12 dropdown checks, ESLint and isolated production build passed again after that change. Stable desktop/mobile screenshots were inspected. Existing arrow animation and reduced-motion handling remain.

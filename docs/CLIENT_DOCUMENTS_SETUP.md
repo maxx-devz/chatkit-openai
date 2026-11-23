@@ -1,7 +1,120 @@
-# Document Library: titles, descriptions and approved file links
+# Document Library: private files and approved links
 
+## Current workflow: upload a file or add a link (2026-11-23)
 
-## Current scope: a simple Document Library
+1. Open `/admin/client-documents` and select the client once.
+2. Drop a file or choose **Choose files**. Select multiple files for a bulk
+   queue (up to20 at once,2 MiB each), or select one for the existing single-file
+   form. Filenames fill titles automatically. Alternatively, paste a Google
+   Drive file link and title.
+3. Description is optional. Leave **Share with the client when saved** checked
+   and choose **Save & share**; uncheck it to save a private draft.
+4. Existing rows expose Open/View-download, Edit, Share/Unshare and Delete
+   directly. There is no need to expand a client or document to use the actions.
+   Delete and Unshare require a short confirmation; audit reasons are recorded
+   automatically rather than forcing repetitive text entry. Clicking a title
+   optionally reveals its description. Search and date/title/size sorting remain.
+
+### Bulk uploads
+
+For multiple selected/dropped files, review or edit each title, remove unwanted
+items, optionally add more files, and choose **Upload & share files** or
+**Upload private drafts**. The existing optional description is applied to all
+files in that batch. The selected client is fixed for its requests. No file is
+uploaded until the upload button is pressed. Invalid/empty/oversized files show
+their own explanation; valid siblings can still be saved.
+
+The browser sends one bounded file request at a time to the existing protected
+endpoint. Results and processed counts are per file; failed or unconfirmed items
+can be retried without resending confirmed successes. Attempted titles/visibility
+stay locked so each retry uses identical content and its original operation UUID.
+Known access/setup/quota failures stop the remaining queue. Existing30-file daily
+and100 MiB retained-client limits remain server-enforced;20 is only the per-batch
+UI limit and does not grant a new storage allowance.
+
+**Stop after current file** allows the current request to finish, then pauses
+unstarted files. Retry/continue sends only remaining/failed items. Each file is a
+separate transaction: successful uploads are kept when a sibling fails or the
+queue is stopped. There is no claim of an atomic multi-file transaction.
+
+Keep the page open. Reload/closing discards unsent browser File objects; these are
+not placed in local/session storage. Switching clients aborts the active browser
+request and stops subsequent requests; an already committed or in-flight save
+can still finish for the original client. Recheck that client's library before
+selecting the same files again after an interrupted page. No durable background
+queue or automatic resume after closing the browser is introduced.
+
+No schema, environment, storage provider or API-body limit change is needed.
+Every file retains the existing server authorization, validation, quota, private
+delivery and audit path. Real database checks from initial upload delivery remain
+historical; the new bulk orchestration is verified with isolated API fixtures.
+
+### Durable private files
+
+Uploads use the existing PostgreSQL BYTEA storage pattern, in the dedicated
+`portal_client_document_files` table; Vercel receives the request and accesses the
+database. No file is stored on Vercel's temporary filesystem, exposed through
+`public/`, sent to OpenAI, indexed into AI knowledge or placed in a public bucket.
+No new storage provider, browser SDK, token or runtime environment variable is
+required. The existing server-only DATABASE_URL is used.
+
+Supported files: PDF, DOCX, XLSX, PPTX, UTF-8 TXT/CSV/Markdown, PNG, JPEG and WebP.
+Each file is limited to **2 MiB**; larger files can use the existing Drive link
+path. Server-side bounded reading checks actual bytes independently of browser
+MIME. Type/signature/container checks are not a malware scan. Only PDF/images
+are eligible for inline viewing; other types download as attachments. Responses
+use private/no-store, nosniff, sandbox and same-origin resource headers, with
+sanitized Content-Disposition filenames. There is no file-content execution.
+
+Every file list, preview and download is authorized on the server. Client URLs
+bind file ID, current revision and selected client. Membership, publisher status,
+publication and archive state are rechecked before delivery. Unsharing, editing
+or archiving invalidates old revision URLs; there are no reusable public signed
+URLs. A file already downloaded cannot be recalled. Browser database roles have
+no access to the file/audit tables; current runtime authorization remains the
+application's existing service-role model, not new per-tenant RLS protection.
+
+Uploaded files can be edited for title, description and sharing state. Replacing
+bytes means adding a new upload. Retried requests use one operation ID; exact
+replays do not duplicate files, and changed/cross-client replays conflict. File
+mutations have an append-only audit receipt and use the existing admin request
+audit wrapper; raw multipart bodies, document contents and credentials are not
+logged. New-file quotas are 30 uploads per client/creator per rolling day and
+100 MiB stored bytes per client. Delete is a portal archive: audit and stored
+bytes remain private and count toward storage; later retention/purge is separate.
+
+### Migration and activation
+
+Versioned migration: `database/client-document-files.sql`, version
+`003_private_uploads` in the existing document schema journal. Runner:
+
+```powershell
+npm run documents:files:migrate -- --confirm-database DATABASE_NAME --app-role RUNTIME_ROLE
+```
+
+Load the approved operator URL privately as
+`CLIENT_DOCUMENTS_MIGRATION_DATABASE_URL` in the operator shell. A remote target
+also requires explicit approval and `--allow-remote`; never run fixtures against
+a shared database. The runner validates database identity, checksum and an
+ordinary runtime role, and grants access only to the new tables/sequence.
+Conditional standard PostgreSQL REVOKEs cover `anon`/`authenticated` roles when
+present, preventing managed-provider default browser grants from exposing bytes.
+
+**Applied on 2026-11-23 to the previously approved Supabase project** after local
+rehearsal. Runtime readability and browser-role denial were checked read-only.
+Existing client and reference counts were unchanged; zero real uploads were
+created during setup. Neon and local dotenv files were untouched. There is no
+additional Google consent or storage-account setup for direct uploads.
+
+The upload UI/code is local and has not been pushed or deployed. Deploy the
+reviewed Next.js source with the existing public database certificate files.
+No Python backend change is required for this document-upload feature.
+
+Reference: [Vercel's default function body limits](https://vercel.com/docs/functions/limitations).
+The 2 MiB application cap stays below the ordinary request/response limit and
+does not require the optional larger-body beta or a plan/configuration change.
+
+## Preserved Drive-link metadata behavior
 
 The user explicitly removed journey/next-action presentation from both admin and
 client document screens on 2026-11-23. Main fields are Document title, Description
@@ -15,7 +128,7 @@ Description is client-facing metadata. It is saved in the existing append-only
 assignment audit result for the exact client/assignment revision and is copied
 forward into publication/unpublication receipts. Old records default to an empty
 description. Legacy requests that omit description or stage preserve existing
-values when editing. No new schema migration or environment setting is required.
+values when editing. Drive-link metadata itself needs no additional schema or environment setting; direct uploads use the migration above.
 
 ## Default: publish an approved Google Drive link
 

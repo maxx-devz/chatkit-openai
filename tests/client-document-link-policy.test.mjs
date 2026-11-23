@@ -20,3 +20,11 @@ test('the simple editor accepts title and description without workflow metadata'
  for(const description of ['<script>alert(1)</script>','bad\u0000value','x'.repeat(1001),123,null])assert.throws(()=>validateAssignment({...save,description}));
  assert.equal(validateAssignment({...save,description:'  Short description  '}).description,'Short description');
 });
+
+
+test('one-step save and share is an explicit confirmed action; ordinary saving stays private',()=>{
+ const body={action:'save_publish',clientId:'12',operation:crypto.randomUUID(),reason:'Shared approved client document',title:'Reviewed report',url:'https://docs.google.com/document/d/abcdefghij12345/edit',confirmed:true};
+ assert.equal(validateAssignment(body).action,'save_publish');assert.throws(()=>validateAssignment({...body,confirmed:false}));
+ assert.throws(()=>validateAssignment({...body,url:'https://drive.google.com/drive/folders/abcdefghij12345'}));
+ assert.throws(()=>validateAssignment({...body,ownerId:'9'}));
+});
