@@ -593,3 +593,118 @@ files. Vercel sign-in protection is preserved. No valid chat, database test writ
 provider call or message was sent.
 Current deployments still use their previous settings. See
 [VERCEL_ENV_SETUP.md](VERCEL_ENV_SETUP.md) for exact pending checks and resume steps.
+
+## Client-grouped document tables — 2026-11-23
+
+Replaced the large client picker/empty landing block and document cards with
+client-grouped tables. Client rows show name/account, portal access and a library
+disclosure. Clicking anywhere on a summary row or its keyboard-accessible button
+expands/collapses the client. Only the selected client's existing authorized API
+data is loaded; switching/closing a group unmounts the previous client panel.
+
+Within a group, rows show document title, publication visibility and updated date
+(UTC). A row expands into description, original Google link, available file size
+and Open attached file / Edit / Publish or Unpublish / Delete actions. The
+existing review, reason, revision and idempotency checks remain in place. Delete
+uses the existing archive command, retaining history and the original Drive file.
+The add/edit form opens on demand and closes after a successful save. Existing
+per-client draft preservation, quiet refresh and authorization-denial behavior
+remain covered. The existing optional protected-delivery path is retained below.
+
+Added client-name/account search; per-client document title/description search;
+newest/oldest/title sorting; and published/private-draft filters. File-size sorts
+work only for rows with supplied numeric byte metadata; unknown sizes sort last.
+The current saved-link API supplies no verified sizes: those display Not provided
+in expanded details and size sorting is disabled with an explanation. No Google
+metadata fetch or guessed byte count was introduced. Tests supplying synthetic
+size metadata demonstrate conditional UI behavior, not live provider support.
+Search/sorting cover the existing latest-100 list; an explicit note appears when
+100 records are returned. This step adds no global cross-client document search,
+pagination, schema migration, environment setting or provider connection.
+
+Actual results: 52 focused desktop/mobile fixture-browser checks passed, covering
+the new disclosure/search/date/title/metadata-size/visibility behavior, delete
+confirmation and existing publication, retry, revocation, saved drafts, screenshot
+focus, stale-response and client-switching regressions. Changed source/tests lint
+and git diff --check passed; isolated production build passed. Inspected desktop
+and mobile screenshots of expanded tables and actions. Real-auth database browser
+selectors were updated for the new navigation, but that disposable database suite
+was not rerun in this presentation step. No live provider verification was run.
+
+Changed source: components/admin/client-document-assignments.js and its CSS
+module. Updated tests/admin-readiness/browser/{document-links,documents}.spec.mjs
+and tests/client-document-assignments/browser/assignments.spec.mjs. Existing
+Consolas configuration, server authorization, persistence, original client IDs,
+document links and unrelated local changes were preserved. No database/provider
+writes, real file deletion, dotenv changes, deployment, commit or push. Fixture
+servers stopped automatically and the primary review server was left running.
+Review the local /admin/client-documents route with an authorized AOC admin.
+
+## Simpler sharing and real private uploads — 2026-11-23
+
+Supersedes the nested-table interaction above. One client selector, an always
+visible drag/drop or Drive-link form and direct row actions replace the multiple
+expansion/add/publish steps. File names fill titles; descriptions are optional.
+Save & share explicitly saves/publicizes a reviewed file or link in one action;
+Save draft retains privacy. Existing link save operations remain private and
+separate publish callers still require confirmation. One-step link sharing uses
+the same locked transaction/audit receipt and retains legacy category/stage
+metadata. Edit, Share/Unshare and Delete are visible without expanding rows.
+Delete/Unshare confirmations remain, with automatic business audit reasons.
+
+Added durable, bounded PostgreSQL file bytes and append-only upload audit, reusing
+the application's portable storage/authorization pattern, not a provider SDK or
+Vercel disk. New server-only routes create/update and preview admin files; the
+existing authenticated client document list/download paths include shared uploads.
+IDs, revisions, client scope, active membership and publisher state are rechecked;
+bytes are not released on denial. Files are not sent to AI or external storage.
+Size sorting now uses real uploaded-byte sizes; opaque Drive links stay unknown.
+2 MiB per file; 100 MiB retained bytes per client and 30 uploads/client/creator/day.
+Archive retains private bytes/audit, and future retention cleanup is not included.
+
+Actual final verification:
+
+- 407 offline Node tests passed; zero failures/skips.
+- 58 desktop/mobile fixture-browser checks passed, including actual file-input
+  and drag/drop UI, filename defaults, private drafts, missing setup, retries,
+  direct actions, search/sort, client switching, screenshot focus and revoked
+  access. API/provider responses in these browser checks were mocked.
+- 39 reported real-auth/disposable PostgreSQL tests passed across assignments
+  (7), links (9), uploaded files (7), protected Google delivery (11), Google
+  adapter (5); these include five parent tests. Google transport was mocked.
+  Both migrations ran twice on each fresh fixture database. The upload suite
+  verifies exact byte persistence, concurrent replay, scope/revocation, old URL
+  denial, inline/download headers, forbidden actors and browser-role SQL grants.
+  A deliberately permissive browser-role default grant was revoked by migration.
+- Changed-source/test lint, git diff --check and isolated production build passed.
+- Desktop/mobile upload screens inspected. No live AI/Google/email/payment or
+  real customer-file verification performed. Real-auth browser selectors were
+  aligned, but that separate retained DB-browser suite was not rerun.
+
+Additive upload migration applied to the approved Supabase target after rehearsal;
+new tables/role grants and browser denial verified. Existing client/reference
+counts unchanged and zero real uploads created. No Neon access, environment file
+change, Git commit, push or deployment. New runtime configuration is not needed.
+The primary review server remains available at /admin/client-documents. Existing
+approved Google links, conversations, credits, resources, knowledge, indexing and
+Internal Portal functionality remain on their existing paths.
+
+Files: database/client-document-files.sql; scripts/migrate-client-document-files.mjs;
+lib/client-document-file-policy.js; lib/client-document-files.js; existing link
+policy/store and document-delivery.js; new admin file POST/GET routes; admin
+document component/CSS; admin audit manifest; package script; pure, database and
+browser tests; setup/portability/progress/UI documentation. All intended source
+lives under actual project paths; ignored .tmp holds only scratch/private fixtures.
+
+Remaining deployment work: publish/review the source and deploy Next.js with the
+existing Supabase certificate packaging. Larger-file direct object storage,
+antivirus scanning, retention purge, real customer-file/provider checks and the
+previous Vercel AI/deployment checks remain outside this completed local slice.
+
+Final follow-through: private/share checkbox choices are included in the
+client-scoped draft, so switching clients cannot turn a private unfinished draft
+into an automatically shared one. This case passed in the final 58-check browser
+run. The final changed-source lint/build passed after that fix. All five generated
+databases and the dedicated aoc_uploads cluster were verified and removed; the
+existing WSL main cluster and primary portal review server were preserved.
+No real customer files were added or downloaded during verification.

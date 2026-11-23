@@ -276,5 +276,25 @@
     "auditedMethods": [
       "POST"
     ]
+  },
+  {
+    "route": "/api/admin/client-document-files",
+    "methods": [
+      "POST"
+    ],
+    "operation": "admin.client_document_files",
+    "recording": "Submitted file writes; file bodies and credentials excluded",
+    "auditedMethods": [
+      "POST"
+    ]
+  },
+  {
+    "route": "/api/admin/client-document-files/[id]",
+    "methods": [
+      "GET"
+    ],
+    "operation": "admin.client_document_files.download",
+    "recording": "Authenticated private read; no change-audit entries",
+    "auditedMethods": []
   }
 ]

@@ -71,6 +71,17 @@ test('explicit Drive link publication uses real auth/SQL without Google configur
    const entry=(await(await list()).json()).items.find(item=>item.id===result.id);assert.equal(entry.description,base.description);assert.equal(entry.stage,null);assert.equal((await opening(entry)).status,302);
    await post({action:'archive',clientId:A.id,id:result.id,revision:approved.revision,operation:crypto.randomUUID(),reason:'Remove synthetic metadata case'});assert.equal((await opening(entry)).status,404);
   });
+  await t.test('one-step save/share is atomic and preserves legacy category on later edits',async()=>{
+   const body={action:'save_publish',clientId:A.id,operation:crypto.randomUUID(),reason:'Approved one-step sharing',title:'One-step reviewed report',description:'Approved findings',url:'https://docs.google.com/document/d/OneStepLinkFixture12345/edit',confirmed:true};
+   const r=await post(body);assert.equal(r.status,200);let value=await r.json();assert.equal(value.status,'published_link');
+   assert.equal((await(await list()).json()).items.find(item=>item.id===value.id).description,'Approved findings');
+   assert.equal((await post(body)).status,200);assert.equal((await db.query('SELECT count(*)::int n FROM portal_client_document_assignment_audit WHERE assignment_id=$1',[value.id])).rows[0].n,1);
+   value=await(await post({action:'publish',clientId:A.id,id:value.id,revision:value.revision,operation:crypto.randomUUID(),reason:'Retain existing report category',category:'report',confirmed:true})).json();
+   const edit=await post({...body,id:value.id,revision:value.revision,operation:crypto.randomUUID(),title:'Updated one-step report'});assert.equal(edit.status,200);value=await edit.json();
+   const row=(await(await list()).json()).items.find(item=>item.id===value.id);assert.equal(row.title,'Updated one-step report');assert.equal(row.category,'report');
+   assert.equal((await post({...body,url:'https://drive.google.com/drive/folders/FolderNotForShare12345',operation:crypto.randomUUID()})).status,400);
+   assert.equal((await post({action:'archive',clientId:A.id,id:value.id,revision:value.revision,operation:crypto.randomUUID(),reason:'Remove one-step synthetic fixture'})).status,200);
+  });
   await t.test('edits and unpublishing invalidate old portal links and preserve history/client IDs',async()=>{
    const unpublish={action:'revoke',clientId:A.id,id:saved.id,revision:published.revision,operation:crypto.randomUUID(),reason:'Withdraw fixture link'};
    const r=await post(unpublish);assert.equal(r.status,200);assert.equal((await opening(link)).status,404);assert.deepEqual((await(await list()).json()).items,[]);saved=await r.json();
