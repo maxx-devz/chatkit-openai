@@ -3,8 +3,10 @@
 ## Current workflow: upload a file or add a link (2026-11-23)
 
 1. Open `/admin/client-documents` and select the client once.
-2. Drop one file onto the upload area or choose a file. Its filename fills the
-   title automatically. Alternatively, paste a Google Drive file link and title.
+2. Drop a file or choose **Choose files**. Select multiple files for a bulk
+   queue (up to20 at once,2 MiB each), or select one for the existing single-file
+   form. Filenames fill titles automatically. Alternatively, paste a Google
+   Drive file link and title.
 3. Description is optional. Leave **Share with the client when saved** checked
    and choose **Save & share**; uncheck it to save a private draft.
 4. Existing rows expose Open/View-download, Edit, Share/Unshare and Delete
@@ -12,6 +14,40 @@
    Delete and Unshare require a short confirmation; audit reasons are recorded
    automatically rather than forcing repetitive text entry. Clicking a title
    optionally reveals its description. Search and date/title/size sorting remain.
+
+### Bulk uploads
+
+For multiple selected/dropped files, review or edit each title, remove unwanted
+items, optionally add more files, and choose **Upload & share files** or
+**Upload private drafts**. The existing optional description is applied to all
+files in that batch. The selected client is fixed for its requests. No file is
+uploaded until the upload button is pressed. Invalid/empty/oversized files show
+their own explanation; valid siblings can still be saved.
+
+The browser sends one bounded file request at a time to the existing protected
+endpoint. Results and processed counts are per file; failed or unconfirmed items
+can be retried without resending confirmed successes. Attempted titles/visibility
+stay locked so each retry uses identical content and its original operation UUID.
+Known access/setup/quota failures stop the remaining queue. Existing30-file daily
+and100 MiB retained-client limits remain server-enforced;20 is only the per-batch
+UI limit and does not grant a new storage allowance.
+
+**Stop after current file** allows the current request to finish, then pauses
+unstarted files. Retry/continue sends only remaining/failed items. Each file is a
+separate transaction: successful uploads are kept when a sibling fails or the
+queue is stopped. There is no claim of an atomic multi-file transaction.
+
+Keep the page open. Reload/closing discards unsent browser File objects; these are
+not placed in local/session storage. Switching clients aborts the active browser
+request and stops subsequent requests; an already committed or in-flight save
+can still finish for the original client. Recheck that client's library before
+selecting the same files again after an interrupted page. No durable background
+queue or automatic resume after closing the browser is introduced.
+
+No schema, environment, storage provider or API-body limit change is needed.
+Every file retains the existing server authorization, validation, quota, private
+delivery and audit path. Real database checks from initial upload delivery remain
+historical; the new bulk orchestration is verified with isolated API fixtures.
 
 ### Durable private files
 

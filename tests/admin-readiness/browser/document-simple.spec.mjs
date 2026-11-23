@@ -34,7 +34,7 @@ test('failed upload keeps the selected file and reuses its retry operation',asyn
 });
 test('oversized files and missing storage setup do not send upload requests',async({page})=>{
  const f=await fixture(page);await open(page);await page.getByLabel('Attach a document',{exact:true}).setInputFiles({...file,buffer:Buffer.alloc(2*1024*1024+1)});await expect(page.getByRole('alert').filter({hasText:'2 MB'})).toContainText('2 MB');expect(f.writes).toHaveLength(0);
- await page.unroute('**/api/**');await fixture(page,{ready:false});await open(page);await expect(page.getByRole('button',{name:'Choose file',exact:true})).toBeDisabled();await expect(page.getByLabel('Or paste a Google Drive link',{exact:true})).toBeEnabled();
+ await page.unroute('**/api/**');await fixture(page,{ready:false});await open(page);await expect(page.getByRole('button',{name:'Choose files',exact:true})).toBeDisabled();await expect(page.getByLabel('Or paste a Google Drive link',{exact:true})).toBeEnabled();
 });
 test('client switching clears the selected file and search/sorting use stored sizes',async({page})=>{
  const f=await fixture(page);await open(page);await page.getByLabel('Attach a document',{exact:true}).setInputFiles(file);await page.getByRole('checkbox',{name:/Share with Alpha Client/}).uncheck();await page.getByLabel('Client account',{exact:true}).selectOption('2');await expect(page.getByLabel('Attach a document',{exact:true})).toHaveJSProperty('value','');await expect(page.getByRole('button',{name:'Remove file',exact:true})).toHaveCount(0);

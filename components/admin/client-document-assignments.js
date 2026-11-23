@@ -3,6 +3,8 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
 import {useAdminDraft} from './admin-draft-provider';
 import DocumentDeliveryManager from './document-delivery-manager';
+import DocumentBulkUpload from './document-bulk-upload';
+import {DOCUMENT_UPLOAD_BATCH_MAX} from '@/lib/client-document-upload-queue';
 import {DOCUMENT_UPLOAD_ACCEPT,DOCUMENT_UPLOAD_MAX} from '@/lib/client-document-file-policy';
 import s from './client-document-assignments.module.css';
 async function readResponse(response){let data;try{data=await response.json();}catch{throw Error('The document request could not be completed. Please try again.');}if(!response.ok){const error=Error(data.error||'The document request could not be completed.');error.status=response.status;throw error;}return data;}
@@ -14,9 +16,11 @@ function dateLabel(value){return value?new Date(value).toLocaleDateString('en-US
 function DocumentForm({client,item,uploadsReady,onSaved,onCancel}){
  const baseline=item?{title:item.title,description:item.description||'',url:item.kind==='upload'?'':item.url,share:item.status==='published_link'}:empty;
  const draft=useAdminDraft(`document-reference:${client.id}:${item?.id||'new'}:${item?.revision||'new'}`,baseline);
+ const [batch,setBatch]=useState(null);
  const [file,setFile]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[dragging,setDragging]=useState(false);
  const input=useRef(null),pending=useRef(null),uploaded=item?.kind==='upload';
  const share=draft.value.share??baseline.share;const setShare=value=>draft.update(old=>({...old,share:value}));
+ function chooseFiles(selected){const incoming=Array.from(selected||[]);if(!incoming.length)return;if(incoming.length>DOCUMENT_UPLOAD_BATCH_MAX){setError('Choose up to '+DOCUMENT_UPLOAD_BATCH_MAX+' files per batch.');return;}if(incoming.length>1){setBatch(incoming);setFile(null);setError('');return;}choose(incoming[0]);}
  function choose(selected){if(!selected)return;if(selected.size>DOCUMENT_UPLOAD_MAX){setError('Each file must be 2 MB or smaller.');return;}setFile(selected);draft.update(old=>({...old,title:selected.name,url:''}));setError('');}
  function update(event){const {name,value}=event.target;draft.update(old=>({...old,[name]:value}));setError('');}
  async function save(event){
@@ -33,14 +37,15 @@ function DocumentForm({client,item,uploadsReady,onSaved,onCancel}){
    await onSaved(result.status==='published_link'?'Document saved and shared with '+client.name+'.':'Document saved as a private draft.');
   }catch(failure){setError(failure.message);}finally{setBusy(false);}
  }
+ if(batch)return <DocumentBulkUpload key={client.id} client={client} files={batch} share={share} onShare={setShare} description={draft.value.description||''} onSaved={onSaved} onClose={complete=>{setBatch(null);if(complete)draft.clear();}}/>;
  return <form className={s.quickForm} onSubmit={save} aria-label={item?'Edit document':'Add document'}>
  <fieldset className={s.fields} disabled={busy}>
  <div className={s.quickHeading}><h2>{item?'Edit document':'Add a document'}</h2>{item&&<button type="button" onClick={onCancel}>Cancel edit</button>}</div>
  {!uploaded&&<div className={s.sourceInputs}>
- {!item&&<div className={s.dropzone} data-dragging={dragging} aria-disabled={!uploadsReady} onDragOver={event=>{event.preventDefault();if(uploadsReady&&!busy)setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={event=>{event.preventDefault();setDragging(false);if(!uploadsReady||busy)return;if(event.dataTransfer.files.length!==1){setError('Choose one file at a time.');return;}choose(event.dataTransfer.files[0]);}}>
- <input ref={input} className="sr-only" aria-label="Attach a document" type="file" id={'document-file-'+client.id} accept={DOCUMENT_UPLOAD_ACCEPT} disabled={!uploadsReady||busy} onChange={event=>choose(event.target.files?.[0])}/>
- <strong>{file?file.name:'Drop a file here'}</strong><span>{file?bytesLabel(file.size)+' · Ready to save':'PDF, Office, text or image · up to 2 MB'}</span>
- <div>{file?<button type="button" onClick={()=>{setFile(null);if(input.current)input.current.value='';}}>Remove file</button>:<button type="button" disabled={!uploadsReady} onClick={()=>input.current?.click()}>Choose file</button>}</div>
+ {!item&&<div className={s.dropzone} data-dragging={dragging} aria-disabled={!uploadsReady} onDragOver={event=>{event.preventDefault();if(uploadsReady&&!busy)setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={event=>{event.preventDefault();setDragging(false);if(!uploadsReady||busy)return;chooseFiles(event.dataTransfer.files);}}>
+ <input ref={input} className="sr-only" aria-label="Attach a document" type="file" id={'document-file-'+client.id} accept={DOCUMENT_UPLOAD_ACCEPT} multiple disabled={!uploadsReady||busy} onChange={event=>{chooseFiles(event.target.files);event.target.value='';}}/>
+ <strong>{file?file.name:'Drop a file here'}</strong><span>{file?bytesLabel(file.size)+' · Ready to save':'PDF, Office, text or image · up to 2 MB each · select multiple files'}</span>
+ <div>{file?<button type="button" onClick={()=>{setFile(null);if(input.current)input.current.value='';}}>Remove file</button>:<button type="button" disabled={!uploadsReady} onClick={()=>input.current?.click()}>Choose files</button>}</div>
  </div>}
  <div className={s.linkInput}><label htmlFor={'document-link-'+client.id}>{item?'Google Drive file link':'Or paste a Google Drive link'}</label><input id={'document-link-'+client.id} name="url" type="url" value={draft.value.url} onChange={update} disabled={Boolean(file)} required={!file} maxLength={500} placeholder="https://docs.google.com/…"/>{!uploadsReady&&!item&&<small>File upload storage needs its database setup. Existing Drive links still work.</small>}</div>
  </div>}
@@ -67,16 +72,16 @@ function DocumentRow({item,client,onEdit,onSaved}){
  </>;
 }
 function SelectedClient({id}){
- const [data,setData]=useState(null),[error,setError]=useState(''),[loading,setLoading]=useState(true),[notice,setNotice]=useState(''),[editing,setEditing]=useState(null),[search,setSearch]=useState(''),[sort,setSort]=useState('newest'),[advanced,setAdvanced]=useState(false);const sequence=useRef(0),form=useRef(null);
+ const [data,setData]=useState(null),[error,setError]=useState(''),[loading,setLoading]=useState(true),[notice,setNotice]=useState(''),[noticeWarning,setNoticeWarning]=useState(false),[editing,setEditing]=useState(null),[search,setSearch]=useState(''),[sort,setSort]=useState('newest'),[advanced,setAdvanced]=useState(false);const sequence=useRef(0),form=useRef(null);
  const load=useCallback(async signal=>{const token=++sequence.current;setLoading(true);setError('');try{const result=await loadClient(id,signal);if(!signal?.aborted&&token===sequence.current)setData(result);}catch(failure){if(!signal?.aborted&&token===sequence.current){if([401,403,404].includes(failure.status))setData(null);setError(failure.message);}}finally{if(!signal?.aborted&&token===sequence.current)setLoading(false);}},[id]);
  useEffect(()=>{const controller=new AbortController();Promise.resolve().then(()=>load(controller.signal));return()=>controller.abort();},[load]);
  useEffect(()=>{if(editing)form.current?.scrollIntoView({block:'nearest',behavior:'smooth'});},[editing]);
- const saved=async message=>{setEditing(null);setNotice(message);await load();};
+ const saved=async (message,warning=false)=>{setEditing(null);setNotice(message);setNoticeWarning(warning);await load();};
  if(!data)return error?<p role="alert" className={s.error}>{error}<button type="button" onClick={()=>load()}>Try again</button></p>:<p role="status">Loading documents…</p>;
  if(!data.setupReady)return <p role="alert">Document storage needs setup. Existing portal documents are unchanged.</p>;
  const items=data.assignments.filter(item=>[item.title,item.description||'',item.filename||''].some(value=>value.toLowerCase().includes(search.trim().toLowerCase()))).toSorted((a,b)=>sort==='title'?a.title.localeCompare(b.title):sort.startsWith('size')?((a.sizeBytes==null)-(b.sizeBytes==null))||(sort==='size-asc'?(a.sizeBytes||0)-(b.sizeBytes||0):(b.sizeBytes||0)-(a.sizeBytes||0)):(sort==='oldest'?1:-1)*((Date.parse(a.updatedAt)||0)-(Date.parse(b.updatedAt)||0)));
  return <div className={s.manager}>
- {notice&&<p role="status" className={s.success}>{notice}</p>}{error&&<p role="alert" className={s.error}>{error} Your unsaved inputs are kept; displayed documents may be out of date.</p>}
+ {notice&&<p role="status" className={noticeWarning?s.bulkSummary:s.success}>{notice}</p>}{error&&<p role="alert" className={s.error}>{error} Your unsaved inputs are kept; displayed documents may be out of date.</p>}
  <div ref={form}><DocumentForm key={editing?editing.id+':'+editing.revision:'new'} client={data.client} item={editing} uploadsReady={data.uploadsReady!==false} onSaved={saved} onCancel={()=>setEditing(null)}/></div>
  <section className={s.simpleLibrary} aria-label="Saved documents"><div className={s.simpleToolbar}><div><label htmlFor={'document-search-'+id}>Search documents</label><input id={'document-search-'+id} type="search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Search title, description or filename"/></div><div><label htmlFor={'document-sort-'+id}>Sort documents</label><select id={'document-sort-'+id} value={sort} onChange={event=>setSort(event.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="title">Title A–Z</option><option value="size-asc">Smallest file first</option><option value="size-desc">Largest file first</option></select></div><button type="button" disabled={loading} onClick={()=>load()}>{loading?'Refreshing…':'Refresh documents'}</button></div>
  {data.assignments.length>=100&&<p className={s.muted}>Search covers the loaded document list (up to 100 links and 100 uploads).</p>}

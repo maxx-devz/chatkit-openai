@@ -708,3 +708,44 @@ run. The final changed-source lint/build passed after that fix. All five generat
 databases and the dedicated aoc_uploads cluster were verified and removed; the
 existing WSL main cluster and primary portal review server were preserved.
 No real customer files were added or downloaded during verification.
+
+
+## 2026-11-23 — bounded bulk document uploads
+
+Implemented on client-documents from43ae8d1. Existing local source was clean;
+preserved unrelated branches and all private environments/review servers.
+
+- Multi-file selection and drag/drop now open a client-specific queue of up to20
+  files. Each retains its original2 MiB/type/storage limits. Titles default to
+  filenames and are editable before an item starts. Existing description/share
+  choices carry into the queue; visibility is explicit before upload.
+- Files upload sequentially through the existing single-file protected endpoint.
+  Per-file results distinguish saved, failed, invalid, unconfirmed and unstarted
+  files. Retry keeps the exact operation ID/metadata and skips saved siblings.
+  A partial result uses neutral feedback, not a misleading all-success notice.
+- Stop-after-current, continue, selection removal/addition and safe client-switch
+  teardown are implemented. Access/setup/quota errors stop remaining work; JSON
+  and non-JSON authorization failures trigger a fresh access check and clear the
+  document form. Pending File objects remain in memory only.
+- Successful writes are independent and remain saved after failure/stop. This
+  browser queue is not a durable server job: unsent files do not survive reload
+  or closing. An in-flight save can complete for its original client after the
+  browser leaves; switching never rebinds it to a different client.
+
+Actual checks:78 desktop/mobile Chrome fixture checks passed (20 new bulk cases
+plus58 existing document regressions);409 offline Node tests passed; changed
+source/test ESLint and isolated full production build passed. Desktop/mobile
+result screenshots inspected; git diff --check passed. Tests mock API responses,
+including transactional receipt replay and ambiguous network results; they do not
+claim a fresh live/storage database or Google-provider verification. The existing
+file-policy/server tests pass in the offline suite. No actual customer upload,
+database query/migration, provider request, environment change or deployment was
+performed for this UI orchestration. No new configuration is needed.
+
+Files: components/admin/document-bulk-upload.js; existing assignments component
+and scoped CSS; lib/client-document-upload-queue.js; pure queue policy tests;
+document-bulk browser suite and the single-file chooser label regression update;
+setup/progress documentation. All application files are in the actual AI\portal
+checkout. Ignored build/test artifacts stay out of Git. Existing auth, per-file
+audit/storage/validation/client isolation, Drive links and single-file edits use
+their unchanged working server paths. No commit or push was made for this task.
