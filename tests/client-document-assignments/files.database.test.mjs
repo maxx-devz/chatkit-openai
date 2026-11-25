@@ -1,3 +1,4 @@
+import sharp from 'sharp';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
@@ -37,7 +38,7 @@ test('real private uploads and scoped downloads on disposable PostgreSQL',{skip:
    for(const key of ['client','unrelated','internal'])assert.ok([401,403].includes((await upload(crypto.randomUUID(),key)).status));
    const body={action:'publish',clientId:A.id,id:saved.id,revision:saved.revision,operation:crypto.randomUUID()},r=await command(body);assert.equal(r.status,200);published=await r.json();assert.equal((await command(body)).status,200);
    entry=(await(await list()).json()).items.find(item=>item.id===saved.id);assert.equal(entry.delivery,'upload');assert.equal(entry.viewLabel,'View PDF');assert.match(entry.downloadUrl,/source=upload/);
-   const viewed=await open(entry);assert.equal(viewed.status,200);assert.equal(viewed.headers.get('Content-Type'),'application/pdf');assert.match(viewed.headers.get('Content-Disposition'),/^inline;/);assert.match(viewed.headers.get('cache-control'),/no-store/);assert.match(viewed.headers.get('Content-Security-Policy'),/sandbox/);assert.equal(await viewed.text(),'%PDF-1.7\nPrivate synthetic upload');
+   const viewed=await open(entry);assert.equal(viewed.status,200);assert.equal(viewed.headers.get('Content-Type'),'application/pdf');assert.match(viewed.headers.get('Content-Disposition'),/^inline;/);assert.match(viewed.headers.get('cache-control'),/no-store/);assert.match(viewed.headers.get('Content-Security-Policy'),/default-src 'none'/);assert.match(viewed.headers.get('Content-Security-Policy'),/frame-ancestors 'self'/);assert.equal(await viewed.text(),'%PDF-1.7\nPrivate synthetic upload');
    const download=await opening.GET(new Request(origin+entry.downloadUrl,{headers:headers('client')}),{params:Promise.resolve({id:entry.id})});assert.equal(download.status,200);assert.match(download.headers.get('Content-Disposition'),/^attachment;/);
    assert.doesNotMatch(JSON.stringify(entry),/content_hash|actor_id|content|reason/);
   });
@@ -56,7 +57,13 @@ test('real private uploads and scoped downloads on disposable PostgreSQL',{skip:
    const edited=await command({action:'update',clientId:A.id,id:value.id,revision:value.revision,operation:crypto.randomUUID(),title:'Updated uploaded report',description:'Approved next steps',share:true});assert.equal(edited.status,200);value=await edited.json();assert.equal((await open(item)).status,404);
    assert.equal((await(await list()).json()).items.find(row=>row.id===value.id).description,'Approved next steps');
    assert.equal((await command({action:'archive',clientId:A.id,id:value.id,revision:value.revision,operation:crypto.randomUUID()})).status,200);assert.equal((await(await list()).json()).items.some(row=>row.id===value.id),false);
-   assert.equal((await db.query('SELECT count(*)::int n FROM portal_client_document_file_audit WHERE file_id=$1',[value.id])).rows[0].n,3);
+   assert.equal((await db.query('SELECT count(*)::int n FROM portal_client_document_file_audit WHERE file_id=$1',[value.id])).rows[0].n,3);assert.equal((await db.query('SELECT octet_length(content) bytes FROM portal_client_document_files WHERE id=$1',[value.id])).rows[0].bytes,0);
+  });
+  await t.test('legacy private image bytes also support half-resolution client previews',async()=>{
+   const bytes=await sharp({create:{width:120,height:80,channels:3,background:'#148'}}).png().toBuffer(),form=new FormData();form.set('clientId',String(A.id));form.set('operation',crypto.randomUUID());form.set('title','Legacy client image');form.set('description','Synthetic image');form.set('share','true');form.set('file',new File([bytes],'legacy.png',{type:'image/png'}));const h=headers();h.delete('content-type');
+   const uploaded=await files.POST(new Request(origin+'/api/admin/client-document-files',{method:'POST',headers:h,body:form}));assert.equal(uploaded.status,200);const result=await uploaded.json(),item=(await(await list()).json()).items.find(x=>x.id===result.id),url=item.viewUrl+'&preview=half';
+   const response=await opening.GET(new Request(origin+url,{headers:headers('client')}),{params:Promise.resolve({id:item.id})});assert.equal(response.status,200);assert.equal(response.headers.get('content-type'),'image/webp');const meta=await sharp(Buffer.from(await response.arrayBuffer())).metadata();assert.equal(meta.width,60);assert.equal(meta.height,40);
+   assert.equal((await command({action:'archive',clientId:A.id,id:item.id,revision:'1',operation:crypto.randomUUID()})).status,200);
   });
   await t.test('invalid content and disallowed metadata create no stored file',async()=>{
    const before=(await db.query('SELECT count(*)::int n FROM portal_client_document_files')).rows[0].n;assert.equal((await upload(crypto.randomUUID(),'admin',A,false,'not a PDF')).status,415);

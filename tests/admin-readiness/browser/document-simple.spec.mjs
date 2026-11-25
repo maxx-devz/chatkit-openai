@@ -32,8 +32,8 @@ test('failed upload keeps the selected file and reuses its retry operation',asyn
  const f=await fixture(page,{failOnce:true});await open(page);await page.getByLabel('Attach a document',{exact:true}).setInputFiles(file);await page.getByRole('button',{name:'Save & share',exact:true}).click();await expect(page.getByRole('alert').filter({hasText:'Fixture: upload unavailable'})).toContainText('Fixture: upload unavailable');await expect(page.getByLabel('Document title',{exact:true})).toHaveValue(file.name);
  await page.getByRole('button',{name:'Save & share',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'Document saved and shared'})).toBeVisible();expect(f.writes[0].operation).toBe(f.writes[1].operation);expect(f.data['1']).toHaveLength(1);
 });
-test('oversized files and missing storage setup do not send upload requests',async({page})=>{
- const f=await fixture(page);await open(page);await page.getByLabel('Attach a document',{exact:true}).setInputFiles({...file,buffer:Buffer.alloc(2*1024*1024+1)});await expect(page.getByRole('alert').filter({hasText:'2 MB'})).toContainText('2 MB');expect(f.writes).toHaveLength(0);
+test('unsupported files and missing storage setup do not send upload requests',async({page})=>{
+ const f=await fixture(page);await open(page);await page.getByLabel('Attach a document',{exact:true}).setInputFiles({name:'Blocked.exe',mimeType:'application/octet-stream',buffer:Buffer.from('MZ')});await expect(page.getByRole('alert').filter({hasText:'not supported'})).toContainText('not supported');expect(f.writes).toHaveLength(0);
  await page.unroute('**/api/**');await fixture(page,{ready:false});await open(page);await expect(page.getByRole('button',{name:'Choose files',exact:true})).toBeDisabled();await expect(page.getByLabel('Or paste a Google Drive link',{exact:true})).toBeEnabled();
 });
 test('client switching clears the selected file and search/sorting use stored sizes',async({page})=>{

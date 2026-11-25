@@ -94,3 +94,10 @@ if (process.stdin.isTTY) {
   process.stdin.resume();
   process.stdin.on("data", (chunk) => { if (chunk.includes(3)) stop(); });
 }
+
+// Private document cleanup has its own bounded, retryable receipts and cannot stop chat.
+if(env.DATABASE_URL&&env.CLIENT_DOCUMENTS_SUPABASE_URL&&env.CLIENT_DOCUMENTS_SUPABASE_SERVICE_KEY&&env.CLIENT_DOCUMENTS_STORAGE_BUCKET){
+ const worker=spawn(process.execPath,['--conditions=react-server',path.join(root,'scripts/sync-client-document-storage.mjs'),'--watch'],{cwd:root,env,stdio:['ignore','pipe','pipe'],windowsHide:true});
+ attachDevOutput(worker,{source:'FILES',color});children.push(worker);
+ worker.on('error',()=>console.warn(formatDevLine('WARN: Document cleanup worker could not start. Portal services remain running.',{source:'FILES',color})));
+}

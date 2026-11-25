@@ -89,7 +89,11 @@
     "test:client-plans": "node --test tests/client-plans.test.mjs",
     "audit:operations:migrate": "node --env-file=.env.local scripts/migrate-admin-operations.mjs",
     "test:audit:operations": "node --test tests/admin-operations.test.mjs",
-    "test:audit:operations:database": "node scripts/check-admin-operations-database.mjs"
+    "test:audit:operations:database": "node scripts/check-admin-operations-database.mjs",
+    "documents:storage:migrate": "node scripts/migrate-client-document-storage.mjs",
+    "documents:storage:lifecycle:migrate": "node scripts/migrate-client-document-storage-lifecycle.mjs",
+    "documents:storage:reconcile": "node --conditions=react-server scripts/reconcile-client-document-storage.mjs",
+    "documents:storage:cleanup": "node --conditions=react-server scripts/sync-client-document-storage.mjs"
   },
   "engines": {
     "node": ">=22"
@@ -109,6 +113,7 @@
     "read-excel-file": "^9.3.12",
     "robots-parser": "^3.0.1",
     "server-only": "^0.0.1",
+    "sharp": "0.35.4",
     "web-vitals": "^6.2.3"
   },
   "devDependencies": {
