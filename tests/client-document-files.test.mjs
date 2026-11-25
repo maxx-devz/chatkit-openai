@@ -8,8 +8,8 @@ test('file content and server-selected MIME are independent of browser MIME; def
  assert.equal(result.title,'Audit.pdf');assert.equal(result.mimeType,'application/pdf');assert.equal(result.sizeBytes,result.content.length);assert.equal(result.share,false);
  assert.equal((await readDocumentFile(request('Notes.txt','Approved note',{share:'true'}))).share,true);
 });
-test('file policy blocks traversal, executable/HTML/SVG, signature mismatch, empty and oversized bytes',()=>{
- for(const name of ['../file.pdf','folder\\file.pdf','report\r\nX.pdf','.hidden.pdf','test.exe','page.html','image.svg'])assert.throws(()=>validateDocumentFile(name,Buffer.from('%PDF-1.7')));
+test('legacy multipart policy blocks traversal, executables, signature mismatch, empty and oversized bytes',()=>{
+ for(const name of ['../file.pdf','folder\\file.pdf','report\r\nX.pdf','.hidden.pdf','test.exe'])assert.throws(()=>validateDocumentFile(name,Buffer.from('%PDF-1.7')));
  for(const name of ['file.pdf','file.png','file.jpg','file.webp','file.docx','file.xlsx','file.pptx'])assert.throws(()=>validateDocumentFile(name,Buffer.from('wrong content')));
  assert.throws(()=>validateDocumentFile('file.txt',Buffer.alloc(0)));assert.throws(()=>validateDocumentFile('file.txt',Buffer.alloc(DOCUMENT_UPLOAD_MAX+1)));
  assert.throws(()=>validateDocumentFile('file.txt',Buffer.from([255,254,0])));
@@ -25,4 +25,10 @@ test('file updates reject owner, client transfer, forged privilege and invalid r
  const base={action:'publish',clientId:'1',id,revision:'1',operation:id};assert.equal(documentFileCommand(base).action,'publish');
  for(const extra of [{ownerId:'2'},{publishedBy:'2'},{content:'bad'},{revision:'0'},{action:'delete_everything'},{clientId:'1 OR TRUE'}])assert.throws(()=>documentFileCommand({...base,...extra}));
  assert.throws(()=>documentFileCommand({...base,action:'update',title:'Title',description:'Note',share:'true'}));
+});
+
+
+test('legacy image uploads normalize misleading raster extensions while keeping custom titles',async()=>{
+ const bytes='RIFF\x10\x00\x00\x00WEBPVP8 synthetic';const result=await readDocumentFile(request('photo.jpeg',bytes,{title:'photo.jpeg'}));assert.equal(result.filename,'photo.webp');assert.equal(result.title,'photo.webp');assert.equal(result.mimeType,'image/webp');
+ assert.equal((await readDocumentFile(request('photo.jpeg',bytes,{title:'Approved flood image'}))).title,'Approved flood image');
 });

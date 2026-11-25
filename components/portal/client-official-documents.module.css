@@ -13,3 +13,5 @@
 .journey { background:linear-gradient(135deg,#edf5ff,#f8fbff); }.files li { background:#ffffffbf; }.panel header { flex-wrap:wrap; }.filters { align-items:end; }
 
 .filters{grid-template-columns:minmax(0,1fr) auto}.filterActions{grid-column:auto;align-items:center}.summary{grid-template-columns:minmax(0,1fr)}.fileDetails{min-width:0}.description{white-space:pre-line;overflow-wrap:anywhere;color:#526779;margin:8px 0;font-size:14px}.files li{align-items:flex-start}@media(max-width:600px){.filters{grid-template-columns:1fr}.filterActions{grid-column:1/-1}}
+
+.files li.documentCard{display:block;min-width:0}.documentRow{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}.documentRow .actions{flex-wrap:wrap;justify-content:flex-end;max-width:55%}.documentCard>section{width:100%;box-sizing:border-box}.documentRow button{font-size:13px}.documentRow a{font-size:13px}@media(max-width:700px){.documentRow{flex-direction:column;gap:12px}.documentRow .actions{max-width:100%;justify-content:flex-start;flex-shrink:1}.documentRow .actions a,.documentRow .actions button{min-height:40px;padding:9px 12px}}

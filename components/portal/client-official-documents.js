@@ -2,9 +2,20 @@
 import {useEffect,useId,useRef,useState} from "react";
 import Link from "next/link";
 import s from "./client-official-documents.module.css";
+import DocumentPreview from '../documents/document-preview';
+import {documentPreviewAddress} from '@/lib/document-preview-policy';
 import {documentOpenLabel} from "@/lib/document-open-label";
 
-export default function ClientOfficialDocuments({clientId,summary=false,initialResult}) {
+function ClientDocument({item}){
+ const [open,setOpen]=useState(item.previewKind==='image');
+ const previewItem={...item,kind:'upload',url:item.viewUrl},canPreview=Boolean(item.previewKind&&documentPreviewAddress(previewItem));
+ return <li className={s.documentCard}><div className={s.documentRow}><div className={s.fileDetails}><strong>{item.title}</strong>{item.description&&<p className={s.description}>{item.description}</p>}<small>Shared {new Date(item.publishedAt).toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric",timeZone:"UTC"})}</small></div><div className={s.actions}>
+ {canPreview&&<button type="button" aria-expanded={open} onClick={()=>setOpen(value=>!value)}>{open?'Hide preview':'Preview'}</button>}
+ {item.canView&&<a href={item.viewUrl} target="_blank" rel="noreferrer">{item.viewLabel||documentOpenLabel({delivery:item.delivery,mimeType:item.mimeType,filename:item.title})}</a>}{item.downloadUrl&&<a href={item.downloadUrl}>Download</a>}
+ </div></div>{canPreview&&open&&<DocumentPreview item={previewItem} smallerImage/>}</li>;
+}
+export default function ClientOfficialDocuments(props){return <ScopedClientDocuments key={String(props.clientId)} {...props}/>;}
+function ScopedClientDocuments({clientId,summary=false,initialResult}) {
  const scopedInitial=initialResult?.clientId===String(clientId)?initialResult:null;
  const initialData=Array.isArray(scopedInitial?.data?.items)?scopedInitial.data:null;
  const initialError=typeof scopedInitial?.error==="string"?scopedInitial.error:"";
@@ -52,7 +63,7 @@ export default function ClientOfficialDocuments({clientId,summary=false,initialR
   </form>}
   {error?<div role="alert"><p>{error}</p><button type="button" onClick={()=>setReload(v=>v+1)}>Try again</button></div>:!data?<p role="status">Loading your documents...</p>:<section id="approved-engagement-documents" aria-label="Shared documents">
    <div className={s.documentHeading}><h3>Shared documents</h3>{!summary&&items.length>0&&<small>Page {query.page+1}</small>}</div>
-   {items.length?<ul className={s.files}>{items.slice(0,summary?3:50).map(item=><li key={item.id}><div className={s.fileDetails}><strong>{item.title}</strong>{item.description&&<p className={s.description}>{item.description}</p>}<small>Shared {new Date(item.publishedAt).toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric",timeZone:"UTC"})}</small></div><div className={s.actions}>{item.canView&&<a href={item.viewUrl} target="_blank" rel="noreferrer">{item.viewLabel||documentOpenLabel({delivery:item.delivery,mimeType:item.mimeType,filename:item.title})}</a>}{item.downloadUrl&&<a href={item.downloadUrl}>Download</a>}</div></li>)}</ul>:query.search?<div className={s.empty} role="status"><strong>No matching documents</strong><p>Try another document title.</p></div>:<p>No documents have been shared yet. Your team will add approved files here.</p>}
+   {items.length?<ul className={s.files}>{items.slice(0,summary?3:50).map(item=><ClientDocument key={clientId+':'+item.id+':'+item.viewUrl} item={item}/>)}</ul>:query.search?<div className={s.empty} role="status"><strong>No matching documents</strong><p>Try another document title.</p></div>:<p>No documents have been shared yet. Your team will add approved files here.</p>}
    {!summary&&(query.page>0||data.hasMore)&&<nav className={s.actions} aria-label="Document pages"><button type="button" disabled={query.page===0} onClick={()=>{setData(null);setQuery(old=>({...old,page:old.page-1}));}}>Previous documents</button><span>Page {query.page+1}</span><button type="button" disabled={!data.hasMore} onClick={()=>{setData(null);setQuery(old=>({...old,page:old.page+1}));}}>Next documents</button></nav>}
    {items.some(item=>item.delivery==="link")&&<p className={s.note}>Google Drive controls file access and downloads. If prompted, sign in with the Google account the file was shared with. Use its download option if the owner allows it.</p>}
   </section>}

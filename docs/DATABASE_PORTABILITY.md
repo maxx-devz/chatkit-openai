@@ -204,3 +204,34 @@ checks, bounded bodies and audit retain their normal application paths. Direct
 uploads have no AI indexing/knowledge inheritance. The migration was rehearsed
 locally twice and applied only to the already approved Supabase target; no Neon
 or existing client data changes were made. See CLIENT_DOCUMENTS_SETUP.md.
+
+
+## Explicit private document Storage decision (2026-11-23)
+
+The user approved private Supabase Storage for larger client documents. See
+CLIENT_DOCUMENTS_SETUP.md for the full contract, residual signed-link windows,
+private setup and actual verification status. This is an optional provider-specific
+byte adapter; Better Auth and existing PostgreSQL BYTEA files remain intact.
+`database/client-document-storage.sql` adds portable metadata/audit tables under
+version 004; `client-document-storage-supabase.sql` is the explicitly approved
+provider-specific restrictive Storage policy. Runtime metadata continues through
+lib/database.js; the guarded migration uses a short-lived pg client. Browser access
+uses only object-scoped upload tokens, never the database Data API or service key.
+Rollback disables the new upload path and retains metadata/bytes; exporting objects
+and changing providers requires a separate migration. This decision does not adopt
+Supabase Auth, migrate old files, alter Neon, or grant browser access to portal tables.
+
+
+Document Storage lifecycle (2026-11-25): version 005_storage_lifecycle adds portable
+cleanup receipts and grant-expiry metadata, permits empty BYTEA only on archived
+legacy rows, and adds a stored-filename audit action. Existing version 004 is not
+changed. Runtime SQL stays in lib/database.js; standalone maintenance uses
+lib/postgres.js and migrations a short-lived pg client. Supabase object copy/delete
+use its approved Storage REST adapter, never DELETE against storage.objects.
+User authorization changed the document deletion policy: uploaded bytes are now
+permanently removed while metadata/audit survive. Google originals remain outside
+this lifecycle. Connection/provider rollback cannot restore deleted bytes; ordinary
+database rollback cannot undo a completed provider deletion. Durable receipts retry
+physical removal after an archive transaction has committed. Reconciliation copies
+and hash-verifies the destination before changing its DB pointer; interruption is
+recovered by rerunning the same scoped command. No Supabase Auth change is involved.

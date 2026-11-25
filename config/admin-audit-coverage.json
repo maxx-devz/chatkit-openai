@@ -296,5 +296,25 @@
     "operation": "admin.client_document_files.download",
     "recording": "Authenticated private read; no change-audit entries",
     "auditedMethods": []
+  },
+  {
+    "route": "/api/admin/client-document-storage",
+    "methods": [
+      "POST"
+    ],
+    "operation": "admin.client_document_storage",
+    "recording": "Submitted private Storage metadata writes; no credentials or file bytes",
+    "auditedMethods": [
+      "POST"
+    ]
+  },
+  {
+    "route": "/api/admin/client-document-storage/[id]",
+    "methods": [
+      "GET"
+    ],
+    "operation": "admin.client_document_storage.download",
+    "recording": "Read-only; no change-audit entries",
+    "auditedMethods": []
   }
 ]

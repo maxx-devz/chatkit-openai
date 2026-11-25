@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {documentStoragePath,assertDocumentStoragePath} from '../lib/client-document-storage-path.js';
+const id='12345678-abcd-1234-abcd-123456789012';
+test('private upload keys keep normal human filenames in unique per-client folders',()=>{assert.equal(documentStoragePath('1',id,'CWR Xmas 02 - 2026.png'),'clients/1/'+id+'/CWR Xmas 02 - 2026.png');assert.notEqual(documentStoragePath('1',id,'report.pdf'),documentStoragePath('2',id,'report.pdf'));assert.match(documentStoragePath('1',id,'café.pdf'),/cafe.pdf$/);});
+test('object cleanup cannot escape its exact document folder',()=>{for(const path of ['clients/2/'+id+'/report.pdf','clients/1/'+id+'/../report.pdf','clients/1/'+id+'/..'])assert.throws(()=>assertDocumentStoragePath('1',id,path));for(const name of ['../report.pdf','bad.exe','.hidden.pdf'])assert.throws(()=>documentStoragePath('1',id,name));assert.equal(assertDocumentStoragePath('1',id,'clients/1/'+id+'/report.pdf'),'clients/1/'+id+'/report.pdf');});

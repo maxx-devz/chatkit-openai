@@ -141,3 +141,92 @@ document-loading.spec.mjs in admin-readiness separately uses mocked component
 API responses for deadlines, retry, foreign initial props and visibility checks.
 Server-rendered markup can appear before hydration; simulated visibility events
 must wait until an interactive handler has demonstrably run.
+
+
+## Private object Storage checks
+
+Run `node --conditions=react-server --test tests/client-document-storage/*.test.mjs`
+for deterministic provider/TUS tests with synthetic keys and mocked fetch.
+`tests/admin-readiness/browser/document-storage.spec.mjs` adds actual Chrome
+desktop/mobile interactions while intercepting Storage/API responses. Existing
+bulk, link, upload, loading and focus tests remain applicable.
+
+`storage.database.test.mjs` requires the same guarded loopback-only Better Auth
+fixture as the other database suites; run after assignments/links/legacy files.
+Apply 004 metadata and the Storage policy twice with an operator and ordinary app
+role, never loading the live .env.local into the test. The disposable database's
+synthetic `storage.objects(bucket_id text)` table enables RLS and deliberately has
+a permissive PUBLIC policy, SELECT/INSERT grants to anon/authenticated and two
+rows (private-fixture, other-bucket). Grant the disposable operator SET ROLE on
+those two NOLOGIN test roles, then apply the reviewed restrictive policy for
+private-fixture. This is a policy stand-in, not Supabase's real Storage schema.
+Real ordinary runtime authorization is checked separately. Provider responses
+remain mocked and assertions reject every non-fixture provider origin.
+The test rejects non-loopback/non-disposable database names and checks the
+runtime's host/database match while requiring a separate non-super/non-BYPASS login.
+
+
+## Selected upload retry and bulk-delete UI coverage
+
+Run document-bulk.spec.mjs and document-bulk-delete.spec.mjs with the existing
+tests/admin-readiness/playwright.config.mjs, with private runtime env settings
+cleared. They test checked/per-row retries, no repeated saved uploads, stable retry
+keys, confirmation cancellation, mixed link/BYTEA/Storage deletion, failed-row
+selection, search filtering, access revocation (JSON and HTML), and client switching.
+These are real Chrome interactions with intercepted synthetic APIs, not live deletes.
+Run the existing simple/link/loading/storage/document fixtures for affected UI
+regressions. Server authorization and archive audit continue through existing routes;
+no new bulk API or database migration was introduced.
+
+
+## Image and PDF preview checks
+
+`node --test tests/document-preview-policy.test.mjs` checks safe MIME/address
+selection, byte-range validation and inline filename encoding. Provider tests
+under tests/client-document-storage cover full/partial streams and rejected
+provider ranges. The disposable storage.database.test.mjs suite adds real runtime
+checks for preview bytes, foreign clients, stale revisions, invalid ranges,
+membership/publisher revocation during a read, unsharing and unsupported source
+preview types. Provider responses in that database suite remain mocked.
+
+Run document-preview.spec.mjs with tests/admin-readiness/playwright.config.mjs for
+desktop and touch Chrome: lazy image loading, collapse/client switch, actual native
+PDF viewer load success, safe download fallback, failed image retry and revoked PDF
+preflight denial. It uses generated PNG/PDF fixtures and intercepted APIs. Chrome's
+headless PDF surface is not reliably captured in screenshots; the native viewer's
+load state is asserted instead. Real mobile Safari/Firefox and deployed CDN behavior
+are not established by these tests.
+
+
+## Permanent byte deletion and reconciliation
+
+Apply documents:storage:lifecycle:migrate twice after Storage version 004 on the
+same guarded disposable DB. The fixtures verify original-name paths, actual
+provider removal, retryable physical deletion, grant-window rechecks, cleanup
+role grants, copied-but-uncommitted rename recovery, mismatched destination
+hash rejection, retained IDs/audit, active/foreign path protection, expired
+pending uploads, concurrent ordinary-role workers and scheduler secret checks.
+Provider fetch remains mocked; no test writes customer objects. Legacy archived
+BYTEA content is asserted empty, with audit rows retained. The cron auth checks
+use a test-only server secret, not an account password.
+
+Run document-cleanup.spec.mjs with the normal admin-readiness browser config for
+desktop/touch pending-cleanup retry, failure feedback and client-switch scoping.
+Normal single/bulk uploads, delete, link, focus/loading and preview suites still
+apply. Production scheduling/CDN and live portal-authenticated UI are separate
+checks; an object-adapter fixture is not evidence of a live portal login.
+
+
+## Client half-resolution previews
+
+`node --test tests/document-image-preview.test.mjs` uses generated real raster
+bytes and sharp to test half dimensions, EXIF orientation, transparency, maximum
+dimensions, original preservation, metadata stripping and rejected active/malformed
+content. No provider call is made. The real disposable files/storage database
+suites exercise thumbnail delivery through current client routes and auth roles,
+including revocation after provider reads. Image bytes there are generated fixtures;
+provider responses remain mocked. Run client-document-preview.spec.mjs alongside
+document-preview.spec.mjs and document-loading.spec.mjs using the normal browser
+config to cover preview-first image cards, original download, deferred PDF viewing,
+fallback, revocation and switching. It uses actual components and generated image/
+PDF responses, not real customer documents or live account credentials.

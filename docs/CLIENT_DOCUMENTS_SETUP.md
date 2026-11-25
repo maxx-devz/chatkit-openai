@@ -421,3 +421,506 @@ See [VERCEL_ENV_SETUP.md](VERCEL_ENV_SETUP.md) for the saved Production and
 client-documents Preview configuration, public certificate packaging, pending
 Preview backend authorization and deployment sequence. The approved-link library
 does not require the optional Client Documents Google OAuth variables.
+
+
+## Approved private Supabase Storage adapter — 2026-11-23
+
+The user explicitly selected private Supabase Storage for larger client documents.
+This is a separate storage architecture decision, not a move to Supabase Auth or
+browser database queries. Existing BYTEA files, IDs, conversations, credits, Drive
+links and Better Auth remain intact. New optional metadata/audit tables use portable
+PostgreSQL; object bytes, signed upload tokens and TUS depend on Supabase Storage.
+Moving those objects to another provider would require a separate export/adapter.
+
+The previous 2 MiB value remains only on the legacy multipart/BYTEA transport.
+The document picker and new direct Storage path have no portal per-file size cap.
+The Supabase project plan, global upload limits, storage capacity, network and the
+server's 300-second validation deadline still bound successful uploads. This is
+not physically unlimited storage. No plan, billing or global provider limit was changed.
+Bulk upload remains 20 files per selection and the direct path limits 30 prepared
+uploads per client/admin per day, including pending attempts, to bound abuse.
+
+Native browser TUS transfers files above 6 MiB in 6 MiB chunks; smaller files use
+an object-scoped signed PUT. Retry state stays in memory in the current tab, never
+localStorage. Refreshing may restart the transfer. Successful metadata/receipts are
+idempotent and stay saved. Each upload receives a generated, immutable private path.
+The service key never goes to the browser; only a one-object upload token does.
+
+The server streams and hashes the complete object before marking it ready or
+sharing it, checks size/version and repeats current administrator/session checks
+before committing. File type validation uses an explicit extension allowlist,
+signature checks and incremental UTF-8 checking. It is not an antivirus scanner
+or full Office/ZIP parser. .exe, installers, unknown extensions and known executable
+signatures are blocked. Source files including HTML, CSS, JavaScript, Python, PHP,
+Liquid and JSON are data; Storage downloads are always attachments. Google native
+cloud files should normally use a Drive link or an Office/PDF export. .gdoc/.gsheet
+shortcuts are stored only as text and are not automatically followed or converted.
+
+### Private configuration and activation
+
+Set privately in `.env.local`, then in the matching Vercel server environment:
+
+- `CLIENT_DOCUMENTS_SUPABASE_URL`: the approved Supabase project URL.
+- `CLIENT_DOCUMENTS_STORAGE_BUCKET`: `client-documents-private`.
+- `CLIENT_DOCUMENTS_SUPABASE_SERVICE_KEY`: a server secret (`sb_secret_...`) or
+  legacy `service_role` JWT from Settings → API Keys. Not a publishable/anon key.
+
+Never use NEXT_PUBLIC for the service key. Do not paste credentials in tickets,
+chat, screenshots or Git. No additional package or Google OAuth setup is required.
+Create a **private** bucket with that exact name through Supabase Storage; leave
+bucket-specific file size/MIME restrictions unset if the project's global limits
+and the portal allowlist should govern uploads. Do not change the plan/global limits.
+
+The reviewed operator applies `004_private_object_storage` using the separate
+private `CLIENT_DOCUMENTS_MIGRATION_DATABASE_URL`. The runtime stays an ordinary
+non-owner role. Example (placeholders, never connection values):
+
+```sh
+npm run documents:storage:migrate -- --confirm-database APPROVED_DATABASE --app-role ORDINARY_RUNTIME_ROLE --allow-remote --supabase-policy
+```
+
+For disposable localhost omit `--allow-remote`. The existing 003 upload migration
+is a prerequisite. The operator also needs ownership/approved policy-management
+authority on `storage.objects` for `--supabase-policy`; ordinary app credentials
+must not receive that authority. A permission error rolls back this transaction.
+Use a privileged SQL Editor session only to run the reviewed, version-controlled
+`database/client-document-storage-supabase.sql` with its bucket setting, then rerun
+the metadata migration with an approved operator. Do not rewrite existing schemas.
+
+The bucket policy is restrictive for all ordinary roles and defeats other broad
+permissive policies for this bucket, leaving unrelated buckets unchanged. Runtime
+preparation and download authorization fail closed if that policy or RLS is missing.
+Service-role credentials intentionally bypass Storage RLS and remain server-only;
+this is not tenant RLS for the portal's metadata tables. Each portal request uses
+existing Better Auth/client permissions and live client-bound queries.
+
+New private downloads require current membership, selected client, revision and
+active publisher, then receive an attachment grant valid for **30 seconds**.
+Unsharing/removal/revocation stops new grants. A copied provider grant can still
+work until expiry, and a download started earlier may finish afterward. One-object
+upload tokens can remain usable for the provider's **two-hour** lifetime after an
+admin loses access, but cannot finalize/publish without fresh portal authorization.
+They cannot overwrite an existing object. These are residual windows, not instant
+revocation. Archiving hides metadata and preserves audit; it does not delete bytes.
+Interrupted/invalid uploads can leave private pending objects. Automatic retention
+cleanup, malware scanning, deployment/CDN behavior and live provider limits need
+separate operational validation; no cleanup worker is implied.
+
+### Verification for this change
+
+- Passed: 413 offline tests, 7 synthetic provider/transfer tests, focused lint,
+  isolated production build, 84 real Chrome desktop/mobile component checks.
+- Disposable PostgreSQL 18: both migrations applied twice, 48 database/API checks
+  across assignments, approved links, legacy uploads, Storage, protected delivery
+  and mocked Google adapters. Actual ordinary app role and real Better Auth used.
+- Storage database checks include same-user workspace switching, forged client IDs,
+  revoked membership/admin, concurrent exact retries, stale revisions, private
+  downloads, invalid bytes and restrictive policies despite broad browser grants.
+- Providers are mocked in all automated suites. Browser APIs are intercepted;
+  this does not establish live Supabase/TUS, Google sharing or deployed CDN behavior.
+- A fixture role-grant/table-name setup failure was corrected. One concurrent
+  response-body read failure occurred during development; it did not recur on the
+  subsequent fresh run with 16 extra concurrent replay reads. Keep it recorded
+  rather than calling repeated failure-free production operation established.
+- Approved Supabase activation (2026-11-23): applied version 004 and the
+  bucket-scoped restrictive policy with the private operator, preserving all
+  existing clients, memberships, assignment/file rows and audit counts. New object
+  metadata rows remain zero. Supabase's delegated policy management permits this
+  without changing storage table ownership or elevating the runtime role.
+- Live activation completed 2026-11-25 after the user privately replaced the
+  publishable key with a server secret. Created `client-documents-private` with
+  `public=false`, no bucket-specific file-size or MIME cap; project limits remain.
+  The already-applied 004 migration and restrictive policy were verified through
+  the ordinary runtime path. Existing record counts were unchanged by activation.
+- Actual provider checks passed: a 3,145,785-byte synthetic JavaScript file used
+  the real signed PUT, full streaming validation, denied public retrieval and a
+  working signed attachment download. A 7 MiB synthetic source used the actual
+  browser transfer helper against live Supabase TUS (POST 201, 6 MiB + 1 MiB PATCH
+  204), then full server-side validation. Portal prepare/complete metadata responses
+  were mocked in that TUS test; no real customer metadata was inserted or published.
+- Live testing found and corrected the signed TUS endpoint: it must be
+  `/storage/v1/upload/resumable/sign`, not the ordinary authenticated endpoint.
+  The existing one-object token remains in x-signature; no service key is sent
+  to the browser. Updated unit/browser fixtures now enforce that signed path.
+- All temporary provider objects were removed. Read-only verification confirmed
+  zero remaining `verification/` objects and zero customer object-metadata rows;
+  existing clients, memberships, links, legacy uploads and audit counts matched
+  the preflight. No real client document was uploaded, edited or published.
+- Current focused lint, 7 provider/transfer fixture tests and the isolated
+  production build passed. The browser rerun passed 83/84: one touch scenario
+  timed out during its initial mocked client-list load, before upload actions.
+  The affected authorization scenario subsequently passed six independent runs
+  (three desktop and three touch), with no application change. The initial timeout
+  remains recorded as a browser fixture flake; it was not a successful full rerun.
+  All six new Storage browser cases passed.
+- Still pending: a user walkthrough with an existing authorized account, deployed
+  Vercel environment/redeployment and live browser-to-provider CORS/CDN behavior.
+  Live TUS was exercised through the real client helper under Node, while browser
+  API/provider traffic remained intercepted. No deployment or Vercel variables
+  were changed. Privately add the three Storage settings to the intended Vercel
+  environments before release. Restart local dev after private env changes.
+  No global plan setting or Neon data was changed. Credentials were not printed,
+  committed or pushed.
+
+
+## Selected retries and bulk library deletion — 2026-11-25
+
+The upload queue now has per-file selection, Select all pending files, Select
+failed files and Retry this file. Retry selected files submits only eligible checked
+rows; saved and invalid entries cannot be selected. Saved uploads are never resent.
+Exact retries retain the existing operation UUID and frozen metadata, including
+an unconfirmed response, so the server can deduplicate them. A file rejected for
+invalid content still needs a corrected source; retrying cannot repair its bytes.
+Queued files and retry selection remain memory-only and client-bound.
+
+The library has row checkboxes, Select shown documents, Clear selection and a red
+Delete selected control. One confirmation identifies the count and selected client.
+Filtering clears hidden selections; changing clients destroys the old selection
+and aborts its current browser request. Requests already committed may still finish
+for the original client. No remaining requests are started after unmount.
+
+Bulk delete calls the existing archive endpoint separately for each selected link,
+legacy BYTEA file or private Storage file. Every call retains its current client,
+revision, authorization, audit and operation receipt. Failed rows remain selected;
+confirmed deletions disappear and are not repeated. Unknown outcomes reuse their
+original operation on retry. Access denial stops further writes and clears data;
+stale revision/setup/throttling conflicts stop the batch for review. Per-request
+timeouts are bounded and non-JSON authorization errors preserve their HTTP status.
+This is portal removal/archival, not permanent object erasure: original Drive files,
+retained upload bytes and audit records stay intact. Existing signed-download
+expiry behavior remains as documented above.
+
+Files: components/admin/document-bulk-upload.js, document-library-table.js,
+client-document-assignments.js and its CSS; browser document-bulk.spec.mjs and
+document-bulk-delete.spec.mjs. No new schema, environment variable or provider
+permission is required. Existing local edits were retained; nothing was pushed.
+
+Actual validation: 36 selected-retry/bulk-delete desktop/mobile Chrome cases plus
+64 affected document regressions passed (100 total); 413 offline tests, focused
+lint, git diff --check and an isolated production build passed. Desktop/mobile
+screenshots were inspected. Browser fixtures intercept all provider/API requests;
+no real customer document was deleted and no remote DB migration was run for this
+UI change. Prior database and live Storage evidence remains separate above.
+User review on /admin/client-documents and deployed verification remain pending.
+
+
+## Empty-library clarity after deletion — 2026-11-25
+
+The user confirmed that the empty table after successful bulk deletion looked
+stuck. Replaced the blank headers/disabled delete strip with a clear folder icon,
+Library is empty heading, completion/first-use explanation and Add a document link
+back to the working form. A filter with no matches has a separate Clear search
+state, so it cannot be mistaken for deleting the whole library. Existing refresh,
+permissions, archive behavior and persisted records are unchanged.
+
+Actual checks: 42 desktop/mobile Chrome upload/delete cases passed, including
+deleting all entries, opening the file picker afterward, first-use emptiness and
+clearing a no-match filter. Focused lint and an isolated production build passed;
+the desktop screenshot was inspected. API/provider calls in these browser checks
+are intercepted fixtures. No database migration, real-client write, Storage change,
+credential change, commit or push was performed for this presentation fix.
+
+
+## Misnamed JPEG/WebP and pending-object retry fix — 2026-11-25
+
+Inspected the reported local flooding-cropped.jpeg header without displaying its
+contents or uploading it. Its actual content is WebP (159,958 bytes). The old
+strict suffix check rejected it. A pending object could remain in private Storage,
+then a retry tried to issue a fresh upload grant for the already-existing path,
+producing a generic provider error rather than completing validation.
+
+Supported raster extensions now detect JPEG, PNG, GIF or WebP from content and
+store the corresponding MIME/filename. Genuine .jpg/.jpeg keep their names.
+A mismatched raster suffix is normalized (this example becomes .webp); bytes are
+not converted, the local original stays unchanged, and custom document titles
+are preserved. Filename-derived default titles follow the corrected filename.
+Unknown formats, executable headers, SVG/HTML disguised as raster and other
+non-image content remain blocked. This is header validation, not malware scanning.
+
+For a pending upload, the server probes only its trusted existing object path and
+expected size. If present, the prepare response skips a second transfer and the
+completion path still streams/hashes the entire file and repeats live authorization
+before saving/publishing. Missing objects still get a one-object upload grant;
+recognized provider missing responses and a concurrent-completion race are handled.
+No overwrite, new object, new retry UUID, cross-client lookup or new permission is
+needed to recover a previously transferred valid image. Changed size is rejected.
+The original operation/actor/client and audit deduplication rules remain intact.
+
+Actual verification: the reported local file now validates as image/webp and
+flooding-cropped.webp, with no local file change. 415 offline checks, 10 provider/
+transfer fixtures, 42 desktop/mobile upload browser checks, focused lint and an
+isolated production build passed. 49 real database/API checks passed on disposable
+WSL PostgreSQL with synthetic accounts and mocked providers. Two earlier runs lost
+the legacy delivery connection when WSL idled/shut down; a foreground WSL keeper
+allowed the fresh full run to complete. The keeper is task-only, not app code.
+
+A live approved Storage check used a generated two-pixel WebP with a .jpeg name:
+first signed upload, existing-object retry, corrected MIME/filename and full
+validation passed; the synthetic object was deleted afterward. No real customer
+image was uploaded or published by these tests. No schema migration, environment
+change, Neon access, commit or push was needed. User review should choose Retry
+this file (or only that selected row) in the existing failed queue; saved siblings
+are not resent. If the queue has been closed, the original file can be selected
+again without manually renaming it. Deployment verification remains separate.
+
+
+## On-demand image and PDF previews - 2026-11-25
+
+In the Admin Document Library, an uploaded PNG, JPEG, WebP, GIF or PDF now has a
+Preview button. Opening the document title also expands its preview; Hide preview
+collapses it. Images fit within the row; PDFs use the browser's native viewer.
+Open full preview and the existing View / download action remain available.
+Unsupported formats and Drive links keep their existing download/open behavior;
+SVG, HTML and source code never become executable inline previews.
+
+Preview loads only on expansion, and switching clients removes it. PDFs first
+check a same-origin, no-store one-byte range so expired access gives a useful
+retry message instead of displaying an HTTP error inside the PDF viewer. This
+request is cancelled when its component closes. The viewer may issue further
+byte-range requests. Development React effect replay can repeat the read-only
+probe; it does not save, publish or duplicate a document.
+
+Private Supabase bytes stream through the existing authenticated delivery route.
+Each request checks current client membership/admin authority, selected client,
+ready/unarchived metadata, revision, private bucket policy and trusted object
+location. Access is checked again after provider headers, before returning bytes.
+Ranges are single, bounded and verified against metadata size/provider headers.
+Responses use private/no-store, nosniff, same-origin resource policy and sanitized
+inline filenames. No service key or public/signed preview URL reaches the UI.
+The legacy BYTEA path also supports these safe preview types. Inline safe files
+have a restrictive default-src/base-uri/form-action/frame-ancestors CSP; downloads
+of other content retain their sandbox policy. A CSP sandbox on native PDF responses
+was removed because it prevents the browser PDF extension from starting.
+
+New requests fail after unsharing, membership/publisher revocation, archival or a
+revision change. Already delivered preview bytes cannot be recalled. Ordinary
+Storage downloads retain their separate 30-second attachment-grant window.
+The client library UI is unchanged by this Admin preview addition.
+
+No migration, new environment variable, auth migration or provider SDK is needed.
+The configured private Storage variables and existing metadata migrations remain
+the prerequisites. No real customer file or database record was changed for this
+preview work; Neon remains untouched. User review and deployed behavior remain
+separate from local checks.
+
+Actual preview verification: 419 offline tests passed, including four new preview
+policy checks; all 11 deterministic provider/transfer tests passed. The eight new
+desktop/touch preview browser cases and 108 existing document browser regressions
+passed. These browser APIs use intercepted fixtures; Chrome's actual PDF extension
+reported successful document loading, not just iframe visibility. Headless PDF
+screenshots do not reliably capture the plugin surface, and other browser engines
+and a user review of real PDFs remain pending.
+
+50 database/API checks passed on fresh disposable WSL PostgreSQL using ordinary
+runtime credentials, synthetic accounts and mocked providers. Initial test runs
+identified a duplicate mode parameter in the test URL and an outdated sandbox
+assertion; both were corrected. PDF browser assertions also account for React
+development effect replay. An overlapping browser-run attempt encountered the
+shared test port; final suites ran sequentially and passed.
+
+A separate approved live Storage transport check uploaded only a generated tiny
+PDF-header fixture, verified full reads and bytes=0-3 partial reads through the
+new provider function, then removed that exact object. It tested transport, not
+real customer PDF rendering or live portal login. The dedicated disposable WSL
+cluster and its four synthetic rehearsal databases were removed afterward; the
+existing main cluster was preserved. Focused lint, git diff --check and an
+isolated production build passed. No commit or push was performed.
+
+
+## Document form layout refresh - 2026-11-25
+
+The Admin add/edit form now uses a white card with an icon/header, client context,
+a dedicated upload area beside the document details, and a separate visibility/save
+footer. Supported-format guidance is expandable rather than filling the dropzone.
+The existing automatic filename title, Google link alternative, optional description,
+drag/drop, multi-file selection and edit/cancel behavior are preserved. Private-draft
+copy follows the sharing checkbox. Mobile stacks the form and makes Save full width.
+The existing portal font, routes, draft preservation, validation, permissions and
+upload/preview/delete handlers remain in use. No new network calls, dependencies,
+environment settings or database changes are introduced by the layout refresh.
+
+Verification of the refreshed form: all 108 existing desktop/touch document cases
+and eight preview cases passed using actual components and intercepted synthetic
+APIs. Desktop and 390px mobile screenshots were inspected; the upload test also
+checks for horizontal overflow. Focused lint, git diff --check and an isolated
+production build passed. No new test-only application path was introduced, and no
+real database/provider writes were made for this visual change. User review and
+deployed verification remain pending. Existing local edits were preserved; no
+commit or push was performed.
+
+
+## Permanent uploaded-file deletion and original filenames - 2026-11-25
+
+This supersedes earlier archive-only byte-retention descriptions. The user asked
+for actual Storage deletion and human filenames. New uploaded objects now use
+clients/<client-id>/<unique-document-id>/<original-filename>; the UUID folder
+prevents same-name uploads from overwriting each other. Ordinary ASCII filenames,
+spaces and punctuation supported by the adapter are preserved; unsupported Unicode
+is normalized to an ASCII-safe object key. The original/validated filename remains
+in portal metadata and download disposition. A portal title is separate from the
+original filename. Editing title, description or sharing changes the Supabase
+PostgreSQL metadata; it does not create another file or rename it to an arbitrary
+display title. Sharing/unsharing retains the file. Drive-link deletion removes only
+the portal link and never edits/deletes its Google original.
+
+Delete now commits revocation/archive plus a durable cleanup receipt, then removes
+the exact uploaded object using the private Storage API and verifies its absence.
+It retains the metadata, hash and audit history. The receipt is needed because a
+PostgreSQL transaction and a remote object operation cannot commit atomically.
+Failed removal is visible as Retry storage cleanup on that client's screen; bulk
+deletion also reports pending physical cleanup. A repeated delete receipt safely
+retries cleanup without another archive or audit entry. Legacy BYTEA uploads clear
+their archived content while preserving audit/metadata; migration 005 changes only
+the archived-row size constraint, leaving active file validation in place.
+
+The worker checks configured origin/bucket, the exact client/document folder and
+current metadata before removal, protects currently active paths, uses row locks
+with SKIP LOCKED and handles bounded batches/backoff. Expired abandoned upload
+attempts are rejected and queued. This is not a bucket-wide delete and never infers
+that an unknown object belongs to a client. Raw provider failures, keys, file bytes
+and signed grants stay out of diagnostic responses/logs.
+
+Upload grant expiry is recorded before external issuance and checked under a row
+lock before granting. Supabase resumable sessions may last 24 hours, so automatic
+abandonment and final cleanup conservatively include that window in addition to
+the two-hour scoped-token window and five-minute margin. Already deleted/retired
+paths are rechecked every five minutes until the final deadline, removing possible
+late completions. Portal revocation is immediate for new reads; bytes already
+delivered cannot be recalled, and existing attachment grants retain their earlier
+documented residual window. Provider reference:
+https://supabase.com/docs/guides/storage/uploads/resumable-uploads
+Object deletion must use Storage API, not its catalog SQL:
+https://supabase.com/docs/guides/storage/management/delete-objects
+
+Apply `npm run documents:storage:lifecycle:migrate -- --confirm-database <name>
+--app-role <ordinary-role>` with CLIENT_DOCUMENTS_MIGRATION_DATABASE_URL privately
+set, plus --allow-remote only for the approved target. No new credentials are
+required. Runtime still needs DATABASE_URL and CLIENT_DOCUMENTS_SUPABASE_URL,
+CLIENT_DOCUMENTS_SUPABASE_SERVICE_KEY and CLIENT_DOCUMENTS_STORAGE_BUCKET, privately
+in .env.local / matching server environment. Do not paste their values into chat.
+The server service key is never exposed to the browser.
+
+New `npm run dev` processes start the independent cleanup watcher automatically
+when these Storage settings are present; its failure never stops Next/Python.
+Restart an already-running development launcher to pick up the new watcher.
+`npm run documents:storage:cleanup` performs one bounded pass with privately loaded
+runtime settings; append -- --watch for a worker. Production needs a separately
+configured scheduler for /api/cron/client-document-cleanup, using existing
+SOURCE_SYNC_SECRET or CRON_SECRET as a 32+ character bearer secret. No scheduler
+or deployment was configured by this task. Configure it privately before relying
+on unattended production retries or expired-upload cleanup.
+
+For old document.ext objects, `npm run documents:storage:reconcile --
+--confirm-database <name> --client <id> --rename` is a read-only dry run. Applying
+requires --apply --actor <approved-active-AOC-admin-user-id>, plus --allow-remote
+for an explicitly approved target. Use the private runtime credentials, not an
+elevated application login. It copies into the deterministic human-name path,
+checks the full content hash, commits the pointer/audit and queues the old key for
+removal. IDs, revision and public portal URLs remain stable. Rerunning recovers
+a completed copy whose DB transaction was interrupted. If a destination hash
+differs, it stops without adopting or overwriting it. Explicit --discard-upload
+<id> is reserved for operator-reviewed abandoned attempts in that same client;
+it rejects their completion and schedules byte deletion. Never use it for a
+current upload. Deleted bytes cannot be restored from metadata/audit alone.
+
+
+Actual approved reconciliation: read-only inventory of gogrit (client 1) found two
+active objects, two archived objects and two abandoned flooding-cropped.jpeg
+attempts from the previously reported failures. Version 005 was rehearsed twice
+on disposable PostgreSQL, then applied to the approved Supabase project only.
+A dry run reported two planned renames and two explicitly selected abandoned
+attempts. The scoped apply renamed both active keys, rejected those two failed
+attempts, removed six obsolete keys (four unwanted objects plus two old keys of
+the retained files), and cleared bytes from three already-archived legacy rows.
+The active customer file bytes were copied only within the existing private
+Supabase bucket, fully hash-checked, and their old copies removed. No document was
+sent to AI or Google. No Neon database was read or modified. No environment file
+or private credential was changed.
+
+A subsequent read-only DB/Storage traversal verified exactly two objects under
+clients/1: CWR Xmas 02 - 2026.png and video.jpg. Both original document IDs,
+revisions and content hashes remained valid; there were zero unreferenced objects
+in that client prefix. Audit/metadata history is retained, with two append-only
+storage-rename entries. Six durable follow-up receipts remain for old upload
+sessions; they contain no retained file bytes. Historical archives in other
+clients were not purged: historical backfill requires an explicitly selected
+client in the admin cleanup request or guarded reconciliation command.
+
+Verification: 421 offline tests and 13 deterministic provider/transfer tests passed.
+54 database/API checks passed against disposable WSL PostgreSQL with synthetic
+accounts, ordinary runtime credentials and mocked providers. This includes cleanup
+retry after initial and later failures, signed-upload late-completion rechecks,
+concurrent worker locking, copied-but-uncommitted rename recovery, unchanged IDs,
+foreign-client denial and cron-secret checks. An initial expanded fixture left
+its own synthetic active document visible to the following delivery suite; it
+was corrected to archive its fixture, and the final full database suites pass.
+Both version 004 and 005 migrations were reapplied idempotently in the rehearsal.
+
+108 existing document browser regressions, eight image/PDF preview cases and four
+new pending-cleanup browser cases passed in desktop/touch Chrome with intercepted
+synthetic APIs. Focused lint, git diff --check and an isolated production build
+passed. A separate live adapter check used a generated text object to verify
+private copy, full hash inspection, repeated deletion and cleanup of the exact
+test keys. That provider fixture is separate from the scoped, user-authorized
+gogrit reconciliation above. Live portal-authenticated browser review, deployed
+CDN behavior and production scheduler verification remain pending. Restart the
+existing development launcher to activate its newly added background worker;
+the current review server was not stopped. No commit, push or deployment occurred.
+
+
+## Client previews and smaller images - 2026-11-25
+
+The client Document Library now shows uploaded image previews first, lazy-loaded
+near the viewport, with Hide preview/Preview controls and original view/download
+links. PDFs open an inline native browser viewer on Preview; a one-byte access
+probe and native byte-range requests keep the initial library from preloading all
+PDFs. PDF bytes are not rasterized, rewritten or reduced in resolution. Drive
+links still open at Google and unsupported uploaded types remain downloadable.
+New source previews are not added. Existing protected-Drive behavior is unchanged.
+
+The user's "divided by 2 resolution" is implemented for raster image previews as
+half oriented width and half oriented height, rounded down (minimum one pixel),
+with a maximum 1,600px long edge and WebP quality 76. Original Storage/BYTEA bytes,
+filenames and downloads remain unchanged. GIF previews use the first frame. The
+existing sharp installation is now an explicit pinned dependency, 0.35.4, in
+package.json/package-lock.json, for reproducible server image processing.
+
+The preview UI is shared under components/documents; the Admin preview remains
+on demand, using its existing full-size private image response. Client list
+metadata includes only the permitted MIME and preview kind, not private object
+paths or signed credentials. Each image preview request repeats the same live
+client/membership/publication/revision checks and rechecks access after image
+conversion, before returning bytes. Client changes remount the library so previous
+preview state and links cannot carry into the next workspace. Responses remain
+private/no-store; no shared thumbnail cache, public URL, external renderer or
+persisted derivative copy is introduced. No new bucket, env variable or migration
+is needed. The existing authentication and private Storage setup still applies.
+
+Thumbnail conversion bounds the original server read to 32 MiB and 40 million
+input pixels, and has a 12-second image-processing deadline. Those are preview
+resource limits only, not new upload limits. Files that cannot be decoded or are
+too large for this bounded conversion retain original view/download, with retry
+feedback. Embedded image metadata is stripped. The first request still reads the
+original from private Storage on the server, so this reduces browser transfer and
+render size without claiming a measured end-to-end speed improvement or lower
+provider egress for the first read. No customer documents were rewritten.
+
+Actual verification: 425 offline tests passed, including true half-dimension,
+orientation, transparency, metadata stripping, pixel/byte safety and invalid-content
+checks. 56 database/API checks passed on disposable WSL PostgreSQL using ordinary
+runtime roles, synthetic users and mocked providers. They cover both Storage and
+legacy BYTEA thumbnails, original-byte preservation, revoked membership during
+provider read, unsharing, stale/foreign IDs and existing upload/delete regressions.
+An initial Storage capability assertion exposed a text-file View link that the
+delivery endpoint would refuse; the capability now matches safe image/PDF types,
+and the full rerun passed. No new source-code inline capability was enabled.
+
+36 desktop/touch Chrome checks passed for new client image/PDF previews plus
+existing Admin previews and client loading/focus/revocation behavior. Client
+image screenshots were inspected at desktop/mobile widths. Browser APIs are
+intercepted fixtures; real image transforms are separately tested in Node and the
+database suites. PDF extension load success is asserted. Focused lint and an
+isolated production build passed. Live authenticated client review, real mobile
+engines and deployed/CDN performance remain pending. The review server was not
+stopped, no env/private account files were changed, and Neon was untouched.
+No commit, push or deployment was performed for this preview addition.

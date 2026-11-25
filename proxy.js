@@ -1,3 +1,4 @@
+import {documentStorageOrigins} from './lib/client-document-storage-config.js';
 import { NextResponse } from "next/server";
 import { DEBUGGER_PORTAL_HEADER, debuggerPageRequest } from "./lib/debugger/routing.js";
 
@@ -14,7 +15,7 @@ export function proxy(request) {
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data:;
     font-src 'self' data:;
-    connect-src 'self';
+    connect-src 'self' ${documentStorageOrigins().join(' ')};
     frame-src 'self' https://cdn.platform.openai.com;
     media-src 'self' blob: data:;
     worker-src 'self' blob:;
