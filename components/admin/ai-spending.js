@@ -3,7 +3,7 @@
 import ActionCue from "@/components/portal-ui/action-cue";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { costStatus, spendingCsv, usd, unpricedReason } from "../../lib/ai-spending-format.js";
+import { costStatus, spendingCsv, clientModelUsageCsv, usd, unpricedReason } from "../../lib/ai-spending-format.js";
 import styles from "./portal-usage.module.css";
 
 export default function AiSpending() {
@@ -40,11 +40,11 @@ export default function AiSpending() {
     };
   }, [month, refresh]);
   const data = snapshot.data?.period === month ? snapshot.data : null;
-  function download() {
+  function download(models=false) {
     if (!data?.ready) return;
-    const url = URL.createObjectURL(new Blob([spendingCsv(data)], { type: "text/csv;charset=utf-8" }));
+    const url = URL.createObjectURL(new Blob([(models?clientModelUsageCsv(data):spendingCsv(data))], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
-    link.href = url; link.download = `client-api-spending-${month}.csv`; link.click();
+    link.href = url; link.download = models?`client-model-usage-${month}.csv`:`client-api-spending-${month}.csv`; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   return <section data-action-card="info" className={styles.spending} aria-labelledby="client-spending-title"><ActionCue tone="info">View costs · Read-only report</ActionCue>
@@ -60,13 +60,17 @@ export default function AiSpending() {
     <div className={styles.spendingActions} role="group" aria-label="Spending report controls">
       <label>UTC month <input type="month" value={month} onChange={event => setMonth(event.target.value)} /></label>
       <button type="button" onClick={() => setRefresh(value => value + 1)}>Refresh costs</button>
-      <button type="button" disabled={!data?.ready} onClick={download}>Export CSV</button>
+      <button type="button" disabled={!data?.ready} onClick={()=>download()}>Export CSV</button>
     </div>
     {snapshot.auditWarning && <p className={styles.notice} role="status">{snapshot.auditWarning}</p>}
     {snapshot.error && <p className={styles.error} role="alert">{snapshot.error}</p>}
     {!data && !snapshot.error && <p role="status">Loading client spending…</p>}
     {data && !data.ready && <p className={styles.notice} role="status">{data.setupMessage}</p>}
     {data?.ready && <>
+      <details className={styles.spendingTable} open><summary>Client usage by model</summary><button type="button" onClick={()=>download(true)}>Export client/model CSV</button><p>Portal-recorded attribution. IDs are shown only when captured for that connection; older records remain “Not recorded.” Costs may be estimates and are separate from organization-wide provider totals.</p>
+        {data.modelUsage?.length?<div style={{overflowX:'auto'}}><table><caption>Client and model usage · {month} UTC</caption><thead><tr><th>Client</th><th>Provider / model</th><th>Organization ID</th><th>Project ID</th><th>Requests</th><th>Input tokens</th><th>Output tokens</th><th>Known cost</th><th>Coverage</th></tr></thead><tbody>{data.modelUsage.map((row,index)=><tr key={index}><td>{row.client}</td><td>{row.provider}<br/>{row.model}</td><td>{row.organizationId||'Not recorded'}</td><td>{row.projectId||'Not recorded'}</td><td>{row.requests}</td><td>{row.inputTokens===null?'Unknown':new Intl.NumberFormat().format(row.inputTokens)}</td><td>{row.outputTokens===null?'Unknown':new Intl.NumberFormat().format(row.outputTokens)}</td><td>{usd(row.knownUsd)}</td><td>{row.unknownEvents?'Partial subtotal':row.estimatedEvents?'Includes estimates':'Provider reported'}</td></tr>)}</tbody></table></div>:<p>No client/model records for this month.</p>}
+        {data.modelUsageTruncated&&<p>Showing the first 500 client/model groups.</p>}
+      </details>
       <div className={styles.spendingTable}>
         <table><caption>Recorded API costs for {month} (UTC)</caption>
           <thead><tr><th>Client</th><th>Known subtotal</th><th>Provider reported</th><th>Estimated</th><th>Coverage</th></tr></thead>

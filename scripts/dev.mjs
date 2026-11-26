@@ -49,7 +49,7 @@ function run(command, args, cwd = root, source = "WEB") {
   child.on("exit", (code) => { if (!stopping) stop(code || 0); });
 }
 
-console.log(formatDevLine("Services: WEB Next.js | CHAT Python | DRIVE source sync | INDEX Hubstaff. Method and status colors are independent.", { color }));
+console.log(formatDevLine("Services: WEB Next.js | CHAT Python | DRIVE source sync | INDEX Hubstaff | FILES document cleanup. Method and status colors are independent.", { color }));
 
 {
   const backendUrl = env.CHATKIT_BACKEND_URL || "http://127.0.0.1:8000";

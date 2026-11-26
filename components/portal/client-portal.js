@@ -112,7 +112,7 @@ function QuickQuestions({ questions }) {
         <h2 id="quick-questions-title">Quick Questions</h2>
       </header>
       {questions.map((question) => (
-        <Link href="/?view=ai" prefetch={false} key={question}>
+        <Link href="/?view=ai" prefetch={false} key={question} hideLinkHint={true}>
           <span>{question}</span>
           <b aria-hidden="true">›</b>
         </Link>

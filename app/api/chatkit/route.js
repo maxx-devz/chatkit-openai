@@ -1,3 +1,4 @@
+import {chatKitPlanErrorMessage,safeChatKitErrorCode} from "@/lib/chatkit-plan-errors";
 import { ASSISTANT_INSTRUCTIONS } from "@/config/assistant";
 import { chatKitBackendUrl, signChatKitRequest } from "@/lib/chatkit-security";
 import {
@@ -130,7 +131,7 @@ async function handlePOST(request) {
     if (!upstream.ok) {
       const details = await upstream.json().catch(() => ({}));
       const uploadMessage = uploadErrorMessage(details.code);
-      const planMessage = {plan_exhausted:"Your AI credits are used up. Open Credits to request more or upgrade your plan.",plan_payment_due:"This month’s plan is waiting for admin payment confirmation.",plan_paused:"Your AI plan is paused. Contact your administrator.",plan_pending:"A reply is running or its usage needs checking. Wait, or contact your administrator.",plan_access_revoked:"Your workspace access changed. Reload the portal."}[details.code] || "";
+      const planMessage = chatKitPlanErrorMessage(details.code);
       const providerMessage = ["provider_encryption_missing", "provider_credentials_unreadable"].includes(details.code)
         ? "The assistant needs an administrator configuration update. Please contact Always Open Commerce." : "";
       // Do not forward hosting-provider HTML, headers, or internal diagnostics.
@@ -141,7 +142,9 @@ async function handlePOST(request) {
         409: "A reply is already running in this conversation. Please wait and try again.",
         429: "The AI provider is busy or its quota was reached. Wait a moment and retry, or contact Always Open Commerce.",
       };
-      console.error("ChatKit backend request failed", { status: upstream.status });
+      const diagnostic = {status:upstream.status,code:safeChatKitErrorCode(details.code)};
+      if(upstream.status===409)console.warn("WARN: ChatKit request conflict",diagnostic);
+      else console.error("ChatKit backend request failed",diagnostic);
       return Response.json({ error: planMessage || uploadMessage || providerMessage || messages[upstream.status] || "The assistant could not connect. Please try again shortly." }, {
         status: planMessage || uploadMessage || messages[upstream.status] ? upstream.status : 503, headers: noStore,
       });

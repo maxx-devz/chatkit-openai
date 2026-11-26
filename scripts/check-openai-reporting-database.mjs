@@ -1,0 +1,44 @@
+// Explicit disposable database only. Never loads .env.local or DATABASE_URL.
+import pg from 'pg';
+import {readClientSpending} from '../lib/ai-spending-repository.js';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {randomUUID} from 'node:crypto';
+import * as secrets from '../lib/provider-secrets.js';
+import {reportingBindingMatches,chatKeyFingerprint,OpenAIReportingError} from '../lib/openai-reporting-pair.js';
+const url=new URL(process.env.OPENAI_PAIR_TEST_DATABASE_URL||'http://missing');
+if(!['127.0.0.1','localhost','[::1]'].includes(url.hostname)||!/^\/aoc_pair_test_[a-z0-9_]+$/.test(url.pathname)||!['postgresql:','postgres:'].includes(url.protocol))throw Error('An explicitly disposable local aoc_pair_test_* database is required.');
+const pool=new pg.Pool({connectionString:url.toString(),max:2,connectionTimeoutMillis:4000});
+const source=await readFile(new URL('../lib/provider-settings.js',import.meta.url),'utf8'),slot=randomUUID();let failAudit=false,checks=0;
+const mocks={...secrets,reportingBindingMatches,OpenAIReportingError,databasePool:pool,resolveAiProvider:()=>({id:'openai'}),providerSetupMessage:()=>'',recordPortalAuditEvent:async db=>{if(failAudit)throw Error('synthetic audit failure');await db.query('INSERT INTO portal_audit_events DEFAULT VALUES');}};
+globalThis[slot]=mocks;
+try{
+ await pool.query("CREATE TABLE portal_clients(id int primary key,name text);INSERT INTO portal_clients VALUES(41,'Synthetic existing client');CREATE TABLE portal_audit_events(id bigserial PRIMARY KEY)");
+ await pool.query(await readFile(new URL('../chatkit_backend/site_ai_schema.sql',import.meta.url),'utf8'));
+ const schema=await readFile(new URL('../database/openai-reporting-pair.sql',import.meta.url),'utf8');await pool.query(schema);await pool.query(schema);const organizationSchema=await readFile(new URL('../database/openai-reporting-organization.sql',import.meta.url),'utf8');await pool.query(organizationSchema);await pool.query(organizationSchema);checks++;
+ const code=`const {${Object.keys(mocks).join(',')}}=globalThis[${JSON.stringify(slot)}];\n`+source.replace(/^import .*;\r?\n/gm,'');const api=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+ const key='sk-proj-synthetic-first-key-123456',adminKey='sk-admin-synthetic-report-key-123456';
+ const reporting={adminKey,binding:{projectId:'proj_A',organizationId:'org-A',chatKeyHash:chatKeyFingerprint(key),checkedAt:new Date().toISOString()}};
+ await api.saveProviderConfiguration('openai',key,'gpt-6-luna','synthetic-owner',{},reporting);checks++;
+ const row=(await pool.query("SELECT * FROM portal_ai_credentials WHERE provider='openai'")).rows[0];assert.equal(secrets.unsealReportingKey(row.encrypted_reporting_key,process.env.PROVIDER_SETTINGS_SECRET),adminKey);assert.ok(!JSON.stringify(row).includes(adminKey));checks++;
+ const runtime=await api.getRuntimeProvider('openai');assert.equal(runtime.defaultHeaders['OpenAI-Project'],'proj_A');assert.equal(runtime.defaultHeaders['OpenAI-Organization'],'org-A');checks++;
+ const publicState=await api.publicProviderSettings();assert.equal(publicState.reportingReady,true);assert.equal(publicState.providers[0].reporting.paired,true);assert.doesNotMatch(JSON.stringify(publicState),/encrypted_reporting_key|sk-admin|chatKeyHash/);checks++;
+ await assert.rejects(api.saveProviderConfiguration('openai',key+'rotated','gpt-6-luna','synthetic-owner',{},reporting));assert.equal((await pool.query("SELECT encrypted_key FROM portal_ai_credentials WHERE provider='openai'")).rows[0].encrypted_key,row.encrypted_key);checks++;
+ await assert.rejects(api.saveProviderConfiguration('openai',key+'rotated','gpt-6-luna','synthetic-owner'));checks++;
+ await api.saveProviderConfiguration('openai','','gpt-6-luna','synthetic-owner');assert.equal((await pool.query("SELECT encrypted_reporting_key FROM portal_ai_credentials WHERE provider='openai'")).rows[0].encrypted_reporting_key,row.encrypted_reporting_key);checks++;
+ const nextKey=key+'next',nextPair={adminKey:adminKey+'next',binding:{scope:'organization',organizationId:'org-A',chatProjectId:'proj_B',chatKeyHash:chatKeyFingerprint(nextKey)}};
+ failAudit=true;await assert.rejects(api.saveProviderConfiguration('openai',nextKey,'gpt-6-luna','synthetic-owner',{},nextPair));assert.equal((await api.getRuntimeProvider('openai')).defaultHeaders['OpenAI-Project'],'proj_A');failAudit=false;checks++;
+ await api.saveProviderConfiguration('openai',nextKey,'gpt-6-luna','synthetic-owner',{},nextPair);assert.equal((await api.getRuntimeProvider('openai')).defaultHeaders?.['OpenAI-Project'],undefined);assert.equal((await api.publicProviderSettings()).providers[0].reporting.paired,true);checks++;
+ await assert.rejects(pool.query("UPDATE portal_ai_credentials SET reporting_binding='{}'::jsonb WHERE provider='openai'"),{code:'23514'});checks++;
+ assert.equal((await pool.query('SELECT count(*)::int n FROM portal_clients WHERE id=41')).rows[0].n,1);checks++;
+ await pool.query(`ALTER TABLE portal_clients ADD COLUMN slug text,ADD COLUMN display_name text;UPDATE portal_clients SET slug='a',display_name='Synthetic Client A';INSERT INTO portal_clients VALUES(42,'Synthetic existing B','b','Synthetic Client B');
+ CREATE TABLE portal_ai_cost_state(id int,started_at timestamptz);INSERT INTO portal_ai_cost_state VALUES(1,'2026-11-01');
+ CREATE TABLE portal_ai_usage_events(request_id uuid,client_id int,action text,started_at timestamptz,cleared_at timestamptz);
+ CREATE TABLE portal_ai_usage_resets(client_id int,period text,reset_before timestamptz);
+ CREATE TABLE portal_ai_cost_events(request_id uuid,client_id int,provider text,model text,kind text,basis text,amount_usd numeric(24,12),input_tokens bigint,output_tokens bigint,reason text,pricing_snapshot jsonb,occurred_at timestamptz,recorded_at timestamptz,cleared_at timestamptz);
+ INSERT INTO portal_ai_cost_events VALUES('00000000-0000-4000-8000-000000000001',41,'openai','gpt-6-astra','chat','estimated',0.01,1000,100,'test','{"connection":{"organizationId":"org-A","projectId":"proj_A"}}','2026-11-02',now(),null),('00000000-0000-4000-8000-000000000002',42,'openai','gpt-6-luna','chat','unknown',null,null,null,'test','{}','2026-11-02',now(),null)`);
+ let usage=await readClientSpending(pool,'2026-11');assert.equal(usage.modelUsage.length,2);assert.equal(usage.modelUsage.find(row=>row.slug==='a').model,'gpt-6-astra');assert.equal(usage.modelUsage.find(row=>row.slug==='a').projectId,'proj_A');assert.equal(usage.modelUsage.find(row=>row.slug==='b').organizationId,null);checks++;
+ await pool.query('UPDATE portal_ai_cost_events SET cleared_at=now() WHERE client_id=42');usage=await readClientSpending(pool,'2026-11');assert.equal(usage.modelUsage.length,1);assert.equal(usage.modelUsage[0].slug,'a');checks++;
+ await pool.query("INSERT INTO portal_ai_usage_resets VALUES(41,'all',now())");assert.equal((await readClientSpending(pool,'2026-11')).modelUsage.length,0);checks++;
+ console.log(`${checks} disposable PostgreSQL checks passed: additive/idempotent migration, encryption, scope, atomic rotation, rollback, model-only reuse, constraints and preserved synthetic client.`);
+}finally{delete globalThis[slot];await pool.end();}

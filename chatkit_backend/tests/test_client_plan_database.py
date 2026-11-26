@@ -57,14 +57,57 @@ class PlanDatabaseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sum(isinstance(v,HTTPException) for v in values),1)
         admitted=next(c for c in contexts if getattr(c,'plan_run_id',None));await finish_plan_reply(admitted)
         next_context=await self.context();await reserve_plan_reply(next_context);await finish_plan_reply(next_context)
-    async def test_missing_cost_and_worker_interruption_fail_closed(self):
+    async def test_completed_reply_missing_usage_blocks_but_interrupted_worker_recovers(self):
         context=await self.context();await reserve_plan_reply(context);await self.cost(context,None);await finish_plan_reply(context)
         row=await (await self.op.execute('SELECT status,credits_used FROM portal_client_plan_runs WHERE id=%s',(context.plan_run_id,))).fetchone()
         self.assertEqual(row['status'],'review');self.assertIsNone(row['credits_used'])
         with self.assertRaises(HTTPException):await reserve_plan_reply(await self.context())
-        # Simulate a worker restart: stale reservations are never assumed free.
+        # The provider expense stays unknown; this unsuccessful client reply is waived.
         await self.op.execute("UPDATE portal_client_plan_runs SET status='running',started_at=NOW()-INTERVAL '4 minutes' WHERE id=%s",(context.plan_run_id,))
+        following=await self.context();await reserve_plan_reply(following)
+        row=await (await self.op.execute('SELECT status,credits_used FROM portal_client_plan_runs WHERE id=%s',(context.plan_run_id,))).fetchone()
+        self.assertEqual(row['status'],'settled');self.assertEqual(row['credits_used'],0)
+        await finish_plan_reply(following)
+    async def test_provider_failure_does_not_charge_or_lock_client_and_logs_safe_diagnostics(self):
+        context=await self.context();await reserve_plan_reply(context);await self.cost(context,None)
+        context.plan_reply_outcome='failed';context.ai_provider=SimpleNamespace(name='openai')
+        context.plan_failure={'code':'insufficient_quota','httpStatus':429,'providerRequestId':'req_fixture','private':'do-not-store'}
+        await finish_plan_reply(context);await finish_plan_reply(context)
+        row=await (await self.op.execute('SELECT status,credits_used FROM portal_client_plan_runs WHERE id=%s',(context.plan_run_id,))).fetchone()
+        self.assertEqual(row['status'],'settled');self.assertEqual(row['credits_used'],0)
+        audit=await (await self.op.execute("SELECT details FROM portal_client_plan_audit WHERE client_id=%s AND action='reply_failed'",(self.client,))).fetchall()
+        self.assertEqual(len(audit),1);self.assertEqual(audit[0]['details']['code'],'insufficient_quota');self.assertEqual(audit[0]['details']['httpStatus'],429)
+        self.assertNotIn('do-not-store',str(audit))
+        ledger=await (await self.op.execute('SELECT basis,amount_usd FROM portal_ai_cost_events WHERE request_id=%s',(context.plan_run_id,))).fetchone()
+        self.assertEqual(ledger['basis'],'unknown');self.assertIsNone(ledger['amount_usd'])
+        following=await self.context();await reserve_plan_reply(following);await finish_plan_reply(following)
+    async def test_cancelled_request_waives_client_charge_but_preserves_provider_expense(self):
+        context=await self.context();await reserve_plan_reply(context);await self.cost(context,Decimal('.004'))
+        context.plan_reply_outcome='cancelled';await finish_plan_reply(context)
+        ledger=await (await self.op.execute('SELECT amount_usd FROM portal_ai_cost_events WHERE request_id=%s',(context.plan_run_id,))).fetchone()
+        self.assertEqual(ledger['amount_usd'],Decimal('.004'))
+        balance=await (await self.op.execute('SELECT used_credits FROM portal_client_plan_balances WHERE client_id=%s',(self.client,))).fetchone();self.assertEqual(balance['used_credits'],0)
+    async def test_recovery_is_scoped_and_new_active_run_still_blocks_concurrent_replies(self):
+        old=await self.context();await reserve_plan_reply(old)
+        await self.op.execute("UPDATE portal_client_plan_runs SET started_at=NOW()-INTERVAL '4 minutes' WHERE id=%s",(old.plan_run_id,))
+        next_context=await self.context();await reserve_plan_reply(next_context)
         with self.assertRaises(HTTPException):await reserve_plan_reply(await self.context())
+        # A late worker cannot debit a run already recovered as interrupted.
+        await self.cost(old,Decimal('.004'));await finish_plan_reply(old)
+        balance=await (await self.op.execute('SELECT used_credits FROM portal_client_plan_balances WHERE client_id=%s',(self.client,))).fetchone();self.assertEqual(balance['used_credits'],0)
+        await finish_plan_reply(next_context)
+    async def test_successful_reply_with_crashed_cleanup_settles_known_cost_once(self):
+        context=await self.context();await reserve_plan_reply(context);await self.cost(context,Decimal('.002'))
+        await self.op.execute("INSERT INTO portal_ai_usage_events(request_id,client_id,actor_user_id,action,status,started_at) VALUES(%s,%s,%s,'client_ai.reply','succeeded',NOW())",(context.plan_run_id,self.client,self.user))
+        await self.op.execute("UPDATE portal_client_plan_runs SET started_at=NOW()-INTERVAL '4 minutes' WHERE id=%s",(context.plan_run_id,))
+        next_context=await self.context();await reserve_plan_reply(next_context);await finish_plan_reply(next_context)
+        row=await (await self.op.execute('SELECT used_credits FROM portal_client_plan_balances WHERE client_id=%s',(self.client,))).fetchone();self.assertEqual(row['used_credits'],2)
+    async def test_successful_reply_with_unknown_usage_is_not_automatically_waived(self):
+        context=await self.context();await reserve_plan_reply(context);await self.cost(context,None)
+        await self.op.execute("INSERT INTO portal_ai_usage_events(request_id,client_id,actor_user_id,action,status,started_at) VALUES(%s,%s,%s,'client_ai.reply','succeeded',NOW())",(context.plan_run_id,self.client,self.user))
+        await self.op.execute("UPDATE portal_client_plan_runs SET started_at=NOW()-INTERVAL '4 minutes' WHERE id=%s",(context.plan_run_id,))
+        with self.assertRaises(HTTPException):await reserve_plan_reply(await self.context())
+        row=await (await self.op.execute('SELECT status,credits_used FROM portal_client_plan_runs WHERE id=%s',(context.plan_run_id,))).fetchone();self.assertEqual(row['status'],'running');self.assertIsNone(row['credits_used'])
     async def test_revoked_foreign_and_paused_memberships_are_denied(self):
         with self.assertRaises(HTTPException):await reserve_plan_reply(await self.context(user='201'))
         await self.op.execute('UPDATE portal_memberships SET is_active=FALSE WHERE client_id=%s',(self.client,))

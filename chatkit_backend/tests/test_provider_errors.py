@@ -80,6 +80,7 @@ class ChatKitProviderStreamTests(unittest.IsolatedAsyncioTestCase):
         # protocol together. Only HTTP and persistence are faked; no paid calls.
         for status, code, can_retry in [(200, "credit_balance_exhausted", False),
                                         (429, "credit_balance_exhausted", False),
+                                        (429, "insufficient_quota", False),
                                         (200, "rate_limit_exceeded", True)]:
             with self.subTest(status=status, code=code):
                 requests = []
@@ -128,6 +129,10 @@ class ChatKitProviderStreamTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(errors[0]["message"], provider_issue(api_error(code)).message)
                 self.assertIn(f"code={code}", "\n".join(logs.output))
                 self.assertNotIn(PRIVATE_MESSAGE, wire + "\n".join(logs.output))
+                self.assertEqual(context.plan_reply_outcome,"failed")
+                self.assertEqual(context.plan_failure["code"],code)
+                if status==200:self.assertNotIn("httpStatus",context.plan_failure)
+                else:self.assertEqual(context.plan_failure["httpStatus"],status)
                 self.assertEqual(len(requests), 1)
                 self.assertTrue(json.loads(requests[0].content)["stream"])
                 # A failed generation still records the attempt; missing token

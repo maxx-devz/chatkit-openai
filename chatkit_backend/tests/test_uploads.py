@@ -80,6 +80,7 @@ class UploadStorageTests(unittest.IsolatedAsyncioTestCase):
         insert = context.db.execute.await_args
         self.assertEqual(insert.args[1][1:3], context.scope)
         self.assertEqual(insert.args[1][-1], b"name,total\nx,42")
+        self.assertTrue(any("SET LOCAL lock_timeout='3s'" in call.args[0] for call in context.db.execute.await_args_list))
         with patch.dict(os.environ, {"CHATKIT_UPLOADS_ENABLED": "false"}):
             context.db.execute.reset_mock()
             with self.assertRaises(UploadError):
@@ -163,7 +164,13 @@ class UploadStorageTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(sent[0]["status"], 200)
             self.assertEqual(upload.await_args.args[0].scope, ("1", "2"))
             self.assertEqual(upload.await_args.args[1:], ("report.csv", b"total\n42"))
-            self.assertEqual(json.loads(sent[1]["body"])["id"], IDENTIFIER)
+            self.assertEqual(json.loads(sent[1]['body'])['id'],IDENTIFIER)
+            for failure,code,status in [(TimeoutError('private detail'),'upload_timeout',504),
+                (type('BusyUpload',(Exception,),{'sqlstate':'55P03'})('private detail'),'upload_busy',409),
+                (type('SlowUpload',(Exception,),{'sqlstate':'57014'})('private detail'),'upload_timeout',504)]:
+                upload.side_effect=failure
+                sent=await post([(b"x-chatkit-timestamp",timestamp),(b"x-chatkit-signature",signature)])
+                self.assertEqual(sent[0]['status'],status);self.assertEqual(json.loads(sent[1]['body'])['code'],code);self.assertNotIn('private detail',str(sent))
 
 
 if __name__ == "__main__":

@@ -134,8 +134,8 @@ npm run dev
 Open <http://127.0.0.1:3000>. Next.js uses port 3000; Python uses port 8000.
 Ctrl+C stops both. Restart this command after Python or environment changes.
 
-`npm run dev` combines local output into timestamped `WEB`, `CHAT`, `DRIVE` and
-`INDEX` lines. Services, methods and statuses use padded, bold badges with explicit
+`npm run dev` combines local output into timestamped `WEB`, `CHAT`, `DRIVE`, `INDEX` and
+`FILES` lines. Services, methods and statuses use padded, bold badges with explicit
 contrasting text/background colors. GET uses black on bright cyan; POST uses black
 on bright magenta (not blue text). Status badges use black on bright green for
 2xx, black on bright cyan for redirects, black on bright yellow for 4xx and white
@@ -345,3 +345,75 @@ domain registration, or deployment health. Those need a real client test.
 - **Port is busy:** stop the existing dev command. Do not kill unrelated processes.
 - **Rollback:** roll back the frontend deployment in Vercel. Keep the additive
   tables and existing data. The removed legacy UI has no environment toggle.
+
+
+### Document cleanup severity (2026-11-26)
+
+The optional document cleanup worker now emits an explicit INFO/WARN summary under
+FILES. A successful check with zero failures is INFO; retryable cleanup failures
+are WARN. The former unprefixed `{ removed: 3, failed: 0 }` message was incorrectly
+classified as ERROR by the logger's generic keyword fallback. Other real errors
+and tracebacks retain their severity. Removal counts include absence/follow-up
+checks for previously deleted files, not necessarily new file deletions.
+
+Restart `npm run dev` to load changes to the launcher, worker or Python backend.
+This follow-up does not change the cleanup schedule, receipts, stored bytes, grants,
+database settings or production logging configuration.
+
+### Concurrent database transaction failure (2026-11-26)
+
+`OutOfOrderTransactionNesting: transaction commit at the wrong nesting level`
+is a Python database failure, not an OpenAI billing or key-validation result.
+ChatKit's event consumer and agent/tool tasks share a request connection. Our
+transaction-local statement-timeout wrapper previously opened a transaction for
+every execute call without coordinating the lifetime of those transactions.
+Overlapping tasks could therefore exit nested transactions in the wrong order,
+breaking thread persistence and subsequent usage, cost-ledger and lease queries.
+HTTP 200 for `/api/chatkit` only confirms that the stream opened.
+
+`chatkit_backend/database.py` now serializes whole transaction scopes per
+connection. Same-task nested savepoints remain supported; child tasks wait for
+the current owner to commit or roll back. Cancellation while waiting does not
+release another task's lock. Different connections remain independent. Keep
+transaction bodies SQL-only and short; do not await a child task that needs the
+same connection while holding its parent's transaction. Existing transaction-local
+10-second statement timeouts and disabled prepared statements remain unchanged.
+No SQL retry, new connection pool, migration or configuration variable is added.
+
+Verification used a fresh, disposable loopback WSL PostgreSQL database and an
+ordinary non-owner, non-superuser runtime role. Before the fix, seven new checks
+produced three failures and one error, including the reported nesting exception.
+After the fix, all seven pass: concurrent queries and cursor results, real scoped
+PostgresStore saves across rollback, nested savepoints, waiting/running task
+cancellation, timeout recovery and independent connections. Existing 13 client-plan
+database tests, two upload database tests and the Node client-plan database checker
+also pass. Another 93 Python connector/provider/stream regressions pass with
+provider responses mocked. No Supabase/Neon data or live AI API was used.
+
+Run the database suite with the existing private disposable fixture variables
+`CLIENT_PLANS_TEST_DATABASE_URL` and `CLIENT_PLANS_TEST_OPERATOR_URL`; the new test
+rejects non-loopback targets or names outside `aoc_documents_<10 hex characters>`:
+
+```powershell
+.venv\Scripts\python.exe -m unittest discover -s chatkit_backend/tests -p test_database_concurrency.py -v
+```
+
+With no private test configuration, database tests skip rather than using the
+configured application database. Stop and restart `npm run dev` to reload Python;
+the current development launcher does not watch Python source for changes. Then
+retry a message through your existing signed-in client account. A paid-provider
+end-to-end retry and the deployed backend remain unverified by these local tests.
+
+### A completed reply still returns 409 / usage needs checking
+
+First distinguish a live request from a completed accounting incident. The former
+now returns `plan_reply_running` (409); a completed unpriced reply returns
+`plan_usage_unavailable` (503), with a safe code in the proxy log. The November 26
+gogrit case had complete token counts for GPT-5.6 Sol but no catalog entry for
+that model. Adding verified model rates fixes future settlement; it does not
+silently rewrite an existing financial record. See CLIENT_PLANS.md for the exact
+read-only investigation, tested reconciliation command and pending approval.
+Restart `npm run dev` after updating Python. No new environment variables or
+database migration are needed. A paid API key does not supply dollar charges for
+each standard OpenAI response; the portal derives its estimates from recorded
+tokens and its explicitly verified price catalog.

@@ -116,3 +116,39 @@ malware detections is not active. Normal size, storage and daily limits remain.
 Uploads fit below [Vercel's request-body limit](https://vercel.com/docs/functions/limitations).
 The frontend forwards one bounded file at a time to the existing signed backend.
 No public file URLs or permanent server filesystem are used.
+
+
+## Attachment timeout diagnostics — 2026-11-26
+
+The attachment save endpoint does not call an AI provider. Upload alone cannot
+exhaust OpenAI credits. A Next.js `TimeoutError` for `/api/chatkit/upload` means
+the signed backend attachment request exceeded its deadline, not a provider billing
+rejection. The historical 47-second proxy timeout was not reproduced during this
+follow-up. Read-only checks found the approved Supabase runtime reachable, with
+the required attachment SELECT/INSERT/DELETE privileges and no blocked sessions
+at the time measured. No live upload or account credentials were used in testing.
+
+Storage now has a three-second transaction-local lock wait limit. The Python
+operation has a 30-second deadline, leaving time to return a structured error
+before the existing 45-second proxy deadline and 60-second route budget. Timeout
+while reading the upstream body is preserved instead of swallowed as malformed
+metadata. User cancellation, unavailable backend, workspace lock contention and
+timeout have distinct safe error codes/messages. Lock conflicts return 409
+`upload_busy`; statement or request timeouts return 504 `upload_timeout`.
+Only fixed stage/code/SQLSTATE diagnostics are logged; no filenames, file bytes,
+signed payloads, database URLs or credentials. There is no automatic upload retry.
+
+Client membership, active-workspace checks, signatures, validation, size/storage
+limits and private cache headers remain enforced. This uses the existing standard
+PostgreSQL schema and connectors; no migration or environment change is required.
+The separate Document Library Storage path is unchanged.
+
+Verification: 434 offline Node tests passed (including 25 focused logger/upload
+cases), 17 focused Python tests passed, focused lint and isolated production build
+passed. A disposable WSL PostgreSQL fixture verified actual byte persistence,
+foreign-owner denial, a roughly three-second row-lock failure with no partial file,
+and one successful save after the lock was released. Fixtures were removed after
+the check. HTTP/provider calls were mocked; a real authenticated upload on the
+user's database still needs user verification. No live database write, migration,
+provider call or private environment edit was made by this follow-up. Code changes
+are local and have not been committed, pushed or deployed.

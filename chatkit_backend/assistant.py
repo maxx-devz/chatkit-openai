@@ -14,6 +14,7 @@ from chatkit.types import UserMessageItem
 from store import Context
 from generation import generation_tools
 from provider_errors import provider_issue
+from plan_failures import failure_diagnostic
 from uploads import AttachmentConverter, MAX_CONTEXT_ATTACHMENTS
 from usage_tracking import record_usage, record_ai_usage_event
 from cost_tracking import record_run_costs, new_cost_request_id
@@ -307,10 +308,14 @@ class PortalChatKitServer(ChatKitServer[Context]):
         except Exception as error:
             stream_failed = True
             issue = provider_issue(error)
+            context.plan_failure = failure_diagnostic(error)
             # Log only our known code, never the provider body, prompt or API key.
-            logger.error("Assistant response failed: %s code=%s", type(error).__name__, issue.code)
+            logger.error("Assistant response failed: %s code=%s http_status=%s provider_request=%s",
+                type(error).__name__,context.plan_failure["code"],context.plan_failure.get("httpStatus"),context.plan_failure.get("providerRequestId"))
             raise CustomStreamError(issue.message, allow_retry=issue.allow_retry) from None
         finally:
+            # Set the outcome before any cancellable cleanup await.
+            context.plan_reply_outcome = "failed" if stream_failed else "succeeded" if result and result.is_complete else "cancelled"
             stream_finished = perf_counter()
             if agent_context is not None:
                 await agent_context.close_stream()
@@ -323,7 +328,8 @@ class PortalChatKitServer(ChatKitServer[Context]):
                 await record_usage(context.db, "client", started_at, usage)
             await record_ai_usage_event(context.db, client_id=context.client_id, user_id=context.user_id,
                 action="client_ai.reply", provider=getattr(context.ai_provider, "name", None),
-                model=context.ai_model, status=status, started_at=started_at, usage=usage, request_id=cost_request_id)
+                model=context.ai_model, status=status, started_at=started_at, usage=usage, request_id=cost_request_id,
+                failure_code=getattr(context,"plan_failure",{}).get("code"))
             await record_run_costs(context, result, request_id=cost_request_id, started_at=started_at, status=status)
             await close_provider_clients(context)
             total_ms = round((perf_counter() - started) * 1000)

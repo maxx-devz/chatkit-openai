@@ -38,3 +38,25 @@ test('Client and unrelated sessions cannot call admin plan APIs or set the audit
  for(const options of [{authorized:false},{origin:false}])assert.equal((await (await route(true,options)).module.POST(request())).status,403);
  const f=await route(true);const response=await f.module.POST(request());assert.equal(response.headers.get('cache-control'),'private, no-store');assert.equal(f.calls[0].actor,'9');
 });
+
+test('Pending usage distinguishes an active reply from an unresolved cost and never enables generation',async()=>{
+ const {balancePresentation}=await import('../lib/credits-presentation.js');
+ const base={configured:true,status:'active',entitled:true,pending:true,remaining:'1149.514325'};
+ for(const pendingState of ['review','running',undefined]) {
+  const state=planAvailability({...base,pendingState});assert.equal(state.canGenerate,false);assert.equal(state.code,'plan_pending');
+  const presentation=balancePresentation({...state,mode:'subscription',configured:true,ready:true,month:{},availableCredits:base.remaining});
+  assert.equal(presentation.label,pendingState==='running'?'Reply in progress':'Contact administrator');
+  assert.equal(state.usageState,pendingState==='running'?'running':'review');
+  assert.match(state.message,pendingState==='running'?/in progress/:/contact your administrator/);
+ }
+});
+
+test('Admin incident messages use allowlisted provider codes and keep HTTP status distinct',async()=>{
+ const {providerIncident}=await import('../lib/provider-incident-policy.js');
+ assert.match(providerIncident({error_code:'insufficient_quota',http_status:'429',provider:'openai'}).message,/billing limit/);
+ assert.equal(providerIncident({error_code:'rate_limit_exceeded',http_status:'429'}).code,'rate_limit_exceeded');
+ assert.match(providerIncident({error_code:'rate_limit_exceeded'}).message,/temporarily rate-limited/);
+ assert.equal(providerIncident({error_code:'private-secret-provider-message',http_status:'secret'}).code,'request_failed');
+ assert.equal(providerIncident({}).httpStatus,'Not supplied');
+ const value=planMutation({action:'release',clientId:'4',runId:randomUUID(),reason:'Release unsuccessful reply without client charge',idempotencyKey:randomUUID(),cost:'1000'});assert.equal(value.cost,undefined);
+});

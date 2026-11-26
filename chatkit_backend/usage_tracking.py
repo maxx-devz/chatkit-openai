@@ -8,10 +8,12 @@ logger = logging.getLogger(__name__)
 
 
 async def record_ai_usage_event(db, *, client_id, user_id, action, provider, model,
-                                status, started_at, usage=None, request_id=None):
+                                status, started_at, usage=None, request_id=None, failure_code=None):
     """Record one user action and its provider run without prompt or reply text."""
     if action not in {"client_ai.reply", "builder.preview"} or status not in {"succeeded", "failed", "cancelled"}:
         raise ValueError("Invalid AI usage event")
+    from plan_failures import SAFE_CODES
+    failure_code = failure_code if failure_code in SAFE_CODES else None
     reported = usage is not None and usage.requests > 0
     counts = (usage.input_tokens, usage.output_tokens, usage.total_tokens) if reported else (None, None, None)
     request_id = request_id or str(uuid4())
@@ -24,13 +26,13 @@ async def record_ai_usage_event(db, *, client_id, user_id, action, provider, mod
                 VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT(request_id) DO NOTHING RETURNING request_id
             ) INSERT INTO portal_integration_runs(source,operation,environment,trigger_type,request_id,
-                actor_user_id,client_id,portal_area,status,started_at,finished_at)
-              SELECT %s,%s,%s,'request',request_id,%s,%s,%s,%s,%s,NOW() FROM recorded""",
+                actor_user_id,client_id,portal_area,status,started_at,finished_at,error_code)
+              SELECT %s,%s,%s,'request',request_id,%s,%s,%s,%s,%s,NOW(),%s FROM recorded""",
                 (request_id, client_id, user_id, action, (provider or "")[:64] or None,
                  (model or "")[:120] or None, status, *counts, started_at,
                  (provider or "ai")[:64], "client_reply" if area == "client_portal" else "builder_preview",
                  os.getenv("VERCEL_ENV", "development")[:32], user_id, client_id, area,
-                 "succeeded" if status == "succeeded" else "failed", started_at))
+                 "succeeded" if status == "succeeded" else "failed", started_at,failure_code))
         except Exception as error:
             logger.error("AI usage event recording failed: %s", type(error).__name__)
 

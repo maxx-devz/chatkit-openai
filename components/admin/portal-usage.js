@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import styles from "./portal-usage.module.css";
 import { providerBillingUrl, providerStatus } from "@/lib/openai-issues";
 import AiSpending from "./ai-spending";
+import OpenAIUsageReport from "./openai-usage-report";
 import ClearAiUsageHistory from "./clear-ai-usage-history";
 
 const number = value => new Intl.NumberFormat().format(Number(value) || 0);
@@ -70,6 +71,7 @@ export default function PortalUsage() {
         <div><h2 id="portal-usage-title">AI chat usage & provider status</h2><p>Recorded chat activity and the latest {providerLabel} API result. Client credit limits follow their active plans.</p></div>
         <button type="button" onClick={() => refreshRef.current?.()}>Refresh usage</button>
       </div>
+      <OpenAIUsageReport />
       {snapshot.auditWarning && <p className={styles.notice} role="status">{snapshot.auditWarning}</p>}
       {error && <p className={styles.error} role="alert">{error} {data ? "The figures below are from the last successful refresh." : ""}</p>}
       {!data && !error && <p role="status">Loading usage...</p>}

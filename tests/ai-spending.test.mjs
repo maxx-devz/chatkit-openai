@@ -23,6 +23,7 @@ test("spending queries preserve decimal strings, missing costs and client scope"
   const result = await readClientSpending({ query: async (sql, values) => {
     if (++count === 1) return { rows: [{ started_at: "2026-10-28T00:00:00Z" }] };
     assert.deepEqual(values, ["2026-10-01T00:00:00.000Z", "2026-11-01T00:00:00.000Z"]);
+    if(count===3){assert.match(sql,/pricing_snapshot/);assert.match(sql,/LIMIT 501/);return {rows:[]};}
     assert.match(sql, /c\.id/);
     assert.match(sql, /e\.action='client_ai.reply'/);
     assert.match(sql, /NOT EXISTS/);
@@ -58,4 +59,8 @@ test("status distinguishes estimates, reported charges, empty and partial histor
   assert.match(costStatus({ events: 1, estimatedEvents: 1 }), /estimates/);
   assert.match(costStatus({ events: 1, reportedEvents: 1 }), /Provider-reported/);
   assert.match(costStatus({ events: 1, reportedEvents: 1, partialHistory: true }), /Partial history/);
+});
+
+test('client/model breakdown preserves recorded identity and unknown historical metadata',async()=>{
+ let calls=0;const report=await readClientSpending({query:async()=>({rows:++calls===1?[{started_at:'2026-10-01T00:00:00Z'}]:calls===2?[]:[{name:'Client A',slug:'a',provider:'openai',model:'gpt-6-astra',organization_id:'org-A',project_id:null,requests:2,input_tokens:'1000',output_tokens:null,known_usd:'0.012345678900',unknown_events:1,estimated_events:1}]})},'2026-10');assert.equal(report.modelUsage[0].client,'Client A');assert.equal(report.modelUsage[0].organizationId,'org-A');assert.equal(report.modelUsage[0].projectId,null);assert.equal(report.modelUsage[0].outputTokens,null);assert.equal(report.modelUsage[0].knownUsd,'0.012345678900');
 });

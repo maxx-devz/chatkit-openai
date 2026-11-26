@@ -45,3 +45,18 @@
 
 .card { background:var(--portal-card-background,#fff); border-color:var(--portal-card-border,#d7e5f2); box-shadow:var(--portal-card-shadow); }
 .header { flex-wrap:wrap; }.body :is(input,select) { min-height:42px; }
+
+.reportingPanel { grid-column:1/-1; background:linear-gradient(125deg,#f0f7ff,#fbfdff); border:1px solid #bfd8f5; border-radius:14px; padding:22px; min-width:0; }
+.reportingTitle { display:flex; align-items:flex-start; gap:12px; margin-bottom:20px; }
+.reportingTitle>span:first-child { display:grid;place-items:center;flex-shrink:0;background:#dbeeff;color:#076bc1;border-radius:10px;width:38px;height:38px;font-size:22px; }
+.reportingTitle h3 { margin:0 0 6px;font-size:16px; }
+.reportingTitle p,.reportingHelp { margin:0;color:#526b88;font-size:12px;line-height:1.6; }
+.reportingStatus { margin-left:auto;white-space:nowrap;border-radius:20px;padding:6px 10px;background:#e1edff;color:#095db0;font-size:11px; }
+.reportingFields { display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:16px; }
+.reportingFields label { display:flex; flex-direction:column;gap:8px;font-size:12px;font-weight:600;min-width:0; }
+.reportingFields input { width:100%;min-width:0;box-sizing:border-box;border:1px solid #afc9e8;background:#fff;color:#123b65;border-radius:8px;padding:12px; }
+.reportingFields small { font-weight:400;font-size:11px;line-height:1.5;color:#526b88; }
+.reportingHelp { margin:16px 0 8px; }
+@media(max-width:900px){.reportingFields{grid-template-columns:1fr}.reportingPanel{padding:16px}.reportingTitle{flex-wrap:wrap}.reportingStatus{margin-left:50px}}
+
+.reportingFields { grid-template-columns:minmax(0,1fr);max-width:720px; }

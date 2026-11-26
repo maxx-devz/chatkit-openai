@@ -10,7 +10,7 @@ import styles from "./provider-settings.module.css";
 
 const names = { openai: "OpenAI", openrouter: "OpenRouter" };
 const emptyDraft = () => ({ key: "", model: "", reasoningEffort: "auto", models: [], verified: false, catalogProvider: "",
-  freeOnly: true, query: "", account: null });
+  freeOnly: true, query: "", account: null, adminKey:"" });
 
 async function settingsRequest(method = "GET", body) {
   const response = await fetch("/api/admin/provider-settings", {
@@ -59,10 +59,14 @@ export default function ProviderSettings() {
     setDrafts((current) => ({ ...current, [selected]: { ...current[selected], ...values } }));
     setNotice(""); setError("");
   }
+  const needsPair=selected==='openai'&&Boolean(draft.key||draft.adminKey||!saved?.reporting?.paired);
+  const pairComplete=!needsPair||Boolean(draft.adminKey);
+  const reportingInput=selected==='openai'&&draft.adminKey?{reporting:{adminKey:draft.adminKey}}:{};
+  function editReporting(values){updateDraft({...values,verified:false,models:[]});}
   async function loadModels() {
     setBusy("load"); setNotice(""); setError("");
     try {
-      const catalog = await settingsRequest("POST", { provider: selected, apiKey: draft.key });
+      const catalog = await settingsRequest("POST", { provider: selected, apiKey: draft.key,...reportingInput });
       if (!mounted.current) return;
       if (!catalog.verified || catalog.provider !== selected || !Array.isArray(catalog.models)) {
         throw new Error("The provider did not return a verified model list. Please retry.");
@@ -84,7 +88,7 @@ export default function ProviderSettings() {
     try {
       const modelId = selectedProviderModel(selected, draft);
       const data = await settingsRequest("PUT", { provider: selected, apiKey: draft.key, model: modelId,
-        generationOptions: { reasoningEffort: draft.reasoningEffort } });
+        generationOptions: { reasoningEffort: draft.reasoningEffort },...reportingInput });
       if (!mounted.current) return;
       const confirmed = data.providers.find((item) => item.id === selected);
       if (data.activeProvider !== selected || confirmed?.model !== modelId || data.activation?.id !== modelId
@@ -92,7 +96,7 @@ export default function ProviderSettings() {
         throw new Error("The server did not confirm this model as active. Reload settings before retrying.");
       }
       setSettings(data);
-      setDrafts((current) => ({ ...current, [selected]: { ...current[selected], key: "", account: data.account || null } }));
+      setDrafts((current) => ({ ...current, [selected]: { ...current[selected], key: "",adminKey:"", account: data.account || null } }));
       setNotice(`${names[selected]} configuration saved: ${confirmed.model}. Connection metadata checked; a chat reply has not been tested.`);
       window.dispatchEvent(new Event("aoc:provider-settings-changed"));
       window.dispatchEvent(new Event("aoc:ai-usage-changed"));
@@ -138,7 +142,7 @@ export default function ProviderSettings() {
               placeholder={saved?.configured ? `Saved key ending ${saved.keySuffix} — leave blank to reuse` : selected === "openrouter" ? "sk-or-v1-…" : "sk-…"}
               onChange={(event) => updateDraft({ key: event.target.value.trim(), verified: false, models: [], catalogProvider: "", account: null })} />
             <button type="button" className={styles.secondary} onClick={loadModels}
-              disabled={Boolean(busy) || !settings?.ready || (!draft.key && !saved?.configured)}>
+              disabled={Boolean(busy) || !settings?.ready || (!draft.key && !saved?.configured) || !pairComplete || (selected==="openai"&&!settings?.reportingReady)}>
               {busy === "load" ? "Checking…" : "Verify & load models"}
             </button>
           </div>
@@ -161,6 +165,15 @@ export default function ProviderSettings() {
             <p>This portal never changes those account policies or silently switches to a paid model. Metadata checks do not test generation.</p>
           </details>
         </aside>}
+        {selected==='openai'&&<section className={styles.reportingPanel} aria-label="OpenAI reporting connection">
+          <div className={styles.reportingTitle}><span aria-hidden="true">↗</span><div><h3>Keep chat and reporting together</h3><p>{needsPair?'Enter your reporting key. Usage and costs cover its whole OpenAI organization.':'Your keys are saved together. Model-only changes keep the reporting connection.'}</p></div><span className={styles.reportingStatus}>{saved?.reporting?.paired?'Paired':'Setup needed'}</span></div>
+          {!settings?.reportingReady&&<p role="alert" className={styles.error}>Paired reporting needs a database update. Run npm run site-ai:migrate against your approved database first.</p>}
+          <div className={styles.reportingFields}>
+            <label htmlFor="provider-admin-key">Organization Admin API key<input aria-label="Organization Admin API key" id="provider-admin-key" type="password" autoComplete="new-password" spellCheck={false} maxLength={512} value={draft.adminKey} disabled={Boolean(busy)||!settings?.reportingReady} placeholder={saved?.reporting?.paired&&!draft.key?'Leave blank to keep the paired reporting key':'sk-admin-…'} onChange={event=>editReporting({adminKey:event.target.value.trim()})}/><small>Required whenever you enter a replacement chat key. Saved encrypted; never shown again.</small></label>
+          </div>
+          <p className={styles.reportingHelp}>The reporting key needs Usage read and Costs read permissions. Verification uses read-only requests and does not generate a reply. Organization-wide totals can include other apps. Matching organizations are checked when OpenAI supplies their IDs; missing metadata is never guessed.</p>
+          <a href="https://platform.openai.com/settings/organization/admin-keys" target="_blank" rel="noreferrer">Get an organization Admin key ↗</a>
+        </section>}
         <div className={styles.field}>
           <label htmlFor="provider-model">Model for the entire portal</label>
           {selected === "openrouter" && <div className={styles.modelFilters}>
@@ -209,12 +222,12 @@ export default function ProviderSettings() {
       <footer className={styles.actions}>
         <p>{active?.configured ? <>Currently using <strong>{active.model}</strong></> : "No saved provider connection yet."}<br />Existing replies are not interrupted when you switch.</p>
         <button data-action="warning" type="button" className={styles.primary} onClick={save}
-          disabled={Boolean(busy) || !draft.verified || !draft.model || !settings?.ready || modelBlocked(selectedModel)
+          disabled={Boolean(busy) || !draft.verified || !draft.model || !settings?.ready || !pairComplete || (selected==="openai"&&!settings?.reportingReady) || modelBlocked(selectedModel)
             || (selected === "openrouter" && draft.freeOnly && !selectedModel?.free)}>
           {busy === "save" ? "Saving…" : `Save & activate ${names[selected]}`}
         </button>
       </footer>
-      <p className={styles.testDisclosure}>Saving verifies the key and model list only; it does not generate a reply or consume generation tokens.
+      <p className={styles.testDisclosure}>Saving verifies the model list and, when entered, the paired reporting connection. It does not generate a reply or consume generation tokens.
         This is connection/model verification, not a billing-capacity check. Actual chat requests use your provider&apos;s API credits or free-model allowance. ChatGPT plan access is separate from API billing.</p>
       <aside className={styles.database}>
         <span className={styles.dot} aria-hidden="true" />

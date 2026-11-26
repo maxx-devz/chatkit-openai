@@ -31,7 +31,7 @@ def unseal_provider_key(provider, value, secret):
 
 async def load_provider_settings(db):
     try:
-        cursor = await db.execute("""SELECT c.provider,c.encrypted_key,s.model,to_jsonb(s)->'generation_options' AS generation_options,(a.provider=c.provider) AS active
+        cursor = await db.execute("""SELECT c.provider,c.encrypted_key,s.model,to_jsonb(s)->'generation_options' AS generation_options,to_jsonb(c)->'reporting_binding' AS reporting_binding,(a.provider=c.provider) AS active
             FROM portal_ai_credentials c LEFT JOIN portal_site_ai_settings s ON s.provider=c.provider
             LEFT JOIN portal_ai_active_provider a ON a.id=1""")
         rows = await cursor.fetchall()
@@ -64,10 +64,25 @@ async def load_provider_settings(db):
                 # Hosted-only tools already check has_openai_hosted_key and
                 # remain unavailable; ordinary OpenRouter chat can continue.
                 openai_key = ""
+    headers = {"X-OpenRouter-Title": "Always Open Commerce Portal"} if router else {}
+    binding = active.get("reporting_binding") or {}
+    if not router and binding.get("chatKeyHash") == hashlib.sha256(active_key.encode()).hexdigest():
+        import re
+        if re.fullmatch(r"proj_[A-Za-z0-9_-]{1,160}", binding.get("projectId", "")) and re.fullmatch(r"org-[A-Za-z0-9_-]{1,160}", binding.get("organizationId", "")):
+            headers = {"OpenAI-Organization": binding["organizationId"], "OpenAI-Project": binding["projectId"]}
+    identity = {}
+    if not router and binding.get("chatKeyHash") == hashlib.sha256(active_key.encode()).hexdigest():
+        import re
+        observed_organization = binding.get("chatOrganizationId")
+        if not observed_organization and (binding.get("organizationMatch") == "verified" or binding.get("projectId")):
+            observed_organization = binding.get("organizationId")
+        for name, value in [("organizationId", observed_organization), ("projectId", binding.get("chatProjectId") or binding.get("projectId"))]:
+            if isinstance(value, str) and re.fullmatch(r"org-[A-Za-z0-9_-]{1,160}" if name == "organizationId" else r"proj_[A-Za-z0-9_-]{1,160}", value):
+                identity[name] = value
     return ProviderConfig(active["provider"], "OpenRouter" if router else "OpenAI", active_key,
                           OPENROUTER_BASE_URL if router else None, active["model"],
-                          {"X-OpenRouter-Title": "Always Open Commerce Portal"} if router else {}, openai_key,
-                          active.get("generation_options") or {})
+                          headers, openai_key,
+                          active.get("generation_options") or {}, identity)
 
 
 async def close_provider_clients(context):

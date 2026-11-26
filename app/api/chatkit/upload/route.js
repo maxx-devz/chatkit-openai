@@ -9,6 +9,7 @@ export const maxDuration = 60;
 const headers = { "Cache-Control": "private, no-store" };
 
 export async function POST(request) {
+  let upstreamTimeout;
   try {
     assertTrustedOrigin(request.headers);
     const context = await getPortalAiContext(request.headers);
@@ -22,16 +23,19 @@ export async function POST(request) {
       instructions: "", payload });
     const url = chatKitBackendUrl(process.env.CHATKIT_BACKEND_URL || "http://127.0.0.1:8000");
     url.pathname = "/chatkit/upload";
+    upstreamTimeout = AbortSignal.timeout(45_000);
     const upstream = await fetch(url, {
       method: "POST", headers: { "Content-Type": "application/json", ...signChatKitRequest(body, process.env.CHATKIT_BACKEND_SECRET),
         ...(process.env.CHATKIT_VERCEL_PROTECTION_BYPASS ? { "x-vercel-protection-bypass": process.env.CHATKIT_VERCEL_PROTECTION_BYPASS } : {}) },
       body, redirect: "error", cache: "no-store",
-      signal: AbortSignal.any([request.signal, AbortSignal.timeout(45_000)]),
+      signal: AbortSignal.any([request.signal, upstreamTimeout]),
     });
-    const data = await upstream.json().catch(() => ({}));
+    let data;
+    try { data=await upstream.json(); }
+    catch(error) { if(upstreamTimeout.aborted||request.signal.aborted||['TimeoutError','AbortError'].includes(error?.name))throw error;throw new UploadRequestError('upload_failed',502); }
     if (!upstream.ok) {
       const message = uploadErrorMessage(data.code);
-      return Response.json({ error: message || uploadErrorMessage("upload_failed") }, {
+      return Response.json({ code:message?data.code:"upload_failed",error: message || uploadErrorMessage("upload_failed") }, {
         status: message ? upstream.status : 503, headers,
       });
     }
@@ -43,7 +47,16 @@ export async function POST(request) {
   } catch (error) {
     const known = requestSecurityErrorResponse(error) || (error?.publicDetails ? portalErrorResponse(error) : null);
     if (known) { known.headers.set("Cache-Control", "private, no-store"); return known; }
-    if (error instanceof UploadRequestError) return Response.json({ error: error.message }, { status: error.status, headers });
+    if (error instanceof UploadRequestError) return Response.json({ code:error.code,error: error.message }, { status: error.status, headers });
+    if(request.signal.aborted)return Response.json({code:'upload_cancelled',error:uploadErrorMessage('upload_cancelled')},{status:408,headers});
+    if(upstreamTimeout?.aborted||error?.name==='TimeoutError') {
+      console.warn('WARN: ChatKit upload backend timed out',{code:'upload_timeout',timeoutMs:45000});
+      return Response.json({code:'upload_timeout',error:uploadErrorMessage('upload_timeout')},{status:504,headers});
+    }
+    if(['ECONNREFUSED','ECONNRESET','ENOTFOUND','ETIMEDOUT'].includes(error?.cause?.code)) {
+      console.error('ChatKit upload backend connection failed',{code:'upload_backend_unavailable',cause:error.cause.code});
+      return Response.json({code:'upload_backend_unavailable',error:uploadErrorMessage('upload_backend_unavailable')},{status:503,headers});
+    }
     console.error("ChatKit upload proxy failed", { name: error?.name });
     return Response.json({ error: uploadErrorMessage("upload_failed") }, { status: 503, headers });
   }

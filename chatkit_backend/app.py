@@ -122,7 +122,10 @@ async def cleanup(db, context, token):
     with anyio.CancelScope(shield=True):
         try:
             if context:
-                await finish_plan_reply(context)
+                try:
+                    await finish_plan_reply(context)
+                except Exception as error:
+                    logger.error("Client reply settlement will recover on next request: %s",type(error).__name__)
             if context and token:
                 await db.execute("""
                     DELETE FROM portal_chatkit_leases WHERE client_id=%s AND user_id=%s AND token=%s
@@ -199,6 +202,8 @@ async def chatkit(request: Request):
         if parsed.type in GENERATE:
             context.ai_provider = await load_provider_settings(db)
             if not provider_config(context).api_key:
+                context.plan_reply_outcome = "failed"
+                context.plan_failure = {"code":"provider_configuration_failed"}
                 raise HTTPException(503, "Backend is not configured")
             context.ai_model = context.ai_provider.model
             message = getattr(parsed.params, "input", None)
@@ -222,6 +227,9 @@ async def chatkit(request: Request):
                 except asyncio.CancelledError:
                     raise
                 except Exception as error:
+                    context.plan_reply_outcome = "failed"
+                    if not getattr(context,"plan_failure",None):
+                        context.plan_failure = {"code":"request_timeout" if isinstance(error,TimeoutError) else "request_failed"}
                     logger.error("ChatKit stream failed: %s", type(error).__name__)
                     event = ErrorEvent(message="The reply was interrupted. Please try again.", allow_retry=True)
                     yield ("data: " + event.model_dump_json() + "\n\n").encode()
@@ -231,6 +239,9 @@ async def chatkit(request: Request):
             return StreamingResponse(events(), media_type="text/event-stream", headers=NO_STORE)
         return Response(result.json, media_type="application/json", headers=NO_STORE)
     except ProviderSettingsError as error:
+        if context:
+            context.plan_reply_outcome = "failed"
+            context.plan_failure = {"code":"provider_configuration_failed"}
         logger.error("ChatKit provider configuration failed: %s", error.code)
         return JSONResponse({"code": error.code, "error": "The assistant needs an administrator configuration update."},
                             status_code=503, headers=NO_STORE)
@@ -268,13 +279,19 @@ async def upload(request: Request):
         content = base64.b64decode(payload["content"], validate=True)
         if len(content) > MAX_FILE_BYTES:
             raise UploadError("upload_too_large", 413)
-        async with asyncio.timeout(40):
+        stage="connect"
+        async with asyncio.timeout(30):
             async with await connect_database(os.environ["DATABASE_URL"]) as db:
+                stage="authorize"
                 client = await load_client(db, envelope)
                 context = Context(db, envelope.client_id, envelope.user_id, "", client)
+                stage="store"
                 attachment = await upload_file(context, payload["filename"], content)
                 return JSONResponse(attachment.model_dump(mode="json", exclude_none=True,
                     context={"exclude_metadata": True}), headers=NO_STORE)
+    except TimeoutError:
+        logger.warning("WARN: ChatKit upload timed out stage=%s code=upload_timeout",locals().get("stage","request"))
+        return JSONResponse({"code":"upload_timeout"},504,headers=NO_STORE)
     except UploadError as error:
         return JSONResponse({"code": error.code}, error.status, headers=NO_STORE)
     except (ValueError, ValidationError):
@@ -282,6 +299,11 @@ async def upload(request: Request):
     except HTTPException as error:
         return JSONResponse({"error": error.detail}, error.status_code, headers=NO_STORE)
     except Exception as error:
-        logger.error("ChatKit upload failed: %s", type(error).__name__)
-        code = "uploads_not_configured" if getattr(error, "sqlstate", None) == "42P01" else "upload_failed"
+        sqlstate=getattr(error,"sqlstate",None)
+        if sqlstate in ("55P03","40P01","57014"):
+            code="upload_timeout" if sqlstate=="57014" else "upload_busy"
+            logger.warning("WARN: ChatKit upload interrupted stage=%s code=%s sqlstate=%s",locals().get("stage","request"),code,sqlstate)
+            return JSONResponse({"code":code},504 if code=="upload_timeout" else 409,headers=NO_STORE)
+        logger.error("ChatKit upload failed: %s stage=%s", type(error).__name__,locals().get("stage","request"))
+        code = "uploads_not_configured" if sqlstate == "42P01" else "upload_failed"
         return JSONResponse({"code": code}, 503, headers=NO_STORE)

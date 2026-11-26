@@ -122,6 +122,9 @@ async def upload_file(context, filename, content):
         raise UploadError("upload_daily_limit", 429)
     identifier = "atc_" + uuid4().hex
     async with context.db.transaction():
+        # Fail promptly when another transaction holds the workspace row, rather
+        # than consuming the entire HTTP upload deadline while waiting for a lock.
+        await context.db.execute("SET LOCAL lock_timeout='3s'")
         # Serialize storage reservations across all users of this client.
         await context.db.execute("SELECT id FROM portal_clients WHERE id=%s FOR UPDATE", (context.client_id,))
         await context.db.execute("""DELETE FROM portal_chatkit_uploads WHERE client_id=%s

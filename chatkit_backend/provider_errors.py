@@ -19,7 +19,7 @@ class ImageGenerationError(Exception):
         super().__init__(issue.code)
 
 
-CONTACT = "Please contact Always Open Commerce."
+CONTACT = "Please contact your administrator. Your available portal credits are unchanged."
 ISSUES = {
     "provider_policy_restricted": ProviderIssue(
         "provider_policy_restricted",
