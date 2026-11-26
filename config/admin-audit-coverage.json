@@ -316,5 +316,14 @@
     "operation": "admin.client_document_storage.download",
     "recording": "Read-only; no change-audit entries",
     "auditedMethods": []
+  },
+  {
+    "route": "/api/admin/openai-usage",
+    "methods": [
+      "GET"
+    ],
+    "operation": "admin.openai_usage",
+    "recording": "Read-only; no change-audit entries",
+    "auditedMethods": []
   }
 ]

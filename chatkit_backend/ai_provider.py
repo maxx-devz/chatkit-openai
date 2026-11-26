@@ -35,6 +35,7 @@ class ProviderConfig:
     default_headers: dict[str, str]
     openai_key: str = field(default="", repr=False)
     generation_options: dict = field(default_factory=dict)
+    reporting_identity: dict = field(default_factory=dict)
 
 
 def provider_config(context=None):

@@ -169,5 +169,18 @@ class ProviderSettingsTests(unittest.IsolatedAsyncioTestCase):
                                  free_guard if provider == "openrouter" and new_model == "openrouter/free" else None)
 
 
+
+
+
+class ReportingProjectBindingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_chat_headers_follow_the_saved_project_and_ignore_a_rotated_key_binding(self):
+        key = "synthetic-chat-key"
+        for fingerprint, expected in [(hashlib.sha256(key.encode()).hexdigest(), {"OpenAI-Organization": "org-A", "OpenAI-Project": "proj_A"}), ("0" * 64, {})]:
+            db = AsyncMock()
+            db.execute.return_value.fetchall.return_value = [{"provider": "openai", "encrypted_key": seal_fixture("openai", key), "model": "synthetic", "active": True, "reporting_binding": {"chatKeyHash": fingerprint, "organizationId": "org-A", "projectId": "proj_A"}}]
+            with patch.dict(os.environ, {"PROVIDER_SETTINGS_SECRET": SECRET}):
+                config = await load_provider_settings(db)
+            self.assertEqual(config.default_headers, expected)
+
 if __name__ == "__main__":
     unittest.main()

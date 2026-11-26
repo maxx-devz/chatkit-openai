@@ -69,7 +69,11 @@ def observation(provider, model, raw_usage, *, kind="chat", today=None, api=None
     if not rate:
         result["reason"] = "model_price_not_verified"
         return result
-    if (today or datetime.now(timezone.utc).date()) > date.fromisoformat(CATALOG["reviewAfter"]):
+    pricing_date = today or datetime.now(timezone.utc).date()
+    if (rate.get("effectiveFrom") and pricing_date < date.fromisoformat(rate["effectiveFrom"])):
+        result["reason"] = "model_price_not_verified"
+        return result
+    if pricing_date > date.fromisoformat(rate.get("reviewAfter", CATALOG["reviewAfter"])):
         result["reason"] = "pricing_review_required"
         return result
     if None in (inputs, outputs, cached, writes) or cached + writes > inputs:
@@ -83,9 +87,9 @@ def observation(provider, model, raw_usage, *, kind="chat", today=None, api=None
               + Decimal(outputs) * Decimal(rate["outputPerMillion"]) * output_factor) / Decimal(1000000)
     result.update(basis="estimated", amount=money(amount), reason="published_standard_token_rates",
                   pricing={"version": CATALOG["version"], "source": (
-                      "https://developers.openai.com/api/docs/guides/decisions" if decision else CATALOG["source"]),
+                      "https://developers.openai.com/api/docs/guides/decisions" if decision else rate.get("source", CATALOG["source"])),
                            **({"endpoint": "/v1/decisions"} if decision else {}),
-                           "verifiedAt": CATALOG["verifiedAt"], "currency": "USD", "rate": rate,
+                           "verifiedAt": rate.get("verifiedAt", CATALOG["verifiedAt"]), "currency": "USD", "rate": rate,
                            "longContext": long_context, "cacheWriteTokens": writes,
                            "cacheWriteFieldReported": "cache_write_tokens" in details})
     return result
@@ -116,6 +120,10 @@ async def record_run_costs(context, result, *, request_id, started_at, status):
         try:
             values = []
             for index, row in enumerate(rows):
+                identity = getattr(getattr(context, "ai_provider", None), "reporting_identity", {})
+                if row["provider"] == provider and identity:
+                    row["pricing"] = {**row["pricing"], "connection": identity}
+
                 values.extend((f"{request_id}:{index}", request_id, context.client_id, row["provider"], row["model"],
                                row["kind"], status, row["basis"], row["amount"], row["input_tokens"],
                                row["output_tokens"], row["cached_tokens"], row["reason"], Jsonb(row["pricing"]), started_at))

@@ -6,20 +6,22 @@ import { validateSiteModel } from "../lib/site-ai-repository.js";
 import { activateModelAfterAccessTest, createModelAccessStore } from "../lib/provider-model-access.js";
 import { missingProviderSchemaMessage } from "../lib/provider-configuration.js";
 import { validateGenerationOptions } from "../lib/provider-generation-options.js";
+import {OpenAIReportingError} from "../lib/openai-reporting-pair.js";
 import { OpenRouterSetupError } from "../lib/openrouter-setup.js";
 
 // Exercise the actual route with isolated dependency bindings: no database,
 // credentials, provider network traffic, or experimental Node flags required.
-async function harness({ access = "available", blocked = false, authenticated = true, ready = true } = {}) {
-  const calls = { probes: 0, writes: [], catalogs: 0 };
+async function harness({ access = "available", blocked = false, authenticated = true, ready = true, paired = true, rejectPair = false, reportingReady = true, revoke = false } = {}) {
+  const calls = { probes: 0, writes: [], catalogs: 0, pairing:[],auth:0 };
   let saved = false;
   const provider = { id: "openai", apiKey: "synthetic-private-key", model: "gpt-6-luna" };
-  const state = () => ({ ready, setupMessage: ready ? "" : "Missing migration", activeProvider: "openai",
-    providers: [{ id: "openai", model: saved ? "gpt-6-luna" : "old-model", configured: true }] });
+  const state = () => ({ ready, reportingReady, setupMessage: ready ? "" : "Missing migration", activeProvider: "openai",
+    providers: [{ id: "openai", model: saved ? "gpt-6-luna" : "old-model", configured: true, reporting:{paired} }] });
   const mocks = {withAdminAudit:(_operation,handler)=>handler,noteAdminAuditError:()=>{},noteAdminAuditOutcome:()=>{},
-    OpenRouterSetupError,
+    OpenRouterSetupError,OpenAIReportingError,
+    verifyOpenAIReportingPair:async input=>{calls.pairing.push(input);if(rejectPair)throw new OpenAIReportingError("Pair rejected");return {adminKey:input.adminKey,binding:{scope:'organization'}};},
     checkOpenRouterAccount: async () => { throw new Error("OpenAI metadata must not use OpenRouter credentials."); },
-    resolveAdminContext: async () => { if (!authenticated) throw { publicDetails: true }; return { admin: { id: 7 } }; },
+    resolveAdminContext: async () => { calls.auth++;if (!authenticated||revoke&&calls.auth>1) throw { publicDetails: true }; return { admin: { id: 7 } }; },
     adminErrorResponse: () => Response.json({ error: "Unauthorized" }, { status: 401 }),
     assertTrustedOrigin: headers => { if (headers.get("origin") !== "https://portal.example") throw new Error("Untrusted origin"); },
     readJsonRequest: request => request.json(), requestSecurityErrorResponse: () => null,
@@ -96,7 +98,7 @@ test("saving writes only the exact validated ID and allowlisted generation setti
   const data = await response.json();
   assert.equal(data.activation.id, "gpt-6-luna");
   assert.equal(data.activation.generationTested, false);
-  assert.deepEqual(calls.writes, [["openai", "", "gpt-6-luna", 7, { model: "gpt-6-luna", reasoningEffort: "low" }]]);
+  assert.deepEqual(calls.writes, [["openai", "", "gpt-6-luna", 7, { model: "gpt-6-luna", reasoningEffort: "low" },null]]);
   assert.equal(calls.probes, 0);
   assert.doesNotMatch(JSON.stringify(data), /synthetic-private-key/);
 });
@@ -118,4 +120,17 @@ test("authorization, origin and missing migration failures cannot initiate probe
     assert.equal(calls.probes, 0);
     assert.equal(calls.writes.length, 0);
   }
+});
+
+test('new OpenAI chat keys require a reporting pair before any save',async()=>{
+ const h=await harness();const r=await h.route.PUT(h.request({apiKey:'synthetic-new-key'}));assert.equal(r.status,400);assert.equal(h.calls.writes.length,0);assert.equal(h.calls.catalogs,0);
+});
+test('verified reporting and chat configuration reach one save; caller cannot substitute the verification chat key',async()=>{
+ const h=await harness();const r=await h.route.PUT(h.request({apiKey:'synthetic-new-key',reporting:{adminKey:'synthetic-admin-key',projectId:'proj_A',organizationId:'org-A',chatKey:'injected-key'}}));assert.equal(r.status,200);
+ assert.equal(h.calls.pairing[0].chatKey,'synthetic-private-key');assert.equal(h.calls.writes[0][5].adminKey,'synthetic-admin-key');assert.doesNotMatch(await r.text(),/synthetic-admin-key|synthetic-new-key/);
+});
+test('rejected pairs, unpaired saves, missing migration and mid-flight revocation never save',async()=>{
+ for(const options of [{rejectPair:true},{paired:false},{reportingReady:false},{revoke:true}]){
+  const h=await harness(options),body=options.rejectPair?{reporting:{adminKey:'private'}}:{};const r=await h.route.PUT(h.request(body));assert.ok(r.status>=400);assert.equal(h.calls.writes.length,0);
+ }
 });

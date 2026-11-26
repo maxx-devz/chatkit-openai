@@ -7,7 +7,7 @@ import { stripVTControlCharacters } from "node:util";
 import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { attachDevOutput, formatDevLine, summarizeSync, supportsLogColor, syncFailureMessage } from "../scripts/dev-log-format.mjs";
+import { attachDevOutput, formatDevLine, summarizeDocumentCleanup, summarizeSync, supportsLogColor, syncFailureMessage } from "../scripts/dev-log-format.mjs";
 
 const now = new Date(2026, 9, 28, 14, 32, 7);
 test("Resumable indexing deadlines are not reported as provider failures",()=>{
@@ -193,4 +193,11 @@ test("The actual dev launcher pipes and flushes service output using isolated fa
   assert.match(stdout, /WEB\s+POST\s+200 OK\s+6\.30 s\s+\/api\/chatkit/);
   assert.match(stderr, /WEB\s+ERROR\s+fixture only/);
   assert.doesNotMatch(stdout + stderr, /\x1b|next\.js:|NO_COLOR.*ignored/);
+});
+
+test('Document cleanup success has a FILES/INFO label even when its failure count is zero',()=>{
+ const message=summarizeDocumentCleanup({removed:3,failed:0,privatePath:'secret'});
+ const line=formatDevLine(message,{source:'FILES',now});assert.match(line,/FILES\s+INFO\s+Document storage cleanup/);assert.doesNotMatch(line,/ERROR|secret|privatePath/);assert.match(line,/3 removal checks succeeded.*0 retries needed/);
+ const failed=formatDevLine(summarizeDocumentCleanup({removed:1,failed:2}),{source:'FILES',now});assert.match(failed,/FILES\s+WARN/);assert.match(failed,/2 retries needed/);
+ assert.match(formatDevLine('ERROR: Storage request failed',{source:'FILES',now}),/FILES\s+ERROR/);
 });

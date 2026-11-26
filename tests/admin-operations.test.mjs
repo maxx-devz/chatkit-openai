@@ -46,7 +46,7 @@ test('OAuth failure/cancellation redirects retain their actual outcome and clien
 });
 
 test('Ordinary GET reads and pure previews do not create any audit record or require audit storage',async()=>{
- for(const path of ['/api/admin/ai-usage','/api/admin/ai-spending','/api/admin/presence','/api/admin/clients','/api/admin/audit']){
+ for(const path of ['/api/admin/openai-usage','/api/admin/ai-usage','/api/admin/ai-spending','/api/admin/presence','/api/admin/clients','/api/admin/audit']){
   let called=0;const handler=createAdminAuditedHandler('admin.read',async()=>{await authorizeAdminAudit({id:'1'});called++;return Response.json({ready:true});},{append:async()=>{throw Error('Must not audit a read');}});const response=await handler(new Request('http://portal.test'+path));assert.equal(response.status,200);assert.equal(called,1);assert.equal(response.headers.get('x-aoc-audit-reference'),null);
  }
  for(const [path,action] of [['/api/admin/provider-settings',null],['/api/admin/credits','preview'],['/api/admin/credits','adjustment_preview'],['/api/admin/ai-usage/history','preview']]){

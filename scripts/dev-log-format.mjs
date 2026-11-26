@@ -5,7 +5,7 @@ const METHODS = {
   GET: "30;106", POST: "30;105", PUT: "97;44", PATCH: "30;103", DELETE: "97;41",
   HEAD: "30;102", OPTIONS: "30;107", CONNECT: "97;45", TRACE: "97;40",
 };
-const SOURCES = { WEB: "97;100", CHAT: "30;107", DRIVE: "30;106", INDEX: "30;103", DEV: "97;40" };
+const SOURCES = { WEB: "97;100", CHAT: "30;107", DRIVE: "30;106", INDEX: "30;103", FILES: "30;102", DEV: "97;40" };
 const SYNC_CODES = new Set([
   "setup_required", "not_connected", "reconnect_required", "google_request_failed", "root_unavailable",
   "source_access_restricted", "source_revision_changed", "source_connection_changed", "source_sync_lease_lost",
@@ -142,4 +142,10 @@ export function summarizeSync(result, kind = "drive") {
     + (ready ? ` | ${counts}` : " | no refresh completed")
     + (failures.length ? ` | codes: ${failures.slice(0, 3).join(", ")}${failures.length > 3 ? ", ..." : ""}` : "")
     + (interval ? ` | interval ${interval}s` : "");
+}
+
+
+export function summarizeDocumentCleanup(result) {
+  const removed=validCount(result?.removed),failed=validCount(result?.failed);
+  return `${failed?'WARN':'INFO'}: Document storage cleanup | ${removed} removal checks succeeded | ${failed} retries needed`;
 }

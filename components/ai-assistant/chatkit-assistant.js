@@ -59,7 +59,7 @@ function ConversationSidebar({ activeId, mode, onDelete, onNew, onRename, onSele
           </div>
         ) : null}
         {!state.loading && !state.error && !state.items.length ? (
-          <p  A className={styles.conversationState}>No saved conversations yet.</p>
+          <p className={styles.conversationState}>No saved conversations yet.</p>
         ) : null}
         {state.items.map((conversation) => (
           <div className={`${styles.conversationRow} ${conversation.id === activeId ? styles.activeConversation : ""}`} key={conversation.id}>

@@ -1,3 +1,4 @@
+import {OpenAIReportingError} from "../lib/openai-reporting-pair.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -8,7 +9,7 @@ import { validateGenerationOptions } from "../lib/provider-generation-options.js
 
 async function endpoint({ auth = true, origin = true, accountError, modelBlocked = false } = {}) {
   const calls = [], key = `provider_route_${randomUUID()}`;
-  const mocks = {withAdminAudit:(_operation,handler)=>handler,noteAdminAuditError:()=>{},noteAdminAuditOutcome:()=>{},
+  const mocks = {OpenAIReportingError,withAdminAudit:(_operation,handler)=>handler,noteAdminAuditError:()=>{},noteAdminAuditOutcome:()=>{},
     assertTrustedOrigin: () => { calls.push("origin"); if (!origin) throw { security: true }; },
     resolveAdminContext: async () => { calls.push("auth"); if (!auth) throw { publicDetails: {} }; return { admin: { id: "admin-test" } }; },
     adminErrorResponse: () => Response.json({ error: "Sign in" }, { status: 401 }),
@@ -66,7 +67,7 @@ test("save rechecks metadata and exact model without a generation probe", async 
   assert.equal(data.activation.generationTested, false);
   assert.equal(data.activation.id, "vendor/model:free");
   assert.deepEqual(calls.at(-1).saved, ["openrouter", "", "vendor/model:free", "admin-test",
-    { model: "vendor/model:free", reasoningEffort: "auto" }]);
+    { model: "vendor/model:free", reasoningEffort: "auto" },null]);
 });
 
 test("expired credentials, throttled checks and excluded models never change saved settings", async () => {

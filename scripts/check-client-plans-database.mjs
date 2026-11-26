@@ -26,11 +26,24 @@ try {
  assert.equal((await readClientPlan(db,'3')).configured,false,'Legacy client is not silently opted in');
  const heldId=randomUUID(),period=new Date().toISOString().slice(0,7);
  await db.query("INSERT INTO portal_client_plan_runs(id,client_id,period,user_id,status) VALUES($1,2,$2,201,'review')",[heldId,period]);
- assert.equal((await readClientPlan(db,'2')).code,'plan_pending');
+ let held=await readClientPlan(db,'2',{admin:true});assert.equal(held.code,'plan_pending');assert.equal(held.usageState,'review');assert.equal(held.canGenerate,false);assert.equal(held.availableCredits,'1000','A read cannot settle missing costs or consume the balance');
+ assert.equal((await db.query('SELECT status FROM portal_client_plan_runs WHERE id=$1',[heldId])).rows[0].status,'review','Reads preserve the review hold');
+ await db.query("UPDATE portal_client_plan_runs SET status='running',started_at=NOW() WHERE id=$1",[heldId]);
+ assert.equal((await readClientPlan(db,'2')).usageState,'running');
+ await assert.rejects(mutateClientPlan(db,{action:'resolve',clientId:'2',runId:heldId,cost:'0.002',reason:'Too early',idempotencyKey:randomUUID()},'1'),PlanConflict);
+ await db.query("UPDATE portal_client_plan_runs SET started_at=NOW()-INTERVAL '4 minutes' WHERE id=$1",[heldId]);
+ assert.equal((await readClientPlan(db,'2')).canGenerate,true,'Stale interrupted replies can recover on the next request without a cost approval');
+ await db.query("UPDATE portal_client_plan_runs SET status='review' WHERE id=$1",[heldId]);
  const resolution={action:'resolve',clientId:'2',runId:heldId,cost:'0.002',reason:'Synthetic verified provider reconciliation',idempotencyKey:randomUUID()};
  await assert.rejects(mutateClientPlan(db,{...resolution,clientId:'1'},'1'),PlanConflict);
  await mutateClientPlan(db,resolution,'1');assert.equal((await mutateClientPlan(db,resolution,'1')).duplicate,true);
  assert.equal(Number((await readClientPlan(db,'2')).availableCredits),998,'Verified reconciliation debits once and releases only its client hold');
+ const releasedId=randomUUID();await db.query("INSERT INTO portal_client_plan_runs(id,client_id,period,user_id,status) VALUES($1,2,$2,201,'review')",[releasedId,period]);
+ const release={action:'release',clientId:'2',runId:releasedId,reason:'Synthetic no-client-charge closure',idempotencyKey:randomUUID()};
+ await assert.rejects(mutateClientPlan(db,{...release,clientId:'1'},'1'),PlanConflict);
+ await mutateClientPlan(db,release,'1');assert.equal((await mutateClientPlan(db,release,'1')).duplicate,true);
+ const adminState=await readClientPlan(db,'2',{admin:true});assert.equal(Number(adminState.availableCredits),998);assert.equal(adminState.providerIssues[0].client_billing,'not_billed');
+ assert.equal((await readClientPlan(db,'2')).providerIssues,undefined,'Provider diagnostics are admin-only');
  const auditAllowed=(await db.query("SELECT has_table_privilege(current_user,'portal_client_plan_audit','UPDATE') AS edit,has_table_privilege(current_user,'portal_client_plan_audit','DELETE') AS remove")).rows[0];assert.equal(auditAllowed.edit,false);assert.equal(auditAllowed.remove,false);
  for(const role of ['anon','authenticated'])for(const table of ['portal_client_plans','portal_client_plan_balances','portal_client_plan_requests','portal_client_plan_topups'])assert.equal((await db.query("SELECT has_table_privilege($1,$2,'SELECT') AS allowed",[role,table])).rows[0].allowed,false,'Browser roles cannot read private plan data');
  // Request text is not an allocation: show only its linked persisted grants.
@@ -51,6 +64,19 @@ try {
  history=(await readClientPlan(db,'1')).requests.find(row=>row.id===noGrant);assert.equal(history.granted_credits,null);assert.equal(history.status,'declined');
  await mutateClientPlan(db,{...topup,requestId:'',credits:'77',idempotencyKey:randomUUID()},'1');
  history=(await readClientPlan(db,'1')).requests.find(row=>row.id===noGrant);assert.equal(history.granted_credits,null,'Unlinked top-ups are never attributed to a request');
+ const {recoverClientPlanFailures}=await import('../lib/client-plan-recovery.js');
+ const failedCharge=randomUUID();await db.query("INSERT INTO portal_client_plan_runs(id,client_id,period,user_id,status,credits_used) VALUES($1,2,$2,201,'settled',77)",[failedCharge,period]);
+ await db.query("INSERT INTO portal_ai_usage_events(request_id,client_id,actor_user_id,action,provider,model,status,started_at) VALUES($1,2,201,'client_ai.reply','openai','synthetic','failed',NOW())",[failedCharge]);
+ await db.query("UPDATE portal_client_plan_runs SET status='review',credits_used=NULL WHERE id=$1",[failedCharge]);
+ await assert.rejects(mutateClientPlan(db,{action:'resolve',clientId:'2',runId:failedCharge,cost:'1',reason:'Legacy failed-reply charge attempt',idempotencyKey:randomUUID()},'1'),PlanConflict,'Failed provider requests cannot be charged through the legacy cost endpoint');
+ await db.query("UPDATE portal_client_plan_runs SET status='settled',credits_used=77 WHERE id=$1",[failedCharge]);
+ const preview=await recoverClientPlanFailures(db,{clientId:'2'});assert.equal(preview.affected,1);assert.equal(preview.applied,false);
+ assert.equal((await db.query('SELECT credits_used::text credits FROM portal_client_plan_runs WHERE id=$1',[failedCharge])).rows[0].credits,'77.000000000000','Dry run never changes a charged record');
+ assert.equal((await recoverClientPlanFailures(db,{clientId:'1'})).affected,0,'Foreign client cannot repair another client');
+ await assert.rejects(recoverClientPlanFailures(db,{clientId:'2',actorId:'101',apply:true}),/Active admin/);
+ assert.equal((await recoverClientPlanFailures(db,{clientId:'2',actorId:'1',apply:true})).affected,1);
+ assert.equal((await recoverClientPlanFailures(db,{clientId:'2',actorId:'1',apply:true})).affected,0,'Recovery is idempotent');
+ assert.equal(Number((await readClientPlan(db,'2')).availableCredits),998,'Failed charge reversed without changing valid usage or paid credits');
  console.log('PASS: requested 200, granted 150/200/300, recorded month, retry totals, pending/declined unknown amounts, payment privacy and foreign-client denial.');
  console.log('PASS: real PostgreSQL plan price/allowance separation, admin authority, paid activation/topups, same-key retries, scoped requests, no partial writes, immutable paid month, pause and append-only audit grants.');
 }finally{await db.end();}

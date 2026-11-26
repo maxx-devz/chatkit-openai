@@ -235,3 +235,60 @@ database rollback cannot undo a completed provider deletion. Durable receipts re
 physical removal after an archive transaction has committed. Reconciliation copies
 and hash-verifies the destination before changing its DB pointer; interruption is
 recovered by rerunning the same scoped command. No Supabase Auth change is involved.
+
+
+Client-plan provider incidents (2026-11-26) reuse existing standard PostgreSQL
+tables and append-only plan audit JSONB. No DDL, provider SDK or migration is added.
+Next.js continues through lib/database.js; Python uses its existing database
+connector. The guarded recovery CLI uses lib/postgres.js and closes its pool.
+Recovery is client-scoped, transactional and idempotent, with an explicit read-only
+preview and audited application; it never updates original provider expense rows.
+See CLIENT_PLANS.md for the unsuccessful-reply non-billing policy and exact approved
+correction record. This does not change payment collection, authentication or RLS.
+
+## Python transaction coordination (2026-11-26)
+
+The ChatKit `PortalConnection` in `chatkit_backend/database.py` now coordinates
+complete transaction scopes with a connection-local, asyncio Task-owned lock.
+This prevents event-consumer and tool/accounting tasks on the same request
+connection from overlapping transaction contexts and exiting savepoints out of
+order. Same-task nested savepoints and force-rollback are preserved. Cancellation
+and SQL errors still propagate without automatic query replay; independent
+connections are not serialized against one another. Keep provider/network work
+outside explicit database transactions, and never wait inside a transaction for
+a child task using that same connection.
+
+Autocommit, transaction-local statement_timeout, prepared-statement settings,
+parameterized queries and existing request scope checks are unchanged. This is
+standard psycopg/PostgreSQL behavior and adds no provider SDK, extension, schema,
+runtime credential or browser data access. It is not a new RLS guarantee. The
+ordinary-runtime disposable database regressions are documented in CHATKIT_SETUP.md.
+No application database connection settings or live records were modified.
+
+
+## Paired OpenAI reporting credentials
+
+`database/openai-reporting-pair.sql` adds nullable TEXT/JSONB fields and a standard
+CHECK constraint to the existing deployment-wide `portal_ai_credentials` table.
+The idempotent version-controlled migration runs through `npm run site-ai:migrate`
+in one transaction with the existing site-AI schema. Next.js reuses `lib/database.js`;
+the migration uses a short-lived standard pg client. Synthetic database verification
+requires an explicit loopback `OPENAI_PAIR_TEST_DATABASE_URL` and a disposable
+`aoc_pair_test_*` database; it never reads DATABASE_URL or .env.local.
+
+Admin reporting secrets are encrypted using the existing server-only provider
+encryption secret. Python reads project-binding metadata only. No Supabase/Neon
+specific database API, extension or auth subsystem is added. The migration was rehearsed on disposable PostgreSQL and later applied to the
+verified Supabase target after the user initiated the command. Existing record
+checksums matched; Neon remains untouched. The runner uses the existing private
+operator URL when configured, keeping the ordinary runtime role restricted.
+
+
+The simpler two-key reporting flow adds
+`database/openai-reporting-organization.sql`: a standard CHECK-constraint
+replacement that accepts explicitly organization-wide metadata and preserves
+existing project pairs. The migration is transactionally applied after the base
+pairing migration. It was tested on disposable PostgreSQL and applied to the
+same verified Supabase target with unchanged existing-record checksums. Client
+model reports reuse existing JSONB pricing snapshots for optional non-secret
+connection identifiers; no provider SDK, table or new usage column is introduced.

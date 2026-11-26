@@ -1,15 +1,15 @@
 "use client";
 import ActionCue from "@/components/portal-ui/action-cue";
 import {useRef,useState} from 'react';
-import {creditNumber} from '@/lib/credits-presentation';
+import {creditNumber,planUsageLabel} from '@/lib/credits-presentation';
 import {usd} from '@/lib/ai-spending-format';
 import styles from './credits.module.css';
 import RequestGrant,{requestDecision} from './request-grant';
 export function PlanMetrics({data}) {return <div className={styles.metrics}>
  <article className={styles.metric}><span>Monthly portal plan</span><strong>{usd(data.month?.monthly_price??data.plan?.monthly_price)} / month</strong><small>Includes AI access and the credits shown. The plan price does not consume credits.</small></article>
  <article className={styles.metric}><span>Included this month</span><strong>{creditNumber(data.month?.included_credits)}</strong><small>{data.month?`${creditNumber(data.month.extra_credits)} extra credits approved`:'Waiting for payment confirmation.'}</small></article>
- <article className={styles.metric}><span>AI credits used</span><strong>{creditNumber(data.month?.used_credits)}</strong><small>Recorded provider usage only. Unknown costs pause new replies until checked.</small></article>
- <article className={styles.metric}><span>Credits remaining</span><strong>{data.code==='plan_pending'?'Checking usage':data.month?creditNumber(data.availableCredits):'Not activated'}</strong><small>{data.message}</small></article>
+ <article className={styles.metric}><span>AI credits used</span><strong>{creditNumber(data.month?.used_credits)}</strong><small>Recorded completed usage. Unsuccessful replies do not consume client credits.</small></article>
+ <article className={styles.metric}><span>{data.code==='plan_pending'?'Balance on hold':'Credits remaining'}</span><strong>{data.code==='plan_pending'?planUsageLabel(data):data.month?creditNumber(data.availableCredits):'Not activated'}</strong><small>{data.message}</small></article>
  </div>;}
 export default function ClientPlanView({data,clientId,canRequest=false,refresh}) {
  const [kind,setKind]=useState('credits'),[note,setNote]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');const key=useRef('');
@@ -28,6 +28,6 @@ export default function ClientPlanView({data,clientId,canRequest=false,refresh})
  <button data-action="add" className={styles.primary} disabled={busy||!note.trim()}>{busy?'Sending…':'Request admin review'}</button></form>:<p>Your account can view this plan. Ask your client administrator to request changes.</p>}
  </section>
  <details id="history" className={styles.section}><summary>Previous requests</summary><p>Your message and the credits actually added are shown separately. A closed request may have a different agreed amount; no remaining amount is added automatically.</p>{data.requests.length?<ul>{data.requests.map(row=><li key={row.id}><strong>{row.kind==='upgrade'?'Plan upgrade':'Extra credits'} · {requestDecision(row)}</strong><p>Your original message: {row.note}</p><RequestGrant row={row}/><small>Requested {new Date(row.created_at).toLocaleDateString()}</small></li>)}</ul>:<p>No requests yet.</p>}</details>
- <section id="tokens" className={styles.section}><h2>How credits work</h2><p>1,000 credits represent US$1 of recorded AI provider cost. Costs may be calculated estimates rather than a final provider invoice. If final usage is missing, new replies pause for review instead of assuming the request was free.</p></section>
+ <section id="tokens" className={styles.section}><h2>How credits work</h2><p>1,000 credits represent US$1 of recorded AI provider cost. Costs may be calculated estimates rather than a final provider invoice. Provider outages and limits are separate from portal credits. If AI is unavailable, contact your administrator. Unsuccessful replies are not charged to your portal allowance.</p></section>
  </div>;
 }

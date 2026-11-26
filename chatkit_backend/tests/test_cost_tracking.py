@@ -124,6 +124,17 @@ class LedgerTests(unittest.IsolatedAsyncioTestCase):
             await record_run_costs(context, run, request_id="00000000-0000-0000-0000-000000000007",
                                    started_at=datetime.now(timezone.utc), status=status)
 
+    async def test_connection_identity_is_recorded_without_credentials_and_missing_metadata_stays_missing(self):
+        context = self.context()
+        context.ai_provider.reporting_identity = {"organizationId": "org-A", "projectId": "proj_A"}
+        await self.record(context)
+        pricing = next(iter(context.db.rows.values()))[13].obj
+        self.assertEqual(pricing["connection"], {"organizationId": "org-A", "projectId": "proj_A"})
+        self.assertNotIn("api_key", pricing)
+        other = self.context()
+        await self.record(other)
+        self.assertNotIn("connection", next(iter(other.db.rows.values()))[13].obj)
+
     async def test_records_each_call_separately_in_one_bulk_write(self):
         context = self.context()
         response = SimpleNamespace(raw_usage=tokens(), output=[])

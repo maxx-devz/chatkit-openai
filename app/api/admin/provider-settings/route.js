@@ -1,3 +1,4 @@
+import {verifyOpenAIReportingPair,OpenAIReportingError} from "@/lib/openai-reporting-pair";
 import {withAdminAudit} from '@/lib/admin-audited-handler';
 import { resolveAdminContext, adminErrorResponse } from "@/lib/admin-data";
 import { assertTrustedOrigin, readJsonRequest, requestSecurityErrorResponse } from "@/lib/request-security";
@@ -15,6 +16,7 @@ export const maxDuration = 60;
 const headers = { "Cache-Control": "private, no-store" };
 
 function failure(error) {
+  if(error instanceof OpenAIReportingError)return Response.json({error:error.message},{status:error.status,headers});
   if (error instanceof OpenRouterSetupError) return Response.json({ error: error.message }, { status: error.status, headers });
   if (error?.publicDetails) return adminErrorResponse(error);
   return requestSecurityErrorResponse(error) || Response.json({ error:
@@ -36,11 +38,21 @@ async function configure(request, save) {
     const { admin } = await resolveAdminContext(request.headers);
     const settings = await publicProviderSettings();
     if (!settings.ready) return Response.json({ error: settings.setupMessage }, { status: 503, headers });
-    const body = await readJsonRequest(request, 4000);
+    const body = await readJsonRequest(request, 6000);
     const id = validateProvider(body.provider);
     const key = body.apiKey ? validateProviderKey(id, body.apiKey) : "";
     const provider = key ? providerFromKey(id, key) : await getRuntimeProvider(id);
     if (!provider.apiKey) return Response.json({ error: "Enter an API key for this provider." }, { status: 400, headers });
+    let reporting=null;
+    if(id==='openai' && (save||body.reporting)){
+      if(!settings.reportingReady)throw new OpenAIReportingError('Run npm run site-ai:migrate against the approved database to enable paired reporting.',503);
+      const saved=settings.providers.find(item=>item.id==='openai')?.reporting;
+      if(key&&!body.reporting?.adminKey)throw new OpenAIReportingError('Enter the organization Admin key when replacing the OpenAI chat key.');
+      if(body.reporting?.adminKey){
+        reporting=await verifyOpenAIReportingPair({chatKey:provider.apiKey,adminKey:body.reporting.adminKey},{signal:request.signal});
+        provider.defaultHeaders={...provider.defaultHeaders,'OpenAI-Organization':reporting.binding.organizationId,'OpenAI-Project':reporting.binding.projectId};
+      }else if(!saved?.paired)throw new OpenAIReportingError('Connect the organization Admin key and project before saving OpenAI settings.');
+    }
     const account = id === "openrouter" ? await checkOpenRouterAccount(provider) : undefined;
     const catalog = await getModelCatalog(provider, { fresh: true });
     if (save) {
@@ -51,7 +63,8 @@ async function configure(request, save) {
       }
       catch (error) { return Response.json({ error: error.message }, { status: 400, headers }); }
       if (request.signal.aborted) return Response.json({ error: "Saving was cancelled." }, { status: 409, headers });
-      await saveProviderConfiguration(id, key, model, admin.id, generationOptions);
+      await resolveAdminContext(request.headers);
+      await saveProviderConfiguration(id, key, model, admin.id, generationOptions, reporting);
       return Response.json({ ...await publicProviderSettings(), account,
         activation: { provider: id, id: model, generationOptions, generationTested: false } }, { headers });
     }
